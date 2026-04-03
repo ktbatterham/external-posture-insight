@@ -147,6 +147,27 @@ export interface DomainSecurityInfo {
   strengths: string[];
 }
 
+export interface HtmlFormInfo {
+  action: string | null;
+  method: string;
+  insecureSubmission: boolean;
+  hasPasswordField: boolean;
+}
+
+export interface HtmlSecurityInfo {
+  fetched: boolean;
+  pageUrl: string | null;
+  forms: HtmlFormInfo[];
+  externalScriptDomains: string[];
+  externalStylesheetDomains: string[];
+  insecureResourceUrls: string[];
+  inlineScriptCount: number;
+  inlineStyleCount: number;
+  missingSriScriptUrls: string[];
+  issues: string[];
+  strengths: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -170,4 +191,5 @@ export interface AnalysisResult {
   crawl: CrawlSummary;
   securityTxt: SecurityTxtInfo;
   domainSecurity: DomainSecurityInfo;
+  htmlSecurity: HtmlSecurityInfo;
 }

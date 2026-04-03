@@ -846,6 +846,144 @@ async function fetchSecurityTxt(finalUrl) {
   };
 }
 
+function getAttribute(tag, attribute) {
+  const match = tag.match(new RegExp(`${attribute}\\s*=\\s*["']([^"']+)["']`, "i"));
+  return match ? match[1] : null;
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+async function analyzeHtmlSecurity(finalUrl) {
+  try {
+    const response = await requestText(finalUrl);
+    const contentType = headerValue(response.headers, "content-type") || "";
+    if (!contentType.toLowerCase().includes("text/html")) {
+      return {
+        fetched: false,
+        pageUrl: finalUrl.toString(),
+        forms: [],
+        externalScriptDomains: [],
+        externalStylesheetDomains: [],
+        insecureResourceUrls: [],
+        inlineScriptCount: 0,
+        inlineStyleCount: 0,
+        missingSriScriptUrls: [],
+        issues: ["Primary response was not HTML, so page content inspection was skipped."],
+        strengths: [],
+      };
+    }
+
+    const html = response.body;
+    const issues = [];
+    const strengths = [];
+
+    const formTags = [...html.matchAll(/<form\b[^>]*>([\s\S]*?)<\/form>/gi)];
+    const forms = formTags.map(([fullTag, innerHtml]) => {
+      const openTagMatch = fullTag.match(/<form\b[^>]*>/i);
+      const openTag = openTagMatch ? openTagMatch[0] : fullTag;
+      const action = getAttribute(openTag, "action");
+      const method = (getAttribute(openTag, "method") || "GET").toUpperCase();
+      const hasPasswordField = /<input\b[^>]*type\s*=\s*["']password["']/i.test(innerHtml);
+      const resolvedAction = action ? new URL(action, finalUrl).toString() : finalUrl.toString();
+      const insecureSubmission = resolvedAction.startsWith("http://");
+
+      return {
+        action,
+        method,
+        insecureSubmission,
+        hasPasswordField,
+      };
+    });
+
+    const scriptTags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
+    const linkTags = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
+    const externalScriptUrls = scriptTags
+      .map((tag) => getAttribute(tag, "src"))
+      .filter(Boolean)
+      .map((src) => new URL(src, finalUrl).toString());
+    const externalStylesheetUrls = linkTags
+      .filter((tag) => /\brel\s*=\s*["'][^"']*stylesheet/i.test(tag))
+      .map((tag) => getAttribute(tag, "href"))
+      .filter(Boolean)
+      .map((href) => new URL(href, finalUrl).toString());
+    const insecureResourceUrls = unique(
+      [...externalScriptUrls, ...externalStylesheetUrls].filter((url) => url.startsWith("http://")),
+    );
+    const externalScriptDomains = unique(
+      externalScriptUrls
+        .map((url) => new URL(url).hostname)
+        .filter((hostname) => hostname !== finalUrl.hostname),
+    );
+    const externalStylesheetDomains = unique(
+      externalStylesheetUrls
+        .map((url) => new URL(url).hostname)
+        .filter((hostname) => hostname !== finalUrl.hostname),
+    );
+    const inlineScriptCount = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi)].length;
+    const inlineStyleCount = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].length;
+    const missingSriScriptUrls = scriptTags
+      .filter((tag) => getAttribute(tag, "src"))
+      .filter((tag) => {
+        const src = getAttribute(tag, "src");
+        const resolved = src ? new URL(src, finalUrl) : null;
+        return resolved && resolved.hostname !== finalUrl.hostname && !getAttribute(tag, "integrity");
+      })
+      .map((tag) => new URL(getAttribute(tag, "src"), finalUrl).toString());
+
+    if (forms.some((form) => form.hasPasswordField)) {
+      strengths.push("Login-like form elements are present for passive inspection.");
+    }
+    if (forms.some((form) => form.insecureSubmission)) {
+      issues.push("At least one form appears to submit over HTTP.");
+    }
+    if (insecureResourceUrls.length) {
+      issues.push("The page references insecure HTTP resources.");
+    }
+    if (inlineScriptCount > 0) {
+      issues.push(`Inline scripts detected (${inlineScriptCount}).`);
+    }
+    if (inlineStyleCount > 0) {
+      issues.push(`Inline style blocks detected (${inlineStyleCount}).`);
+    }
+    if (missingSriScriptUrls.length) {
+      issues.push("Some third-party scripts are missing Subresource Integrity attributes.");
+    }
+    if (!issues.length) {
+      strengths.push("No obvious passive HTML transport/content risks detected on the fetched page.");
+    }
+
+    return {
+      fetched: true,
+      pageUrl: finalUrl.toString(),
+      forms,
+      externalScriptDomains,
+      externalStylesheetDomains,
+      insecureResourceUrls,
+      inlineScriptCount,
+      inlineStyleCount,
+      missingSriScriptUrls,
+      issues,
+      strengths,
+    };
+  } catch (error) {
+    return {
+      fetched: false,
+      pageUrl: finalUrl.toString(),
+      forms: [],
+      externalScriptDomains: [],
+      externalStylesheetDomains: [],
+      insecureResourceUrls: [],
+      inlineScriptCount: 0,
+      inlineStyleCount: 0,
+      missingSriScriptUrls: [],
+      issues: [error instanceof Error ? error.message : "HTML inspection failed."],
+      strengths: [],
+    };
+  }
+}
+
 async function safeResolve(operation) {
   try {
     return await operation();
@@ -1198,6 +1336,7 @@ async function analyzeUrl(input) {
     crawl: await crawlRelatedPages(result),
     securityTxt: await fetchSecurityTxt(new URL(result.finalUrl)),
     domainSecurity: await analyzeDomainSecurity(result.host),
+    htmlSecurity: await analyzeHtmlSecurity(new URL(result.finalUrl)),
   };
 }
 

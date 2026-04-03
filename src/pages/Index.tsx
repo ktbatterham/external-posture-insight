@@ -8,6 +8,7 @@ import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { HtmlSecurityPanel } from "@/components/HtmlSecurityPanel";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
 import { RedirectChain } from "@/components/RedirectChain";
@@ -298,6 +299,8 @@ const Index = () => {
             <HistoryPanel history={history} diff={historyDiff} />
 
             <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
+
+            <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">
