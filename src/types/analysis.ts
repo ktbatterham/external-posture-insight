@@ -116,6 +116,21 @@ export interface HistoryDiff {
   }>;
 }
 
+export interface SecurityTxtInfo {
+  status: "present" | "missing" | "invalid";
+  url: string | null;
+  contact: string[];
+  expires: string | null;
+  policy: string[];
+  acknowledgments: string[];
+  encryption: string[];
+  hiring: string[];
+  preferredLanguages: string[];
+  canonical: string[];
+  raw: string | null;
+  issues: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -137,4 +152,5 @@ export interface AnalysisResult {
   strengths: string[];
   remediation: RemediationSnippet[];
   crawl: CrawlSummary;
+  securityTxt: SecurityTxtInfo;
 }

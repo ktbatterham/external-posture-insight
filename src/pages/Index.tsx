@@ -11,6 +11,7 @@ import { RawHeadersPanel } from "@/components/RawHeadersPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
 import { RedirectChain } from "@/components/RedirectChain";
 import { SecurityGrade } from "@/components/SecurityGrade";
+import { SecurityTxtPanel } from "@/components/SecurityTxtPanel";
 import { TechnologyStack } from "@/components/TechnologyStack";
 import { UrlForm } from "@/components/UrlForm";
 import { Button } from "@/components/ui/button";
@@ -306,6 +307,7 @@ const Index = () => {
 
               <div className="space-y-8">
                 <FindingsPanel issues={analysisData.issues} strengths={analysisData.strengths} />
+                <SecurityTxtPanel securityTxt={analysisData.securityTxt} />
                 <CertificateAnalysis certInfo={analysisData.certificate} />
                 <RedirectChain redirects={analysisData.redirects} />
               </div>

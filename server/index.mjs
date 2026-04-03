@@ -668,6 +668,49 @@ function requestOnce(targetUrl, method = "HEAD") {
   });
 }
 
+function requestText(targetUrl) {
+  const isHttps = targetUrl.protocol === "https:";
+  const transport = isHttps ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const request = transport.request(
+      targetUrl,
+      {
+        method: "GET",
+        rejectUnauthorized: false,
+        headers: {
+          "User-Agent": "SecureHeaderInsight/1.0",
+          Accept: "text/plain,text/*;q=0.9,*/*;q=0.1",
+          "Accept-Encoding": "identity",
+        },
+      },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          body += chunk;
+          if (body.length > 64_000) {
+            body = body.slice(0, 64_000);
+          }
+        });
+        response.on("end", () => {
+          resolve({
+            statusCode: response.statusCode || 0,
+            headers: response.headers,
+            body,
+          });
+        });
+      },
+    );
+
+    request.on("error", reject);
+    request.setTimeout(12000, () => {
+      request.destroy(new Error("Request timed out."));
+    });
+    request.end();
+  });
+}
+
 async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
   const redirects = [];
   let currentUrl = initialUrl;
@@ -707,6 +750,98 @@ async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
     finalUrl: currentUrl,
     redirects,
     response,
+  };
+}
+
+function parseSecurityTxt(raw, url) {
+  const fields = {
+    contact: [],
+    policy: [],
+    acknowledgments: [],
+    encryption: [],
+    hiring: [],
+    preferredLanguages: [],
+    canonical: [],
+  };
+  const issues = [];
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const match = trimmed.match(/^([^:]+):\s*(.+)$/);
+    if (!match) {
+      continue;
+    }
+    const [, key, value] = match;
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey === "contact") fields.contact.push(value);
+    if (normalizedKey === "expires") fields.expires = value;
+    if (normalizedKey === "policy") fields.policy.push(value);
+    if (normalizedKey === "acknowledgments") fields.acknowledgments.push(value);
+    if (normalizedKey === "encryption") fields.encryption.push(value);
+    if (normalizedKey === "hiring") fields.hiring.push(value);
+    if (normalizedKey === "preferred-languages") fields.preferredLanguages.push(value);
+    if (normalizedKey === "canonical") fields.canonical.push(value);
+  }
+
+  if (!fields.contact.length) {
+    issues.push("No Contact field found.");
+  }
+  if (!fields.expires) {
+    issues.push("No Expires field found.");
+  }
+  if (fields.canonical.length && !fields.canonical.includes(url.toString())) {
+    issues.push("Canonical field does not include the discovered security.txt URL.");
+  }
+
+  return {
+    status: issues.length && !raw.includes("Contact:") ? "invalid" : "present",
+    url: url.toString(),
+    contact: fields.contact,
+    expires: fields.expires || null,
+    policy: fields.policy,
+    acknowledgments: fields.acknowledgments,
+    encryption: fields.encryption,
+    hiring: fields.hiring,
+    preferredLanguages: fields.preferredLanguages,
+    canonical: fields.canonical,
+    raw: raw.trim() || null,
+    issues,
+  };
+}
+
+async function fetchSecurityTxt(finalUrl) {
+  const candidates = [
+    new URL("/.well-known/security.txt", finalUrl.origin),
+    new URL("/security.txt", finalUrl.origin),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const response = await requestText(candidate);
+      if (response.statusCode >= 200 && response.statusCode < 300 && response.body.trim()) {
+        return parseSecurityTxt(response.body, candidate);
+      }
+    } catch {
+      // Continue to the fallback path.
+    }
+  }
+
+  return {
+    status: "missing",
+    url: null,
+    contact: [],
+    expires: null,
+    policy: [],
+    acknowledgments: [],
+    encryption: [],
+    hiring: [],
+    preferredLanguages: [],
+    canonical: [],
+    raw: null,
+    issues: ["No security.txt file found at /.well-known/security.txt or /security.txt."],
   };
 }
 
@@ -926,6 +1061,7 @@ async function analyzeUrl(input) {
   return {
     ...result,
     crawl: await crawlRelatedPages(result),
+    securityTxt: await fetchSecurityTxt(new URL(result.finalUrl)),
   };
 }
 
