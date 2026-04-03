@@ -131,6 +131,22 @@ export interface SecurityTxtInfo {
   issues: string[];
 }
 
+export interface DomainSecurityInfo {
+  host: string;
+  mxRecords: string[];
+  nsRecords: string[];
+  caaRecords: string[];
+  spf: string | null;
+  dmarc: string | null;
+  mtaSts: {
+    dns: string | null;
+    policyUrl: string | null;
+    policy: string | null;
+  };
+  issues: string[];
+  strengths: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -153,4 +169,5 @@ export interface AnalysisResult {
   remediation: RemediationSnippet[];
   crawl: CrawlSummary;
   securityTxt: SecurityTxtInfo;
+  domainSecurity: DomainSecurityInfo;
 }

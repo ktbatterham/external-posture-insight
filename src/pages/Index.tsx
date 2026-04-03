@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CrawlPanel } from "@/components/CrawlPanel";
+import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
@@ -295,6 +296,8 @@ const Index = () => {
             <CrawlPanel crawl={analysisData.crawl} />
 
             <HistoryPanel history={history} diff={historyDiff} />
+
+            <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">
