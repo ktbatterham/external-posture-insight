@@ -6,6 +6,7 @@ import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CrawlPanel } from "@/components/CrawlPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
 import { RedirectChain } from "@/components/RedirectChain";
@@ -14,9 +15,10 @@ import { TechnologyStack } from "@/components/TechnologyStack";
 import { UrlForm } from "@/components/UrlForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AnalysisResult } from "@/types/analysis";
+import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
 
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
+const HISTORY_KEY = "secure-header-insight:history";
 
 interface RecentScan {
   url: string;
@@ -46,10 +48,81 @@ const saveRecentScan = (scan: RecentScan) => {
   return next;
 };
 
+const loadHistory = (): Record<string, HistorySnapshot[]> => {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, HistorySnapshot[]>) : {};
+  } catch {
+    return {};
+  }
+};
+
+const snapshotFromAnalysis = (analysis: AnalysisResult): HistorySnapshot => ({
+  finalUrl: analysis.finalUrl,
+  host: analysis.host,
+  scannedAt: analysis.scannedAt,
+  score: analysis.score,
+  grade: analysis.grade,
+  statusCode: analysis.statusCode,
+  responseTimeMs: analysis.responseTimeMs,
+  headers: analysis.headers.map((header) => ({
+    label: header.label,
+    status: header.status,
+    value: header.value,
+  })),
+  issues: analysis.issues.map((issue) => ({
+    severity: issue.severity,
+    title: issue.title,
+    detail: issue.detail,
+  })),
+});
+
+const saveHistorySnapshot = (analysis: AnalysisResult) => {
+  const current = loadHistory();
+  const key = analysis.host;
+  const snapshot = snapshotFromAnalysis(analysis);
+  const nextForHost = [snapshot, ...(current[key] || [])].slice(0, 10);
+  const next = { ...current, [key]: nextForHost };
+  window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  return nextForHost;
+};
+
+const buildHistoryDiff = (history: HistorySnapshot[]): HistoryDiff | null => {
+  if (history.length < 2) {
+    return null;
+  }
+
+  const [current, previous] = history;
+  const currentIssues = new Set(current.issues.map((issue) => issue.title));
+  const previousIssues = new Set(previous.issues.map((issue) => issue.title));
+  const previousHeaders = new Map(previous.headers.map((header) => [header.label, header.status]));
+
+  return {
+    previousScore: previous.score,
+    scoreDelta: current.score - previous.score,
+    previousGrade: previous.grade,
+    newIssues: [...currentIssues].filter((issue) => !previousIssues.has(issue)),
+    resolvedIssues: [...previousIssues].filter((issue) => !currentIssues.has(issue)),
+    headerChanges: current.headers
+      .map((header) => ({
+        label: header.label,
+        from: previousHeaders.get(header.label) ?? "unknown",
+        to: header.status,
+      }))
+      .filter((change) => change.from !== change.to),
+  };
+};
+
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
+  const [historyDiff, setHistoryDiff] = useState<HistoryDiff | null>(null);
 
   useEffect(() => {
     setRecentScans(loadRecentScans());
@@ -75,6 +148,9 @@ const Index = () => {
             scannedAt: payload.scannedAt,
           }),
         );
+        const nextHistory = saveHistorySnapshot(payload);
+        setHistory(nextHistory);
+        setHistoryDiff(buildHistoryDiff(nextHistory));
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
@@ -216,6 +292,8 @@ const Index = () => {
             <RemediationPanel remediation={analysisData.remediation} />
 
             <CrawlPanel crawl={analysisData.crawl} />
+
+            <HistoryPanel history={history} diff={historyDiff} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">

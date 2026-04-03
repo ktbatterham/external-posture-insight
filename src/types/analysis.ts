@@ -91,6 +91,31 @@ export interface CrawlSummary {
   inconsistentHeaders: string[];
 }
 
+export interface HistorySnapshot {
+  finalUrl: string;
+  host: string;
+  scannedAt: string;
+  score: number;
+  grade: string;
+  statusCode: number;
+  responseTimeMs: number;
+  headers: Pick<SecurityHeaderResult, "label" | "status" | "value">[];
+  issues: Pick<ScanIssue, "severity" | "title" | "detail">[];
+}
+
+export interface HistoryDiff {
+  previousScore: number | null;
+  scoreDelta: number | null;
+  previousGrade: string | null;
+  newIssues: string[];
+  resolvedIssues: string[];
+  headerChanges: Array<{
+    label: string;
+    from: string;
+    to: string;
+  }>;
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
