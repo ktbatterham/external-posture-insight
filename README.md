@@ -9,6 +9,13 @@ Secure Header Insight is a live website security scanner for HTTP hardening chec
 - TLS certificate trust, issuer, expiry, protocol, cipher, and fingerprint reporting
 - Cookie flag analysis for `Secure`, `HttpOnly`, and `SameSite`
 - Heuristic stack detection from server and CDN headers
+- Multi-page crawl summaries for important same-origin routes
+- Platform-specific remediation snippets for `nginx`, `Apache`, `Cloudflare`, `Vercel`, and `Netlify`
+- Local history snapshots with score and header diffs
+- `security.txt` discovery and validation
+- Domain and email posture checks for MX, SPF, DMARC, CAA, and MTA-STS
+- Passive HTML inspection for forms, third-party assets, inline scripts/styles, and missing SRI
+- Low-noise exposure checks for a tiny set of high-signal paths
 - JSON export for each scan
 - Recent scan history in the browser
 
