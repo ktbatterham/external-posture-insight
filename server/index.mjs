@@ -642,6 +642,10 @@ function scanTls(targetUrl) {
 }
 
 function requestOnce(targetUrl, method = "HEAD") {
+  return requestWithHeaders(targetUrl, method);
+}
+
+function requestWithHeaders(targetUrl, method = "HEAD", extraHeaders = {}) {
   const isHttps = targetUrl.protocol === "https:";
   const transport = isHttps ? https : http;
   const startedAt = Date.now();
@@ -656,6 +660,7 @@ function requestOnce(targetUrl, method = "HEAD") {
           "User-Agent": "SecureHeaderInsight/1.0",
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Encoding": "identity",
+          ...extraHeaders,
         },
       },
       (response) => {
@@ -1071,6 +1076,79 @@ async function analyzeExposure(finalUrl) {
   };
 }
 
+function parseCsvHeader(value) {
+  return value
+    ? value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+    : [];
+}
+
+async function analyzeCorsSecurity(finalUrl, responseHeaders) {
+  let optionsResponse = { statusCode: 0, headers: {} };
+  try {
+    optionsResponse = await requestWithHeaders(finalUrl, "OPTIONS", {
+      Origin: "https://security-posture-insight.local",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type,authorization",
+    });
+  } catch {
+    // Keep the default empty response if OPTIONS is blocked or errors out.
+  }
+
+  const mergedHeaders = {
+    ...responseHeaders,
+    ...optionsResponse.headers,
+  };
+  const allowedOrigin = headerValue(mergedHeaders, "access-control-allow-origin");
+  const allowCredentials = headerValue(mergedHeaders, "access-control-allow-credentials");
+  const allowMethods = parseCsvHeader(headerValue(mergedHeaders, "access-control-allow-methods"));
+  const allowHeaders = parseCsvHeader(headerValue(mergedHeaders, "access-control-allow-headers"));
+  const allowPrivateNetwork = headerValue(mergedHeaders, "access-control-allow-private-network");
+  const vary = headerValue(mergedHeaders, "vary");
+  const issues = [];
+  const strengths = [];
+
+  if (allowedOrigin === "*") {
+    if (allowCredentials?.toLowerCase() === "true") {
+      issues.push("CORS allows any origin while also allowing credentials.");
+    } else {
+      issues.push("CORS allows any origin.");
+    }
+  } else if (allowedOrigin) {
+    strengths.push(`CORS is scoped to ${allowedOrigin}.`);
+  }
+
+  if (allowMethods.includes("PUT") || allowMethods.includes("DELETE") || allowMethods.includes("PATCH")) {
+    issues.push(`Preflight allows elevated methods: ${allowMethods.join(", ")}.`);
+  }
+  if (allowHeaders.includes("*")) {
+    issues.push("CORS allows any request header.");
+  }
+  if (allowPrivateNetwork?.toLowerCase() === "true") {
+    issues.push("CORS allows private network access.");
+  }
+  if (allowedOrigin && allowedOrigin !== "*" && !(vary || "").toLowerCase().includes("origin")) {
+    issues.push("CORS varies by origin but the response does not advertise Vary: Origin.");
+  }
+  if (!allowedOrigin) {
+    strengths.push("No permissive CORS policy detected on the scanned page.");
+  }
+
+  return {
+    allowedOrigin,
+    allowCredentials,
+    allowMethods,
+    allowHeaders,
+    allowPrivateNetwork,
+    vary,
+    optionsStatus: optionsResponse.statusCode,
+    issues,
+    strengths,
+  };
+}
+
 async function safeResolve(operation) {
   try {
     return await operation();
@@ -1425,6 +1503,7 @@ async function analyzeUrl(input) {
     domainSecurity: await analyzeDomainSecurity(result.host),
     htmlSecurity: await analyzeHtmlSecurity(new URL(result.finalUrl)),
     exposure: await analyzeExposure(new URL(result.finalUrl)),
+    corsSecurity: await analyzeCorsSecurity(new URL(result.finalUrl), result.rawHeaders),
   };
 }
 

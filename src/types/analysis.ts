@@ -183,6 +183,18 @@ export interface ExposureSummary {
   strengths: string[];
 }
 
+export interface CorsSecurityInfo {
+  allowedOrigin: string | null;
+  allowCredentials: string | null;
+  allowMethods: string[];
+  allowHeaders: string[];
+  allowPrivateNetwork: string | null;
+  vary: string | null;
+  optionsStatus: number;
+  issues: string[];
+  strengths: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -208,4 +220,5 @@ export interface AnalysisResult {
   domainSecurity: DomainSecurityInfo;
   htmlSecurity: HtmlSecurityInfo;
   exposure: ExposureSummary;
+  corsSecurity: CorsSecurityInfo;
 }

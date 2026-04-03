@@ -3,6 +3,7 @@ import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
 import { toast } from "sonner";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
+import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
 import { CrawlPanel } from "@/components/CrawlPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { ExposurePanel } from "@/components/ExposurePanel";
@@ -10,6 +11,7 @@ import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { HtmlSecurityPanel } from "@/components/HtmlSecurityPanel";
+import { PostureSummaryPanel } from "@/components/PostureSummaryPanel";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
 import { RedirectChain } from "@/components/RedirectChain";
@@ -293,6 +295,8 @@ const Index = () => {
               </div>
             </div>
 
+            <PostureSummaryPanel analysis={analysisData} />
+
             <RemediationPanel remediation={analysisData.remediation} />
 
             <CrawlPanel crawl={analysisData.crawl} />
@@ -304,6 +308,8 @@ const Index = () => {
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
 
             <ExposurePanel exposure={analysisData.exposure} />
+
+            <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">
