@@ -3,6 +3,7 @@ import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
 import { toast } from "sonner";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
+import { CrawlPanel } from "@/components/CrawlPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
@@ -213,6 +214,8 @@ const Index = () => {
             </div>
 
             <RemediationPanel remediation={analysisData.remediation} />
+
+            <CrawlPanel crawl={analysisData.crawl} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">

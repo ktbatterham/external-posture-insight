@@ -1,0 +1,100 @@
+import { GitCompareArrows, Route } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CrawlSummary } from "@/types/analysis";
+
+interface CrawlPanelProps {
+  crawl: CrawlSummary;
+}
+
+const gradeStyles: Record<string, string> = {
+  "A+": "bg-emerald-100 text-emerald-900",
+  A: "bg-emerald-100 text-emerald-900",
+  B: "bg-lime-100 text-lime-900",
+  C: "bg-amber-100 text-amber-900",
+  D: "bg-orange-100 text-orange-900",
+  F: "bg-rose-100 text-rose-900",
+  Redirected: "bg-slate-200 text-slate-800",
+};
+
+export const CrawlPanel = ({ crawl }: CrawlPanelProps) => {
+  if (!crawl.pages.length) {
+    return null;
+  }
+
+  return (
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Route className="h-5 w-5" />
+          Multi-Page Crawl
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Strongest page</p>
+            <p className="mt-2 text-lg font-semibold text-slate-950">{crawl.strongestPage ?? "Unknown"}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Weakest page</p>
+            <p className="mt-2 text-lg font-semibold text-slate-950">{crawl.weakestPage ?? "Unknown"}</p>
+          </div>
+        </div>
+
+        {crawl.inconsistentHeaders.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+              <GitCompareArrows className="h-4 w-4" />
+              Inconsistent across routes
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {crawl.inconsistentHeaders.map((header) => (
+                <Badge key={header} variant="secondary" className="bg-amber-100 text-amber-900">
+                  {header}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-3">
+          {crawl.pages.map((page) => (
+            <div key={`${page.path}-${page.label}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-950">{page.label}</h3>
+                    <code className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{page.path}</code>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-500">{page.finalUrl}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className={gradeStyles[page.grade] ?? gradeStyles.F}>
+                    {page.grade}
+                  </Badge>
+                  {page.sameOrigin ? (
+                    <span className="text-sm font-semibold text-slate-600">{page.score}/100</span>
+                  ) : (
+                    <span className="text-sm font-semibold text-slate-600">off-origin redirect</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+                  Status {page.statusCode || "unreachable"} · {page.responseTimeMs}ms
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+                  Missing: {!page.sameOrigin ? "not compared" : page.missingHeaders.length ? page.missingHeaders.join(", ") : "none"}
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+                  Warnings: {!page.sameOrigin ? "not compared" : page.warningHeaders.length ? page.warningHeaders.join(", ") : "none"}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

@@ -74,6 +74,15 @@ const REMEDIATION_TARGETS = {
   "cross-origin-resource-policy": "same-origin",
 };
 
+const CRAWL_CANDIDATES = [
+  { label: "Homepage", path: "/" },
+  { label: "Login", path: "/login" },
+  { label: "App", path: "/app" },
+  { label: "Dashboard", path: "/dashboard" },
+  { label: "Admin", path: "/admin" },
+  { label: "API root", path: "/api" },
+];
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -701,11 +710,27 @@ async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
   };
 }
 
-async function analyzeUrl(input) {
-  const normalizedUrl = normalizeUrl(input);
+async function analyzeUrlCore(input, options = {}) {
+  const { includeCertificate = true } = options;
+  const normalizedUrl = input instanceof URL ? input : normalizeUrl(input);
   const requestData = await fetchWithRedirects(normalizedUrl);
-  const certificate = await scanTls(requestData.finalUrl);
-
+  const certificate = includeCertificate
+    ? await scanTls(requestData.finalUrl)
+    : {
+        available: false,
+        valid: false,
+        authorized: false,
+        issuer: null,
+        subject: null,
+        validFrom: null,
+        validTo: null,
+        daysRemaining: null,
+        protocol: null,
+        cipher: null,
+        fingerprint: null,
+        subjectAltName: [],
+        issues: [],
+      };
   const rawHeaders = buildRawHeaders(requestData.response.headers);
   const { headers: headerResults, issues: headerIssues, strengths } = analyzeHeaders(
     requestData.response.headers,
@@ -764,7 +789,7 @@ async function analyzeUrl(input) {
           : "Security posture needs work before this would count as well hardened.";
 
   return {
-    inputUrl: input,
+    inputUrl: input instanceof URL ? input.toString() : input,
     normalizedUrl: normalizedUrl.toString(),
     finalUrl: requestData.finalUrl.toString(),
     host: requestData.finalUrl.hostname,
@@ -783,6 +808,124 @@ async function analyzeUrl(input) {
     issues,
     strengths,
     remediation: buildRemediation(headerResults),
+  };
+}
+
+function buildCrawlCandidates(result) {
+  const finalUrl = new URL(result.finalUrl);
+  const userPath = new URL(result.normalizedUrl).pathname || "/";
+  const seen = new Set();
+
+  return [
+    { label: userPath === "/" ? "Homepage" : "Requested page", path: userPath },
+    ...CRAWL_CANDIDATES,
+  ]
+    .map((candidate) => {
+      const url = new URL(candidate.path, finalUrl.origin);
+      return {
+        label: candidate.label,
+        path: url.pathname,
+        url,
+      };
+    })
+    .filter((candidate) => {
+      const key = candidate.path;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 5);
+}
+
+function summarizePageAnalysis(label, path, pageResult, rootHost) {
+  const sameOrigin = new URL(pageResult.finalUrl).hostname === rootHost;
+  return {
+    label,
+    path,
+    finalUrl: pageResult.finalUrl,
+    sameOrigin,
+    statusCode: pageResult.statusCode,
+    responseTimeMs: pageResult.responseTimeMs,
+    score: sameOrigin ? pageResult.score : 0,
+    grade: sameOrigin ? pageResult.grade : "Redirected",
+    missingHeaders: sameOrigin ? pageResult.headers
+      .filter((header) => header.status === "missing")
+      .map((header) => header.label) : [],
+    warningHeaders: sameOrigin ? pageResult.headers
+      .filter((header) => header.status === "warning")
+      .map((header) => header.label) : [],
+    issueCount: sameOrigin ? pageResult.issues.length : 1,
+  };
+}
+
+async function crawlRelatedPages(rootResult) {
+  const candidates = buildCrawlCandidates(rootResult);
+  const rootHost = new URL(rootResult.finalUrl).hostname;
+  const pages = [];
+
+  for (const candidate of candidates) {
+    try {
+      const pageResult = await analyzeUrlCore(candidate.url, { includeCertificate: false });
+      pages.push(summarizePageAnalysis(candidate.label, candidate.path, pageResult, rootHost));
+    } catch {
+      pages.push({
+        label: candidate.label,
+        path: candidate.path,
+        finalUrl: candidate.url.toString(),
+        sameOrigin: true,
+        statusCode: 0,
+        responseTimeMs: 0,
+        score: 0,
+        grade: "F",
+        missingHeaders: SECURITY_HEADERS.map((header) => header.label),
+        warningHeaders: [],
+        issueCount: 1,
+      });
+    }
+  }
+
+  const comparablePages = pages.filter((page) => page.sameOrigin);
+
+  const strongestPage = comparablePages.length
+    ? comparablePages.reduce((best, page) => (page.score > best.score ? page : best), comparablePages[0]).label
+    : null;
+  const weakestPage = comparablePages.length
+    ? comparablePages.reduce((worst, page) => (page.score < worst.score ? page : worst), comparablePages[0]).label
+    : null;
+
+  const headerMap = new Map();
+  for (const page of comparablePages) {
+    for (const header of SECURITY_HEADERS) {
+      const status = page.missingHeaders.includes(header.label)
+        ? "missing"
+        : page.warningHeaders.includes(header.label)
+          ? "warning"
+          : "present";
+      const existing = headerMap.get(header.label) || new Set();
+      existing.add(status);
+      headerMap.set(header.label, existing);
+    }
+  }
+
+  const inconsistentHeaders = [...headerMap.entries()]
+    .filter(([, states]) => states.size > 1)
+    .map(([label]) => label);
+
+  return {
+    pages,
+    strongestPage,
+    weakestPage,
+    inconsistentHeaders,
+  };
+}
+
+async function analyzeUrl(input) {
+  const result = await analyzeUrlCore(input, { includeCertificate: true });
+  return {
+    ...result,
+    crawl: await crawlRelatedPages(result),
   };
 }
 

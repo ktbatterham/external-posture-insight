@@ -70,6 +70,27 @@ export interface RemediationSnippet {
   snippet: string;
 }
 
+export interface CrawlPageResult {
+  label: string;
+  path: string;
+  finalUrl: string;
+  sameOrigin: boolean;
+  statusCode: number;
+  responseTimeMs: number;
+  score: number;
+  grade: string;
+  missingHeaders: string[];
+  warningHeaders: string[];
+  issueCount: number;
+}
+
+export interface CrawlSummary {
+  pages: CrawlPageResult[];
+  weakestPage: string | null;
+  strongestPage: string | null;
+  inconsistentHeaders: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -90,4 +111,5 @@ export interface AnalysisResult {
   issues: ScanIssue[];
   strengths: string[];
   remediation: RemediationSnippet[];
+  crawl: CrawlSummary;
 }
