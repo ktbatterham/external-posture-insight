@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
 import { ApiSurfacePanel } from "@/components/ApiSurfacePanel";
+import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
 
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
 const HISTORY_KEY = "secure-header-insight:history";
@@ -182,6 +183,34 @@ const Index = () => {
     URL.revokeObjectURL(objectUrl);
   };
 
+  const downloadTextFile = (filename: string, content: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const exportMarkdown = () => {
+    if (!analysisData) return;
+    downloadTextFile(
+      `security-report-${analysisData.host}.md`,
+      buildMarkdownReport(analysisData),
+      "text/markdown;charset=utf-8",
+    );
+  };
+
+  const exportHtml = () => {
+    if (!analysisData) return;
+    downloadTextFile(
+      `security-report-${analysisData.host}.html`,
+      buildHtmlReport(analysisData),
+      "text/html;charset=utf-8",
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(58,111,255,0.14),_transparent_30%),linear-gradient(180deg,_#f7fafc_0%,_#eef3f8_45%,_#f8fbfd_100%)]">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -256,6 +285,12 @@ const Index = () => {
                 summary={analysisData.summary}
               />
               <div className="flex gap-3">
+                <Button variant="outline" className="rounded-2xl" onClick={exportMarkdown}>
+                  Export Markdown
+                </Button>
+                <Button variant="outline" className="rounded-2xl" onClick={exportHtml}>
+                  Export HTML
+                </Button>
                 <Button variant="outline" className="rounded-2xl" onClick={exportReport}>
                   <Download className="mr-2 h-4 w-4" />
                   Export JSON

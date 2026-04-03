@@ -1,28 +1,15 @@
 import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnalysisResult } from "@/types/analysis";
+import { getAreaScores, getUnifiedIssueSummary } from "@/lib/posture";
 
 interface PostureSummaryPanelProps {
   analysis: AnalysisResult;
 }
 
 export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
-  const severityCounts = analysis.issues.reduce(
-    (acc, issue) => {
-      acc[issue.severity] += 1;
-      return acc;
-    },
-    { critical: 0, warning: 0, info: 0 },
-  );
-
-  const areaCounts = analysis.issues.reduce<Record<string, number>>((acc, issue) => {
-    acc[issue.area] = (acc[issue.area] || 0) + 1;
-    return acc;
-  }, {});
-
-  const topAreas = Object.entries(areaCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
+  const severityCounts = getUnifiedIssueSummary(analysis);
+  const areaScores = getAreaScores(analysis);
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -49,14 +36,29 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
         </div>
 
         <div className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Most affected areas</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Normalized area scores</p>
           <div className="mt-3 grid gap-2">
-            {topAreas.length ? topAreas.map(([area, count]) => (
-              <div key={area} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm text-slate-700">
-                <span className="capitalize">{area}</span>
-                <span className="font-semibold">{count}</span>
+            {areaScores.map((area) => (
+              <div key={area.key} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{area.label}</span>
+                  <span className="font-semibold">{area.score}/100</span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-slate-100">
+                  <div
+                    className={`h-2 rounded-full ${
+                      area.status === "strong"
+                        ? "bg-emerald-500"
+                        : area.status === "watch"
+                          ? "bg-amber-500"
+                          : "bg-rose-500"
+                    }`}
+                    style={{ width: `${area.score}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{area.notes.join(" · ")}</p>
               </div>
-            )) : <p className="text-sm text-slate-500">No issues recorded.</p>}
+            ))}
           </div>
         </div>
 
