@@ -1,178 +1,237 @@
-import { useState } from "react";
-import { UrlForm } from "@/components/UrlForm";
-import { SecurityGrade } from "@/components/SecurityGrade";
-import { HeadersTable } from "@/components/HeadersTable";
-import { TechnologyStack } from "@/components/TechnologyStack";
+import { startTransition, useEffect, useState } from "react";
+import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
+import { toast } from "sonner";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
-import { toast } from "sonner";
+import { FindingsPanel } from "@/components/FindingsPanel";
+import { HeadersTable } from "@/components/HeadersTable";
+import { RawHeadersPanel } from "@/components/RawHeadersPanel";
+import { RedirectChain } from "@/components/RedirectChain";
+import { SecurityGrade } from "@/components/SecurityGrade";
+import { TechnologyStack } from "@/components/TechnologyStack";
+import { UrlForm } from "@/components/UrlForm";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { AnalysisResult } from "@/types/analysis";
 
-const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
 
-const generateSecurityData = async (url: string) => {
-  try {
-    // Use the CORS proxy to fetch headers
-    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl, {
-      method: 'HEAD',
-      headers: {
-        'Origin': window.location.origin,
-      }
-    });
+interface RecentScan {
+  url: string;
+  grade: string;
+  scannedAt: string;
+}
 
-    const headers = response.headers;
-    const isSecure = url.startsWith('https');
-    const domain = new URL(url).hostname;
-    const isPopularSite = domain.includes('google') || domain.includes('facebook') || domain.includes('amazon');
+const METRIC_CARD_CLASS =
+  "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur";
 
-    // Analyze security headers
-    const securityHeaders = [
-      {
-        name: "Strict-Transport-Security",
-        value: headers.get("strict-transport-security"),
-        description: "Ensures secure HTTPS connection",
-      },
-      {
-        name: "Content-Security-Policy",
-        value: headers.get("content-security-policy"),
-        description: "Controls resources the user agent is allowed to load",
-      },
-      {
-        name: "X-Frame-Options",
-        value: headers.get("x-frame-options"),
-        description: "Prevents clickjacking attacks",
-      },
-      {
-        name: "X-Content-Type-Options",
-        value: headers.get("x-content-type-options"),
-        description: "Prevents MIME type sniffing",
-      },
-      {
-        name: "Referrer-Policy",
-        value: headers.get("referrer-policy"),
-        description: "Controls how much referrer information should be included with requests",
-      },
-    ];
-
-    // Calculate security grade based on actual headers and HTTPS
-    const calculateGrade = () => {
-      let score = 0;
-      if (isSecure) score += 2;
-      securityHeaders.forEach(header => {
-        if (header.value) score += 1;
-      });
-      
-      if (score >= 6) return "A+";
-      if (score >= 5) return "A";
-      if (score >= 4) return "B";
-      if (score >= 3) return "C";
-      return "D";
-    };
-
-    const grade = calculateGrade();
-    console.log('Security Analysis:', {
-      url,
-      headers: Object.fromEntries([...headers.entries()]),
-      grade
-    });
-
-    return {
-      grade,
-      headers: securityHeaders,
-      technologies: [
-        { name: isSecure ? "HTTPS" : "HTTP", category: "security" as const },
-        { name: "Web Server", category: "server" as const, version: headers.get("server") || undefined },
-        { name: "React", category: "frontend" as const, version: "18.2.0" },
-        ...(domain.includes('cloudflare') ? [{ name: "Cloudflare", category: "security" as const }] : []),
-      ],
-      certificate: {
-        valid: isSecure,
-        issuer: isSecure ? "Let's Encrypt Authority X3" : "None",
-        expirationDate: new Date(Date.now() + (90 * 24 * 60 * 60 * 1000)).toLocaleDateString(),
-        daysUntilExpiration: 90,
-        protocol: isSecure ? "TLS 1.3" : "None",
-        strength: isSecure ? ("strong" as const) : ("weak" as const),
-      },
-      cookies: [
-        {
-          name: "session",
-          secure: isSecure,
-          httpOnly: true,
-          sameSite: "Strict" as const,
-          expires: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toLocaleDateString(),
-        },
-        {
-          name: "preferences",
-          secure: isSecure,
-          httpOnly: true,
-          sameSite: "Lax" as const,
-          expires: null,
-        }
-      ],
-    };
-  } catch (error) {
-    console.error('Error analyzing security:', error);
-    toast.error("Failed to analyze website. Make sure the URL is accessible and try again.");
-    throw error;
+const loadRecentScans = (): RecentScan[] => {
+  if (typeof window === "undefined") {
+    return [];
   }
+
+  try {
+    const raw = window.localStorage.getItem(RECENT_SCANS_KEY);
+    return raw ? (JSON.parse(raw) as RecentScan[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveRecentScan = (scan: RecentScan) => {
+  const next = [scan, ...loadRecentScans().filter((item) => item.url !== scan.url)].slice(0, 6);
+  window.localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(next));
+  return next;
 };
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [analyzed, setAnalyzed] = useState(false);
-  const [analysisData, setAnalysisData] = useState<Awaited<ReturnType<typeof generateSecurityData>> | null>(null);
+  const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+
+  useEffect(() => {
+    setRecentScans(loadRecentScans());
+  }, []);
 
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
+
     try {
-      const securityData = await generateSecurityData(url);
-      setAnalysisData(securityData);
-      setAnalyzed(true);
+      const response = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Scan failed.");
+      }
+
+      startTransition(() => {
+        setAnalysisData(payload);
+        setRecentScans(
+          saveRecentScan({
+            url: payload.finalUrl,
+            grade: payload.grade,
+            scannedAt: payload.scannedAt,
+          }),
+        );
+      });
     } catch (error) {
-      // Error is already handled in generateSecurityData
+      toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const exportReport = () => {
+    if (!analysisData) {
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(analysisData, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `security-report-${analysisData.host}.json`;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container py-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-primary mb-4">
-            Website Security Scanner
-          </h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Analyze your website's security headers, certificates, cookies, and technology stack to get detailed recommendations
-            for improving your security posture.
-          </p>
-        </div>
-
-        <div className="flex justify-center mb-12">
-          <UrlForm onSubmit={handleAnalyze} isLoading={isLoading} />
-        </div>
-
-        {analyzed && analysisData && (
-          <div className="space-y-8">
-            <div className="flex justify-center">
-              <SecurityGrade grade={analysisData.grade} />
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(58,111,255,0.14),_transparent_30%),linear-gradient(180deg,_#f7fafc_0%,_#eef3f8_45%,_#f8fbfd_100%)]">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <section className="rounded-[2rem] border border-white/70 bg-white/70 px-6 py-8 shadow-2xl shadow-slate-200/50 backdrop-blur sm:px-8">
+          <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6">
+              <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-900">
+                Live HTTP security analysis
+              </div>
+              <div className="space-y-4">
+                <h1 className="max-w-3xl font-serif text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+                  See what a site actually returns, not what a demo thinks it should.
+                </h1>
+                <p className="max-w-2xl text-base leading-7 text-slate-600">
+                  Secure Header Insight now scans live response headers, follows redirects, inspects TLS details,
+                  parses cookies, and turns the result into a report you can act on.
+                </p>
+              </div>
+              <UrlForm onSubmit={handleAnalyze} isLoading={isLoading} initialValue="https://example.com" />
             </div>
 
-            <div className="grid gap-8 lg:grid-cols-2">
+            <Card className="overflow-hidden border-slate-200 bg-slate-950 text-slate-50 shadow-xl">
+              <CardContent className="space-y-4 p-6">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">What this scan checks</p>
+                <div className="grid gap-3 text-sm text-slate-200">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                    Security headers including CSP, HSTS, framing, MIME sniffing, referrer, and isolation policies.
+                  </div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                    TLS trust, protocol version, expiry window, cipher details, and final redirect destination.
+                  </div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                    `Set-Cookie` flags, inferred stack signals, raw headers, and a downloadable JSON report.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {recentScans.length > 0 && (
+          <section className="mt-8">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-600">
+              <Clock3 className="h-4 w-4" />
+              Recent scans
+            </div>
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {recentScans.map((scan) => (
+                <button
+                  key={scan.url}
+                  type="button"
+                  onClick={() => handleAnalyze(scan.url)}
+                  className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-medium text-slate-900">{scan.url}</span>
+                    <span className="text-lg font-black text-slate-700">{scan.grade}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{new Date(scan.scannedAt).toLocaleString()}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {analysisData && (
+          <section className="mt-8 space-y-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <SecurityGrade
+                grade={analysisData.grade}
+                score={analysisData.score}
+                summary={analysisData.summary}
+              />
+              <div className="flex gap-3">
+                <Button variant="outline" className="rounded-2xl" onClick={exportReport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export JSON
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className={METRIC_CARD_CLASS}>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                  <Activity className="h-4 w-4" />
+                  Response time
+                </div>
+                <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.responseTimeMs}ms</div>
+              </div>
+              <div className={METRIC_CARD_CLASS}>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                  <Link2 className="h-4 w-4" />
+                  Final URL
+                </div>
+                <div className="mt-3 truncate text-lg font-bold text-slate-950">{analysisData.finalUrl}</div>
+              </div>
+              <div className={METRIC_CARD_CLASS}>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                  <Server className="h-4 w-4" />
+                  HTTP status
+                </div>
+                <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.statusCode}</div>
+              </div>
+              <div className={METRIC_CARD_CLASS}>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                  <Clock3 className="h-4 w-4" />
+                  Scanned
+                </div>
+                <div className="mt-3 text-lg font-bold text-slate-950">
+                  {new Date(analysisData.scannedAt).toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">
-                <div className="bg-white p-6 rounded-lg shadow-sm">
-                  <h2 className="text-2xl font-semibold mb-4">Security Headers</h2>
+                <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="mb-4 text-2xl font-bold text-slate-950">Security Headers</h2>
                   <HeadersTable headers={analysisData.headers} />
                 </div>
-                <CertificateAnalysis certInfo={analysisData.certificate} />
+                <RawHeadersPanel headers={analysisData.rawHeaders} />
               </div>
-              
+
               <div className="space-y-8">
-                <TechnologyStack technologies={analysisData.technologies} />
-                <CookieAnalysis cookies={analysisData.cookies} />
+                <FindingsPanel issues={analysisData.issues} strengths={analysisData.strengths} />
+                <CertificateAnalysis certInfo={analysisData.certificate} />
+                <RedirectChain redirects={analysisData.redirects} />
               </div>
             </div>
-          </div>
+
+            <div className="grid gap-8 xl:grid-cols-2">
+              <TechnologyStack technologies={analysisData.technologies} />
+              <CookieAnalysis cookies={analysisData.cookies} />
+            </div>
+          </section>
         )}
       </div>
     </div>

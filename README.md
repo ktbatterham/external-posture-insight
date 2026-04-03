@@ -1,69 +1,48 @@
-# Welcome to your Lovable project
+# Secure Header Insight
 
-## Project info
+Secure Header Insight is a live website security scanner for HTTP hardening checks. It inspects a target URL through a local Node API, follows redirects, reads response headers, evaluates TLS certificate details, parses `Set-Cookie` flags, and produces a graded report in the browser.
 
-**URL**: https://lovable.dev/projects/037378a1-1442-466d-803c-7df264798560
+## Features
 
-## How can I edit this code?
+- Live header analysis for HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, COOP, and CORP
+- Redirect chain inspection
+- TLS certificate trust, issuer, expiry, protocol, cipher, and fingerprint reporting
+- Cookie flag analysis for `Secure`, `HttpOnly`, and `SameSite`
+- Heuristic stack detection from server and CDN headers
+- JSON export for each scan
+- Recent scan history in the browser
 
-There are several ways of editing your application.
+## Stack
 
-**Use Lovable**
+- React + Vite + TypeScript
+- Tailwind + shadcn/ui
+- Node.js API server using core `http`, `https`, and `tls`
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/037378a1-1442-466d-803c-7df264798560) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Local development
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+That starts:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- the Vite frontend on `http://localhost:8080`
+- the scan API on `http://127.0.0.1:8787`
 
-**Use GitHub Codespaces**
+The frontend proxies `/api/*` requests to the local API in development.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Production-style run
 
-## What technologies are used for this project?
+```sh
+npm run build
+npm start
+```
 
-This project is built with .
+`npm start` serves the API and the built frontend from the same Node process.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Notes
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/037378a1-1442-466d-803c-7df264798560) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- Scans are based on what the origin returns for the requested URL at scan time.
+- Technology detection is heuristic and intentionally conservative.
+- Some sites may block automated requests or respond differently to bots versus browsers.

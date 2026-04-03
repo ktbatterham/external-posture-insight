@@ -1,83 +1,81 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Server, Globe, Shield, Code } from "lucide-react";
-
-interface Technology {
-  name: string;
-  category: "server" | "frontend" | "security" | "other";
-  version?: string;
-}
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Cloud, Code2, Globe, Network, Server, Shield } from "lucide-react";
+import { TechnologyResult } from "@/types/analysis";
 
 interface TechnologyStackProps {
-  technologies: Technology[];
+  technologies: TechnologyResult[];
 }
 
-export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
-  const getCategoryIcon = (category: Technology["category"]) => {
-    switch (category) {
-      case "server":
-        return <Server className="w-4 h-4" />;
-      case "frontend":
-        return <Globe className="w-4 h-4" />;
-      case "security":
-        return <Shield className="w-4 h-4" />;
-      default:
-        return <Code className="w-4 h-4" />;
-    }
-  };
+const categoryConfig = {
+  server: {
+    icon: <Server className="h-4 w-4" />,
+    color: "bg-sky-100 text-sky-900",
+  },
+  frontend: {
+    icon: <Code2 className="h-4 w-4" />,
+    color: "bg-emerald-100 text-emerald-900",
+  },
+  security: {
+    icon: <Shield className="h-4 w-4" />,
+    color: "bg-amber-100 text-amber-900",
+  },
+  hosting: {
+    icon: <Cloud className="h-4 w-4" />,
+    color: "bg-indigo-100 text-indigo-900",
+  },
+  network: {
+    icon: <Network className="h-4 w-4" />,
+    color: "bg-violet-100 text-violet-900",
+  },
+} as const;
 
-  const getCategoryColor = (category: Technology["category"]) => {
-    switch (category) {
-      case "server":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "frontend":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "security":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
-    }
-  };
+export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
+  if (!technologies.length) {
+    return null;
+  }
+
+  const grouped = technologies.reduce<Record<string, TechnologyResult[]>>((acc, tech) => {
+    acc[tech.category] = [...(acc[tech.category] || []), tech];
+    return acc;
+  }, {});
 
   return (
-    <Card>
+    <Card className="border-slate-200 shadow-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Code className="w-5 h-5" />
-          Detected Technologies
+        <CardTitle className="flex items-center gap-2 text-slate-900">
+          <Globe className="h-5 w-5" />
+          Detected Stack
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid gap-4">
-          {Object.entries(
-            technologies.reduce((acc, tech) => {
-              if (!acc[tech.category]) {
-                acc[tech.category] = [];
-              }
-              acc[tech.category].push(tech);
-              return acc;
-            }, {} as Record<Technology["category"], Technology[]>)
-          ).map(([category, techs]) => (
-            <div key={category}>
-              <div className="flex items-center gap-2 mb-2">
-                {getCategoryIcon(category as Technology["category"])}
-                <h3 className="font-semibold capitalize">{category}</h3>
+      <CardContent className="space-y-6">
+        {Object.entries(grouped).map(([category, items]) => {
+          const config = categoryConfig[category as keyof typeof categoryConfig];
+          return (
+            <div key={category} className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold capitalize text-slate-700">
+                {config.icon}
+                {category}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {techs.map((tech) => (
-                  <Badge
-                    key={tech.name}
-                    variant="secondary"
-                    className={`${getCategoryColor(tech.category)}`}
+              <div className="grid gap-3">
+                {items.map((tech) => (
+                  <div
+                    key={`${tech.category}-${tech.name}-${tech.version ?? "none"}`}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
                   >
-                    {tech.name}
-                    {tech.version && ` (${tech.version})`}
-                  </Badge>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-medium text-slate-900">{tech.name}</div>
+                      <Badge variant="secondary" className={config.color}>
+                        {tech.version ?? "Detected"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{tech.evidence}</p>
+                  </div>
                 ))}
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </CardContent>
     </Card>
   );

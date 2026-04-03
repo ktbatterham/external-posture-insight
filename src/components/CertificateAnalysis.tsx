@@ -1,85 +1,83 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Shield, Calendar, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Calendar, Fingerprint, LockKeyhole, Shield } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-interface CertificateInfo {
-  valid: boolean;
-  issuer: string;
-  expirationDate: string;
-  daysUntilExpiration: number;
-  protocol: string;
-  strength: "weak" | "moderate" | "strong";
-}
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CertificateResult } from "@/types/analysis";
 
 interface CertificateAnalysisProps {
-  certInfo: CertificateInfo;
+  certInfo: CertificateResult;
 }
 
 export const CertificateAnalysis = ({ certInfo }: CertificateAnalysisProps) => {
-  const getStrengthColor = (strength: string) => {
-    switch (strength) {
-      case "strong":
-        return "bg-success-100 text-success-800";
-      case "moderate":
-        return "bg-warning-100 text-warning-800";
-      case "weak":
-        return "bg-danger-100 text-danger-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   return (
-    <Card>
+    <Card className="border-slate-200 shadow-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="w-5 h-5" />
-          SSL/TLS Certificate Analysis
+        <CardTitle className="flex items-center gap-2 text-slate-900">
+          <Shield className="h-5 w-5" />
+          TLS Certificate
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Status</span>
-            <Badge variant={certInfo.valid ? "default" : "destructive"}>
-              {certInfo.valid ? "Valid" : "Invalid"}
-            </Badge>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Issuer</span>
-            <span className="text-sm">{certInfo.issuer}</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Protocol Version</span>
-            <Badge variant="outline">{certInfo.protocol}</Badge>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Encryption Strength</span>
-            <Badge className={getStrengthColor(certInfo.strength)}>
-              {certInfo.strength.charAt(0).toUpperCase() + certInfo.strength.slice(1)}
-            </Badge>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Expires</span>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span className="text-sm">{certInfo.expirationDate}</span>
-            </div>
-          </div>
-        </div>
-
-        {certInfo.daysUntilExpiration < 30 && (
-          <Alert variant="destructive">
+        {!certInfo.available ? (
+          <Alert>
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="ml-2">
-              Certificate expires in {certInfo.daysUntilExpiration} days. Consider renewal soon.
-            </AlertDescription>
+            <AlertDescription>{certInfo.issues[0]}</AlertDescription>
           </Alert>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Trust</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant={certInfo.valid ? "default" : "destructive"}>
+                    {certInfo.valid ? "Trusted" : "Untrusted"}
+                  </Badge>
+                  {certInfo.protocol && <Badge variant="outline">{certInfo.protocol}</Badge>}
+                </div>
+                <p className="mt-3 text-sm text-slate-600">
+                  {certInfo.issuer ? `Issued by ${certInfo.issuer}` : "Issuer not available"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Expiry</p>
+                <div className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-900">
+                  <Calendar className="h-4 w-4" />
+                  {certInfo.validTo ?? "Unknown"}
+                </div>
+                <p className="mt-3 text-sm text-slate-600">
+                  {certInfo.daysRemaining !== null
+                    ? `${certInfo.daysRemaining} day${certInfo.daysRemaining === 1 ? "" : "s"} remaining`
+                    : "Remaining lifetime unavailable"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-sm text-slate-600">
+              <div className="flex items-start gap-2">
+                <LockKeyhole className="mt-0.5 h-4 w-4 text-slate-500" />
+                <span>{certInfo.cipher ? `Cipher: ${certInfo.cipher}` : "Cipher not reported"}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Fingerprint className="mt-0.5 h-4 w-4 text-slate-500" />
+                <span className="break-all">
+                  {certInfo.fingerprint ? `SHA-256 fingerprint: ${certInfo.fingerprint}` : "Fingerprint unavailable"}
+                </span>
+              </div>
+              {certInfo.subject && (
+                <p>
+                  <span className="font-medium text-slate-900">Subject:</span> {certInfo.subject}
+                </p>
+              )}
+            </div>
+
+            {certInfo.issues.map((issue) => (
+              <Alert key={issue} variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{issue}</AlertDescription>
+              </Alert>
+            ))}
+          </>
         )}
       </CardContent>
     </Card>

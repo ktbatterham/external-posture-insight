@@ -2,42 +2,50 @@ import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 
 interface SecurityGradeProps {
   grade: string;
+  score: number;
+  summary: string;
 }
 
-export const SecurityGrade = ({ grade }: SecurityGradeProps) => {
-  const getGradeColor = (grade: string) => {
-    switch (grade) {
-      case "A+":
-      case "A":
-        return "text-success-DEFAULT";
-      case "B":
-      case "C":
-        return "text-warning-DEFAULT";
-      default:
-        return "text-danger-DEFAULT";
-    }
-  };
+const gradeStyles: Record<string, { text: string; ring: string; bg: string }> = {
+  "A+": { text: "text-emerald-700", ring: "ring-emerald-200", bg: "from-emerald-50 to-white" },
+  A: { text: "text-emerald-700", ring: "ring-emerald-200", bg: "from-emerald-50 to-white" },
+  B: { text: "text-amber-700", ring: "ring-amber-200", bg: "from-amber-50 to-white" },
+  C: { text: "text-orange-700", ring: "ring-orange-200", bg: "from-orange-50 to-white" },
+  D: { text: "text-rose-700", ring: "ring-rose-200", bg: "from-rose-50 to-white" },
+  F: { text: "text-rose-700", ring: "ring-rose-200", bg: "from-rose-50 to-white" },
+};
 
-  const getGradeIcon = (grade: string) => {
-    switch (grade) {
-      case "A+":
-      case "A":
-        return <ShieldCheck className="w-12 h-12" />;
-      case "B":
-      case "C":
-        return <Shield className="w-12 h-12" />;
-      default:
-        return <ShieldAlert className="w-12 h-12" />;
-    }
-  };
+export const SecurityGrade = ({ grade, score, summary }: SecurityGradeProps) => {
+  const style = gradeStyles[grade] ?? gradeStyles.F;
+  const icon =
+    grade === "A+" || grade === "A" ? (
+      <ShieldCheck className="h-12 w-12" />
+    ) : grade === "B" || grade === "C" ? (
+      <Shield className="h-12 w-12" />
+    ) : (
+      <ShieldAlert className="h-12 w-12" />
+    );
 
   return (
-    <div className="flex flex-col items-center justify-center p-6 border rounded-lg shadow-sm">
-      <div className={getGradeColor(grade)}>{getGradeIcon(grade)}</div>
-      <h2 className={`text-4xl font-bold mt-2 ${getGradeColor(grade)}`}>
-        {grade}
-      </h2>
-      <p className="text-gray-600 mt-2">Security Grade</p>
+    <div
+      className={`w-full rounded-3xl bg-gradient-to-br ${style.bg} p-8 shadow-sm ring-1 ${style.ring}`}
+    >
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
+          <div className={`rounded-2xl bg-white/80 p-4 ${style.text}`}>{icon}</div>
+          <div>
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+              Security Grade
+            </p>
+            <div className="mt-1 flex items-end gap-3">
+              <h2 className={`text-5xl font-black ${style.text}`}>{grade}</h2>
+              <p className="pb-1 text-lg font-semibold text-slate-600">{score}/100</p>
+            </div>
+          </div>
+        </div>
+
+        <p className="max-w-xl text-sm leading-6 text-slate-600">{summary}</p>
+      </div>
     </div>
   );
 };
