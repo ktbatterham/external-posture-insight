@@ -6,6 +6,7 @@ import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
+import { RemediationPanel } from "@/components/RemediationPanel";
 import { RedirectChain } from "@/components/RedirectChain";
 import { SecurityGrade } from "@/components/SecurityGrade";
 import { TechnologyStack } from "@/components/TechnologyStack";
@@ -210,6 +211,8 @@ const Index = () => {
                 </div>
               </div>
             </div>
+
+            <RemediationPanel remediation={analysisData.remediation} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">

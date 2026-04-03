@@ -63,6 +63,17 @@ const SECURITY_HEADERS = [
   },
 ];
 
+const REMEDIATION_TARGETS = {
+  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+  "content-security-policy": "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; upgrade-insecure-requests",
+  "x-frame-options": "SAMEORIGIN",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+  "cross-origin-opener-policy": "same-origin",
+  "cross-origin-resource-policy": "same-origin",
+};
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -431,6 +442,108 @@ function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects
   return { score, grade };
 }
 
+function buildRemediation(headerResults) {
+  const requiredHeaders = headerResults
+    .filter((header) => header.status !== "present")
+    .map((header) => ({
+      key: header.key,
+      label: header.label,
+      value: REMEDIATION_TARGETS[header.key],
+    }))
+    .filter((header) => header.value);
+
+  if (!requiredHeaders.length) {
+    return [];
+  }
+
+  const nginxLines = requiredHeaders.map(
+    (header) => `add_header ${header.label} "${header.value}" always;`,
+  );
+  const apacheLines = requiredHeaders.map(
+    (header) => `Header always set ${header.label} "${header.value}"`,
+  );
+  const cloudflareLines = requiredHeaders.map(
+    (header) =>
+      `secured.headers.set("${header.label}", "${header.value.replaceAll('"', '\\"')}");`,
+  );
+  const vercelLines = requiredHeaders.map((header) => `        { key: "${header.label}", value: "${header.value}" },`);
+  const netlifyLines = requiredHeaders.map((header) => `  ${header.label}: ${header.value}`);
+  const names = requiredHeaders.map((header) => header.label).join(", ");
+
+  return [
+    {
+      platform: "nginx",
+      title: "Nginx security headers",
+      description: `Adds recommended headers for: ${names}.`,
+      filename: "nginx.conf",
+      snippet: [
+        "server {",
+        "  # ...existing config",
+        ...nginxLines.map((line) => `  ${line}`),
+        "}",
+      ].join("\n"),
+    },
+    {
+      platform: "apache",
+      title: "Apache mod_headers rules",
+      description: `Use inside your vhost or .htaccess where mod_headers is enabled.`,
+      filename: ".htaccess",
+      snippet: [
+        "<IfModule mod_headers.c>",
+        ...apacheLines.map((line) => `  ${line}`),
+        "</IfModule>",
+      ].join("\n"),
+    },
+    {
+      platform: "cloudflare",
+      title: "Cloudflare Worker response hardening",
+      description: "Apply these headers in a Worker or edge response transform.",
+      filename: "worker.js",
+      snippet: [
+        "export default {",
+        "  async fetch(request, env, ctx) {",
+        "    const response = await fetch(request);",
+        "    const secured = new Response(response.body, response);",
+        ...cloudflareLines.map((line) => `    ${line}`),
+        "    return secured;",
+        "  },",
+        "};",
+      ].join("\n"),
+    },
+    {
+      platform: "vercel",
+      title: "Vercel headers() config",
+      description: "Paste into next.config.js or next.config.mjs.",
+      filename: "next.config.js",
+      snippet: [
+        "export default {",
+        "  async headers() {",
+        "    return [",
+        "      {",
+        '        source: "/(.*)",',
+        "        headers: [",
+        ...vercelLines,
+        "        ],",
+        "      },",
+        "    ];",
+        "  },",
+        "};",
+      ].join("\n"),
+    },
+    {
+      platform: "netlify",
+      title: "Netlify _headers file",
+      description: "Add this block to your Netlify `_headers` file.",
+      filename: "_headers",
+      snippet: [
+        "/*",
+        ...netlifyLines,
+        "",
+      ].join("\n"),
+    },
+  ];
+}
+
 function scanTls(targetUrl) {
   if (targetUrl.protocol !== "https:") {
     return Promise.resolve({
@@ -669,6 +782,7 @@ async function analyzeUrl(input) {
     redirects: requestData.redirects,
     issues,
     strengths,
+    remediation: buildRemediation(headerResults),
   };
 }
 

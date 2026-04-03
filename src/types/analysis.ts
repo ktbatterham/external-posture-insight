@@ -62,6 +62,14 @@ export interface ScanIssue {
   detail: string;
 }
 
+export interface RemediationSnippet {
+  platform: "nginx" | "apache" | "cloudflare" | "vercel" | "netlify";
+  title: string;
+  description: string;
+  filename: string;
+  snippet: string;
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -81,4 +89,5 @@ export interface AnalysisResult {
   redirects: RedirectHop[];
   issues: ScanIssue[];
   strengths: string[];
+  remediation: RemediationSnippet[];
 }
