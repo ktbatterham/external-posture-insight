@@ -84,6 +84,13 @@ const CRAWL_CANDIDATES = [
   { label: "API root", path: "/api" },
 ];
 
+const EXPOSURE_PROBES = [
+  { label: "Robots", path: "/robots.txt" },
+  { label: "Sitemap", path: "/sitemap.xml" },
+  { label: "Git metadata", path: "/.git/HEAD" },
+  { label: "Environment file", path: "/.env" },
+];
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -984,6 +991,86 @@ async function analyzeHtmlSecurity(finalUrl) {
   }
 }
 
+async function analyzeExposure(finalUrl) {
+  const probes = [];
+  const issues = [];
+  const strengths = [];
+
+  for (const probe of EXPOSURE_PROBES) {
+    const probeUrl = new URL(probe.path, finalUrl.origin);
+    try {
+      let response;
+      let resolvedUrl = probeUrl;
+
+      if (probe.path === "/robots.txt" || probe.path === "/sitemap.xml") {
+        const redirectData = await fetchWithRedirects(probeUrl, 3);
+        response = redirectData.response;
+        resolvedUrl = redirectData.finalUrl;
+      } else {
+        response = await requestOnce(probeUrl, "HEAD");
+        if (response.statusCode === 405 || response.statusCode === 403) {
+          response = await requestOnce(probeUrl, "GET");
+        }
+      }
+
+      let finding = "safe";
+      let detail = "Not exposed.";
+
+      if (probe.path === "/robots.txt" || probe.path === "/sitemap.xml") {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          finding = "interesting";
+          detail =
+            resolvedUrl.toString() === probeUrl.toString()
+              ? "Public discovery file is available."
+              : `Public discovery file is available after redirect to ${resolvedUrl.toString()}.`;
+          strengths.push(`${probe.label} is published.`);
+        } else if (response.statusCode === 401 || response.statusCode === 403) {
+          finding = "interesting";
+          detail = "Discovery file exists but is access-controlled.";
+        } else {
+          detail = "Discovery file not found.";
+        }
+      } else if (response.statusCode >= 200 && response.statusCode < 300) {
+        finding = "exposed";
+        detail = "Sensitive path returned a successful response.";
+        issues.push(`${probe.label} may be exposed at ${probe.path}.`);
+      } else if (response.statusCode === 401 || response.statusCode === 403) {
+        finding = "interesting";
+        detail = "Sensitive path exists but is access-controlled.";
+        strengths.push(`${probe.label} appears access-controlled.`);
+      }
+
+      probes.push({
+        label: probe.label,
+        path: probe.path,
+        statusCode: response.statusCode,
+        finalUrl: resolvedUrl.toString(),
+        finding,
+        detail,
+      });
+    } catch (error) {
+      probes.push({
+        label: probe.label,
+        path: probe.path,
+        statusCode: 0,
+        finalUrl: probeUrl.toString(),
+        finding: "safe",
+        detail: error instanceof Error ? error.message : "Probe failed.",
+      });
+    }
+  }
+
+  if (!issues.length) {
+    strengths.push("No obvious high-signal sensitive files were openly exposed in the limited probe set.");
+  }
+
+  return {
+    probes,
+    issues,
+    strengths,
+  };
+}
+
 async function safeResolve(operation) {
   try {
     return await operation();
@@ -1337,6 +1424,7 @@ async function analyzeUrl(input) {
     securityTxt: await fetchSecurityTxt(new URL(result.finalUrl)),
     domainSecurity: await analyzeDomainSecurity(result.host),
     htmlSecurity: await analyzeHtmlSecurity(new URL(result.finalUrl)),
+    exposure: await analyzeExposure(new URL(result.finalUrl)),
   };
 }
 

@@ -168,6 +168,21 @@ export interface HtmlSecurityInfo {
   strengths: string[];
 }
 
+export interface ExposureProbe {
+  label: string;
+  path: string;
+  statusCode: number;
+  finalUrl: string;
+  finding: "safe" | "interesting" | "exposed";
+  detail: string;
+}
+
+export interface ExposureSummary {
+  probes: ExposureProbe[];
+  issues: string[];
+  strengths: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -192,4 +207,5 @@ export interface AnalysisResult {
   securityTxt: SecurityTxtInfo;
   domainSecurity: DomainSecurityInfo;
   htmlSecurity: HtmlSecurityInfo;
+  exposure: ExposureSummary;
 }

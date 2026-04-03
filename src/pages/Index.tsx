@@ -5,6 +5,7 @@ import { CertificateAnalysis } from "@/components/CertificateAnalysis";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CrawlPanel } from "@/components/CrawlPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
+import { ExposurePanel } from "@/components/ExposurePanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
@@ -301,6 +302,8 @@ const Index = () => {
             <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
+
+            <ExposurePanel exposure={analysisData.exposure} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">
