@@ -195,6 +195,22 @@ export interface CorsSecurityInfo {
   strengths: string[];
 }
 
+export interface ApiSurfaceProbe {
+  label: string;
+  path: string;
+  statusCode: number;
+  finalUrl: string;
+  classification: "absent" | "public" | "restricted" | "interesting";
+  contentType: string | null;
+  detail: string;
+}
+
+export interface ApiSurfaceInfo {
+  probes: ApiSurfaceProbe[];
+  issues: string[];
+  strengths: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -221,4 +237,5 @@ export interface AnalysisResult {
   htmlSecurity: HtmlSecurityInfo;
   exposure: ExposureSummary;
   corsSecurity: CorsSecurityInfo;
+  apiSurface: ApiSurfaceInfo;
 }

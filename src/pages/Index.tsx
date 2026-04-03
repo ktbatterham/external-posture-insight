@@ -22,6 +22,7 @@ import { UrlForm } from "@/components/UrlForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
+import { ApiSurfacePanel } from "@/components/ApiSurfacePanel";
 
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
 const HISTORY_KEY = "secure-header-insight:history";
@@ -310,6 +311,8 @@ const Index = () => {
             <ExposurePanel exposure={analysisData.exposure} />
 
             <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
+
+            <ApiSurfacePanel apiSurface={analysisData.apiSurface} />
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-8">

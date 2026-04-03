@@ -91,6 +91,12 @@ const EXPOSURE_PROBES = [
   { label: "Environment file", path: "/.env" },
 ];
 
+const API_SURFACE_PROBES = [
+  { label: "API root", path: "/api" },
+  { label: "GraphQL", path: "/graphql" },
+  { label: "Versioned API", path: "/api/v1" },
+];
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -1149,6 +1155,80 @@ async function analyzeCorsSecurity(finalUrl, responseHeaders) {
   };
 }
 
+async function analyzeApiSurface(finalUrl) {
+  const probes = [];
+  const issues = [];
+  const strengths = [];
+
+  for (const probe of API_SURFACE_PROBES) {
+    const targetUrl = new URL(probe.path, finalUrl.origin);
+    try {
+      let response = await requestWithHeaders(targetUrl, "GET", {
+        Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
+      });
+      let resolvedUrl = targetUrl;
+
+      if ([301, 302, 303, 307, 308].includes(response.statusCode) && headerValue(response.headers, "location")) {
+        const redirectData = await fetchWithRedirects(targetUrl, 2);
+        response = redirectData.response;
+        resolvedUrl = redirectData.finalUrl;
+      }
+
+      const contentType = headerValue(response.headers, "content-type");
+      let classification = "absent";
+      let detail = "Endpoint not found.";
+
+      if (response.statusCode === 401 || response.statusCode === 403) {
+        classification = "restricted";
+        detail = "Endpoint exists but requires authorization or is blocked.";
+        strengths.push(`${probe.label} appears access-controlled.`);
+      } else if (response.statusCode >= 200 && response.statusCode < 300) {
+        if ((contentType || "").includes("application/json")) {
+          classification = "public";
+          detail = "Public JSON-style endpoint responded successfully.";
+          issues.push(`${probe.label} appears publicly reachable at ${probe.path}.`);
+        } else {
+          classification = "interesting";
+          detail = "Endpoint responded successfully but does not clearly look like JSON.";
+        }
+      } else if (response.statusCode >= 300 && response.statusCode < 400) {
+        classification = "interesting";
+        detail = "Endpoint redirected.";
+      }
+
+      probes.push({
+        label: probe.label,
+        path: probe.path,
+        statusCode: response.statusCode,
+        finalUrl: resolvedUrl.toString(),
+        classification,
+        contentType,
+        detail,
+      });
+    } catch (error) {
+      probes.push({
+        label: probe.label,
+        path: probe.path,
+        statusCode: 0,
+        finalUrl: targetUrl.toString(),
+        classification: "absent",
+        contentType: null,
+        detail: error instanceof Error ? error.message : "Probe failed.",
+      });
+    }
+  }
+
+  if (!issues.length) {
+    strengths.push("No obviously public API endpoints were detected in the limited probe set.");
+  }
+
+  return {
+    probes,
+    issues,
+    strengths,
+  };
+}
+
 async function safeResolve(operation) {
   try {
     return await operation();
@@ -1504,6 +1584,7 @@ async function analyzeUrl(input) {
     htmlSecurity: await analyzeHtmlSecurity(new URL(result.finalUrl)),
     exposure: await analyzeExposure(new URL(result.finalUrl)),
     corsSecurity: await analyzeCorsSecurity(new URL(result.finalUrl), result.rawHeaders),
+    apiSurface: await analyzeApiSurface(new URL(result.finalUrl)),
   };
 }
 
