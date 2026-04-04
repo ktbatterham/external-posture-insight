@@ -41,7 +41,7 @@ export const UrlForm = ({ onSubmit, isLoading, initialValue = "" }: UrlFormProps
           <Globe className="h-5 w-5 text-slate-400" />
           <Input
             type="text"
-            placeholder="example.com or https://example.com"
+            placeholder="example.com"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             className="border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
@@ -52,6 +52,9 @@ export const UrlForm = ({ onSubmit, isLoading, initialValue = "" }: UrlFormProps
           {isLoading ? "Scanning..." : "Run Scan"}
         </Button>
       </div>
+      <p className="px-2 pt-3 text-sm text-slate-500">
+        Enter a domain or full URL. If you omit the scheme, the scanner will try HTTPS automatically.
+      </p>
     </form>
   );
 };

@@ -1,6 +1,7 @@
 import { Boxes, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { ApiSurfaceInfo } from "@/types/analysis";
 
 interface ApiSurfacePanelProps {
@@ -27,24 +28,34 @@ export const ApiSurfacePanel = ({ apiSurface }: ApiSurfacePanelProps) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3">
-          {apiSurface.probes.map((probe) => (
-            <div key={probe.path} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="font-semibold text-slate-950">{probe.label}</p>
-                  <p className="text-sm text-slate-500">{probe.path}</p>
+          {apiSurface.probes.map((probe) => {
+            const status = probe.statusCode ? getHttpStatusDetails(probe.statusCode) : null;
+            return (
+              <div key={probe.path} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-950">{probe.label}</p>
+                    <p className="text-sm text-slate-500">{probe.path}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className={styles[probe.classification]}>
+                      {probe.classification}
+                    </Badge>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {probe.statusCode ? `${probe.statusCode} ${status?.label}` : "n/a"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className={styles[probe.classification]}>
-                    {probe.classification}
-                  </Badge>
-                  <span className="text-sm font-semibold text-slate-700">{probe.statusCode || "n/a"}</span>
-                </div>
+                <p className="mt-3 text-sm text-slate-600">{probe.detail}</p>
+                {status ? (
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {status.meaning}
+                  </p>
+                ) : null}
+                {probe.contentType && <p className="mt-1 text-xs text-slate-500">{probe.contentType}</p>}
               </div>
-              <p className="mt-3 text-sm text-slate-600">{probe.detail}</p>
-              {probe.contentType && <p className="mt-1 text-xs text-slate-500">{probe.contentType}</p>}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="space-y-2">

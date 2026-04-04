@@ -1,6 +1,7 @@
 import { GitCompareArrows, Route } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { CrawlSummary } from "@/types/analysis";
 
 interface CrawlPanelProps {
@@ -70,40 +71,46 @@ export const CrawlPanel = ({ crawl }: CrawlPanelProps) => {
         )}
 
         <div className="grid gap-3">
-          {crawl.pages.map((page) => (
-            <div key={`${page.path}-${page.label}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-slate-950">{page.label}</h3>
-                    <code className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{page.path}</code>
+          {crawl.pages.map((page) => {
+            const status = page.statusCode ? getHttpStatusDetails(page.statusCode) : null;
+            return (
+              <div key={`${page.path}-${page.label}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-slate-950">{page.label}</h3>
+                      <code className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{page.path}</code>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">{page.finalUrl}</p>
                   </div>
-                  <p className="mt-2 text-sm text-slate-500">{page.finalUrl}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className={gradeStyles[page.grade] ?? gradeStyles.F}>
+                      {page.grade}
+                    </Badge>
+                    {page.sameOrigin ? (
+                      <span className="text-sm font-semibold text-slate-600">{page.score}/100</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-600">off-origin redirect</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className={gradeStyles[page.grade] ?? gradeStyles.F}>
-                    {page.grade}
-                  </Badge>
-                  {page.sameOrigin ? (
-                    <span className="text-sm font-semibold text-slate-600">{page.score}/100</span>
-                  ) : (
-                    <span className="text-sm font-semibold text-slate-600">off-origin redirect</span>
-                  )}
+                <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+                  <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+                    <div>Status {page.statusCode ? `${page.statusCode} ${status?.label}` : "unreachable"} · {page.responseTimeMs}ms</div>
+                    {status ? (
+                      <div className="mt-1 text-xs leading-5 text-slate-500">{status.meaning}</div>
+                    ) : null}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+                    Missing: {!page.sameOrigin ? "not compared" : page.missingHeaders.length ? page.missingHeaders.join(", ") : "none"}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+                    Warnings: {!page.sameOrigin ? "not compared" : page.warningHeaders.length ? page.warningHeaders.join(", ") : "none"}
+                  </div>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
-                  Status {page.statusCode || "unreachable"} · {page.responseTimeMs}ms
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
-                  Missing: {!page.sameOrigin ? "not compared" : page.missingHeaders.length ? page.missingHeaders.join(", ") : "none"}
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
-                  Warnings: {!page.sameOrigin ? "not compared" : page.warningHeaders.length ? page.warningHeaders.join(", ") : "none"}
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

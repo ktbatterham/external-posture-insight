@@ -496,11 +496,38 @@ function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects
     }
   }
 
+  const scoredCookies = new Map();
   for (const cookie of cookies) {
-    if (!cookie.secure) score -= 6;
-    if (!cookie.httpOnly) score -= 4;
-    if (!cookie.sameSite) score -= 4;
+    const expiresAt = cookie.expires ? Date.parse(cookie.expires) : NaN;
+    if (!Number.isNaN(expiresAt) && expiresAt <= Date.now()) {
+      continue;
+    }
+
+    const cookieKey = cookie.name.toLowerCase();
+    const existing = scoredCookies.get(cookieKey);
+    const candidate = existing
+      ? {
+          secure: existing.secure && cookie.secure,
+          httpOnly: existing.httpOnly && cookie.httpOnly,
+          sameSite: existing.sameSite && cookie.sameSite,
+        }
+      : {
+          secure: cookie.secure,
+          httpOnly: cookie.httpOnly,
+          sameSite: cookie.sameSite,
+        };
+    scoredCookies.set(cookieKey, candidate);
   }
+
+  let cookiePenalty = 0;
+  for (const cookie of scoredCookies.values()) {
+    let perCookiePenalty = 0;
+    if (!cookie.secure) perCookiePenalty += 2;
+    if (!cookie.httpOnly) perCookiePenalty += 1;
+    if (!cookie.sameSite) perCookiePenalty += 1;
+    cookiePenalty += Math.min(perCookiePenalty, 4);
+  }
+  score -= Math.min(cookiePenalty, 10);
 
   if (redirects.length > 1) {
     score -= Math.min(redirects.length - 1, 4) * 2;
