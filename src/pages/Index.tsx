@@ -7,6 +7,7 @@ import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
 import { CrawlPanel } from "@/components/CrawlPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
+import { DisclosureTrustPanel } from "@/components/DisclosureTrustPanel";
 import { ExposurePanel } from "@/components/ExposurePanel";
 import { ExecutiveSummaryPanel } from "@/components/ExecutiveSummaryPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
@@ -23,6 +24,7 @@ import { RedirectChain } from "@/components/RedirectChain";
 import { SecurityGrade } from "@/components/SecurityGrade";
 import { SecurityTxtPanel } from "@/components/SecurityTxtPanel";
 import { TechnologyStack } from "@/components/TechnologyStack";
+import { TaxonomySummaryPanel } from "@/components/TaxonomySummaryPanel";
 import { ThirdPartyTrustPanel } from "@/components/ThirdPartyTrustPanel";
 import { UrlForm } from "@/components/UrlForm";
 import { Button } from "@/components/ui/button";
@@ -598,6 +600,8 @@ const Index = () => {
               <PostureSummaryPanel analysis={analysisData} />
             </div>
 
+            <TaxonomySummaryPanel analysis={analysisData} />
+
             <div id="findings" className="grid gap-8 xl:grid-cols-2">
               <PriorityActionsPanel analysis={analysisData} />
               <MonitoringPanel analysis={analysisData} diff={historyDiff} />
@@ -611,9 +615,10 @@ const Index = () => {
               <HistoryPanel history={history} diff={historyDiff} />
             </div>
 
-            <div id="trust" className="grid gap-8 xl:grid-cols-2">
+            <div id="trust" className="grid gap-8 xl:grid-cols-3">
               <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
               <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
+              <DisclosureTrustPanel analysis={analysisData} />
             </div>
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
