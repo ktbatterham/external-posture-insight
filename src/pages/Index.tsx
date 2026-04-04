@@ -54,6 +54,16 @@ interface MonitoredTarget {
 const METRIC_CARD_CLASS =
   "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur";
 
+const REPORT_SECTIONS = [
+  { id: "overview", label: "Overview" },
+  { id: "findings", label: "Findings" },
+  { id: "trust", label: "Trust" },
+  { id: "discovery", label: "Discovery" },
+  { id: "exposure", label: "Exposure" },
+  { id: "headers", label: "Headers" },
+  { id: "cookies", label: "Cookies" },
+] as const;
+
 const loadRecentScans = (): RecentScan[] => {
   if (typeof window === "undefined") {
     return [];
@@ -219,6 +229,8 @@ const buildHistoryDiff = (history: HistorySnapshot[]): HistoryDiff | null => {
       .filter((change) => change.from !== change.to),
   };
 };
+
+const sectionTitleClass = "text-xs font-semibold uppercase tracking-[0.18em] text-slate-500";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -463,23 +475,82 @@ const Index = () => {
 
         {analysisData && (
           <section className="mt-8 space-y-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <SecurityGrade
-                grade={analysisData.grade}
-                score={analysisData.score}
-                summary={analysisData.summary}
-              />
-              <div className="flex gap-3">
-                <Button variant="outline" className="rounded-2xl" onClick={exportMarkdown}>
-                  Export Markdown
-                </Button>
-                <Button variant="outline" className="rounded-2xl" onClick={exportHtml}>
-                  Export HTML
-                </Button>
-                <Button variant="outline" className="rounded-2xl" onClick={exportReport}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export JSON
-                </Button>
+            <div id="overview" className="space-y-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <SecurityGrade
+                  grade={analysisData.grade}
+                  score={analysisData.score}
+                  summary={analysisData.summary}
+                />
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="outline" className="rounded-2xl" onClick={exportMarkdown}>
+                    Export Markdown
+                  </Button>
+                  <Button variant="outline" className="rounded-2xl" onClick={exportHtml}>
+                    Export HTML
+                  </Button>
+                  <Button variant="outline" className="rounded-2xl" onClick={exportReport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export JSON
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <p className={sectionTitleClass}>Scanned target</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-950">{analysisData.host}</p>
+                      <p className="mt-1 text-sm text-slate-500">{analysisData.finalUrl}</p>
+                    </div>
+                    <div>
+                      <p className={sectionTitleClass}>Overall posture</p>
+                      <p className="mt-2 text-lg font-semibold capitalize text-slate-950">
+                        {analysisData.executiveSummary.posture}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">{analysisData.executiveSummary.mainRisk}</p>
+                    </div>
+                    <div>
+                      <p className={sectionTitleClass}>Scan timestamp</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-950">
+                        {new Date(analysisData.scannedAt).toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">Latest completed scan for this target in this browser.</p>
+                    </div>
+                    <div>
+                      <p className={sectionTitleClass}>What to do first</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-950">
+                        {analysisData.headers.filter((header) => header.status !== "present").length > 0
+                          ? "Fix missing protections"
+                          : "Review deeper posture"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Start with the executive readout and priority actions before drilling into raw details.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="p-5">
+                    <p className={sectionTitleClass}>Jump to</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {REPORT_SECTIONS.map((section) => (
+                        <a
+                          key={section.id}
+                          href={`#${section.id}`}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-900"
+                        >
+                          {section.label}
+                        </a>
+                      ))}
+                    </div>
+                    <p className="mt-4 text-sm leading-6 text-slate-500">
+                      The report is organized from decision support first to raw evidence later, so you can skim the story before diving into the mechanics.
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
             </div>
 
@@ -527,18 +598,20 @@ const Index = () => {
               <PostureSummaryPanel analysis={analysisData} />
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-2">
+            <div id="findings" className="grid gap-8 xl:grid-cols-2">
               <PriorityActionsPanel analysis={analysisData} />
               <MonitoringPanel analysis={analysisData} diff={historyDiff} />
             </div>
 
             <RemediationPanel remediation={analysisData.remediation} />
 
-            <CrawlPanel crawl={analysisData.crawl} />
+            <div id="discovery" className="space-y-8">
+              <CrawlPanel crawl={analysisData.crawl} />
 
-            <HistoryPanel history={history} diff={historyDiff} />
+              <HistoryPanel history={history} diff={historyDiff} />
+            </div>
 
-            <div className="grid gap-8 xl:grid-cols-2">
+            <div id="trust" className="grid gap-8 xl:grid-cols-2">
               <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
               <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
             </div>
@@ -550,14 +623,16 @@ const Index = () => {
               <ThirdPartyTrustPanel thirdPartyTrust={analysisData.thirdPartyTrust} />
             </div>
 
-            <ExposurePanel exposure={analysisData.exposure} />
+            <div id="exposure" className="space-y-8">
+              <ExposurePanel exposure={analysisData.exposure} />
 
-            <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
+              <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
 
-            <ApiSurfacePanel apiSurface={analysisData.apiSurface} />
+              <ApiSurfacePanel apiSurface={analysisData.apiSurface} />
+            </div>
 
             <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
-              <div className="space-y-8">
+              <div id="headers" className="space-y-8">
                 <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                   <h2 className="mb-4 text-2xl font-bold text-slate-950">Security Headers</h2>
                   <HeadersTable headers={analysisData.headers} />
@@ -573,7 +648,7 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-2">
+            <div id="cookies" className="grid gap-8 xl:grid-cols-2">
               <TechnologyStack technologies={analysisData.technologies} />
               <CookieAnalysis cookies={analysisData.cookies} />
             </div>
