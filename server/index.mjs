@@ -186,6 +186,39 @@ function normalizeUrl(input) {
   return normalized;
 }
 
+function shouldRetryOverHttp(error) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("socket hang up") ||
+    message.includes("econnreset") ||
+    message.includes("tls") ||
+    message.includes("ssl") ||
+    message.includes("wrong version number") ||
+    message.includes("alert handshake failure")
+  );
+}
+
+function formatErrorMessage(error) {
+  if (error instanceof AggregateError && Array.isArray(error.errors) && error.errors.length) {
+    const messages = error.errors
+      .map((item) => (item instanceof Error ? item.message : String(item)))
+      .filter(Boolean);
+    if (messages.length) {
+      return messages.join("; ");
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Unable to analyze URL.";
+}
+
 function headerValue(headers, name) {
   const value = headers[name];
   if (Array.isArray(value)) {
@@ -614,12 +647,12 @@ function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects
   const headerPenalty = {
     "strict-transport-security": { missing: 10, warning: 4 },
     "content-security-policy": { missing: 12, warning: 4 },
-    "x-frame-options": { missing: 5, warning: 2 },
-    "x-content-type-options": { missing: 5, warning: 2 },
-    "referrer-policy": { missing: 5, warning: 2 },
-    "permissions-policy": { missing: 2, warning: 1 },
-    "cross-origin-opener-policy": { missing: 2, warning: 1 },
-    "cross-origin-resource-policy": { missing: 2, warning: 1 },
+    "x-frame-options": { missing: 3, warning: 2 },
+    "x-content-type-options": { missing: 4, warning: 2 },
+    "referrer-policy": { missing: 3, warning: 2 },
+    "permissions-policy": { missing: 1, warning: 1 },
+    "cross-origin-opener-policy": { missing: 1, warning: 1 },
+    "cross-origin-resource-policy": { missing: 1, warning: 1 },
   };
 
   if (!isHttps) {
@@ -673,13 +706,15 @@ function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects
 
   let cookiePenalty = 0;
   for (const cookie of scoredCookies.values()) {
+    const cookieName = cookie.name || "";
+    const isLikelyPreferenceCookie = /(locale|lang|language|country|theme|consent|prefs?|preference|visitor|device|did)/i.test(cookieName);
     let perCookiePenalty = 0;
-    if (!cookie.secure) perCookiePenalty += 2;
-    if (!cookie.httpOnly) perCookiePenalty += 1;
+    if (!cookie.secure) perCookiePenalty += 1;
+    if (!cookie.httpOnly && !isLikelyPreferenceCookie) perCookiePenalty += 1;
     if (!cookie.sameSite) perCookiePenalty += 1;
     cookiePenalty += Math.min(perCookiePenalty, 4);
   }
-  score -= Math.min(cookiePenalty, 10);
+  score -= Math.min(cookiePenalty, 8);
 
   if (redirects.length > 1) {
     score -= Math.min(redirects.length - 1, 4) * 2;
@@ -2550,8 +2585,27 @@ async function analyzeDomainSecurity(host) {
 
 async function analyzeUrlCore(input, options = {}) {
   const { includeCertificate = true } = options;
-  const normalizedUrl = input instanceof URL ? input : normalizeUrl(input);
-  const requestData = await fetchWithRedirects(normalizedUrl);
+  let normalizedUrl = input instanceof URL ? input : normalizeUrl(input);
+  let requestData;
+
+  try {
+    requestData = await fetchWithRedirects(normalizedUrl);
+  } catch (error) {
+    if (normalizedUrl.protocol === "https:" && shouldRetryOverHttp(error)) {
+      const fallbackUrl = new URL(normalizedUrl);
+      fallbackUrl.protocol = "http:";
+      normalizedUrl = fallbackUrl;
+      try {
+        requestData = await fetchWithRedirects(normalizedUrl);
+      } catch (fallbackError) {
+        throw new Error(
+          `HTTPS failed and the site did not respond cleanly over HTTP either: ${formatErrorMessage(fallbackError)}`,
+        );
+      }
+    } else {
+      throw error;
+    }
+  }
   const certificate = includeCertificate
     ? await scanTls(requestData.finalUrl)
     : {
@@ -2859,7 +2913,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, result);
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Unable to analyze URL.",
+        error: formatErrorMessage(error),
       });
     }
     return;
