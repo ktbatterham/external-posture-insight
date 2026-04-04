@@ -88,6 +88,36 @@ const saveMonitoredTargets = (targets: MonitoredTarget[]) => {
   return targets;
 };
 
+const syncMonitoredTargetFromAnalysis = (targets: MonitoredTarget[], payload: AnalysisResult) => {
+  let changed = false;
+  const next = targets.map((target) => {
+    const matchesTarget =
+      target.url === payload.finalUrl || target.url === payload.normalizedUrl || target.label === payload.host;
+    if (!matchesTarget) {
+      return target;
+    }
+
+    const updatedTarget = {
+      ...target,
+      url: payload.finalUrl,
+      label: payload.host,
+      lastScannedAt: payload.scannedAt,
+    };
+
+    if (
+      updatedTarget.url !== target.url ||
+      updatedTarget.label !== target.label ||
+      updatedTarget.lastScannedAt !== target.lastScannedAt
+    ) {
+      changed = true;
+    }
+
+    return updatedTarget;
+  });
+
+  return changed ? next : targets;
+};
+
 const cadenceMs: Record<MonitoredTarget["cadence"], number> = {
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
@@ -277,12 +307,10 @@ const Index = () => {
         setHistoryDiff(buildHistoryDiff(nextHistory));
       }
       setMonitoredTargets((current) => {
-        const next = current.map((target) =>
-          target.url === payload.finalUrl || target.url === payload.normalizedUrl || target.label === payload.host
-            ? { ...target, url: payload.finalUrl, label: payload.host, lastScannedAt: payload.scannedAt }
-            : target,
-        );
-        saveMonitoredTargets(next);
+        const next = syncMonitoredTargetFromAnalysis(current, payload);
+        if (next !== current) {
+          saveMonitoredTargets(next);
+        }
         return next;
       });
     });
@@ -364,18 +392,26 @@ const Index = () => {
 
     setIsLoading(true);
     let successCount = 0;
+    let failureCount = 0;
 
-    try {
-      for (const [index, target] of dueTargets.entries()) {
-        await analyzeUrl(target.url, index === dueTargets.length - 1);
+    for (const target of dueTargets) {
+      try {
+        await analyzeUrl(target.url, false);
         successCount += 1;
+      } catch {
+        failureCount += 1;
       }
-      toast.success(`Completed ${successCount} due monitoring scan${successCount === 1 ? "" : "s"}.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "One of the due monitoring scans failed.");
-    } finally {
-      setIsLoading(false);
     }
+
+    if (successCount && failureCount) {
+      toast.warning(`Completed ${successCount} due monitoring scan${successCount === 1 ? "" : "s"} with ${failureCount} failure${failureCount === 1 ? "" : "s"}.`);
+    } else if (successCount) {
+      toast.success(`Completed ${successCount} due monitoring scan${successCount === 1 ? "" : "s"}.`);
+    } else {
+      toast.error("All due monitoring scans failed.");
+    }
+
+    setIsLoading(false);
   };
 
   const exportReport = () => {

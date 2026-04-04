@@ -1279,11 +1279,24 @@ function mergeTechnologies(...groups) {
   return merged;
 }
 
-async function analyzeHtmlSecurity(finalUrl) {
+async function fetchHtmlDocument(finalUrl) {
+  const response = await requestText(finalUrl);
+  const contentType = headerValue(response.headers, "content-type") || "";
+  if (!contentType.toLowerCase().includes("text/html")) {
+    return null;
+  }
+
+  const html = response.body;
+  return {
+    html,
+    pageTitle: getHtmlTitle(html),
+    signature: normalizeHtmlSignature(html),
+  };
+}
+
+function analyzeHtmlSecurity(finalUrl, document) {
   try {
-    const response = await requestText(finalUrl);
-    const contentType = headerValue(response.headers, "content-type") || "";
-    if (!contentType.toLowerCase().includes("text/html")) {
+    if (!document) {
       return {
         fetched: false,
         pageUrl: finalUrl.toString(),
@@ -1313,10 +1326,10 @@ async function analyzeHtmlSecurity(finalUrl) {
       };
     }
 
-    const html = response.body;
+    const html = document.html;
     const issues = [];
     const strengths = [];
-    const pageTitle = getHtmlTitle(html);
+    const pageTitle = document.pageTitle;
     const metaGenerator = getAttribute(
       html.match(/<meta\b[^>]*name\s*=\s*["']generator["'][^>]*>/i)?.[0] || "",
       "content",
@@ -1749,24 +1762,12 @@ async function analyzeCorsSecurity(finalUrl, responseHeaders) {
   };
 }
 
-async function analyzeApiSurface(finalUrl) {
+async function analyzeApiSurface(finalUrl, homepageContext = null) {
   const probes = [];
   const issues = [];
   const strengths = [];
-  let homepageSignature = "";
-  let homepageTitle = null;
-
-  try {
-    const homepageResponse = await requestText(finalUrl, {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    });
-    if (homepageResponse.statusCode >= 200 && homepageResponse.statusCode < 300) {
-      homepageSignature = normalizeHtmlSignature(homepageResponse.body);
-      homepageTitle = extractHtmlTitle(homepageResponse.body);
-    }
-  } catch {
-    // Ignore homepage body fetch failures and continue with probe-only heuristics.
-  }
+  const homepageSignature = homepageContext?.signature || "";
+  const homepageTitle = homepageContext?.pageTitle || null;
 
   for (const probe of API_SURFACE_PROBES) {
     const targetUrl = new URL(probe.path, finalUrl.origin);
@@ -2265,7 +2266,13 @@ async function crawlRelatedPages(rootResult, discovery) {
 async function analyzeUrl(input) {
   const result = await analyzeUrlCore(input, { includeCertificate: true });
   const finalUrl = new URL(result.finalUrl);
-  const htmlSecurity = await analyzeHtmlSecurity(finalUrl);
+  let htmlDocument = null;
+  try {
+    htmlDocument = await fetchHtmlDocument(finalUrl);
+  } catch {
+    htmlDocument = null;
+  }
+  const htmlSecurity = analyzeHtmlSecurity(finalUrl, htmlDocument);
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
   const publicSignals = await fetchPublicSignals(result.host);
 
@@ -2279,7 +2286,7 @@ async function analyzeUrl(input) {
     aiSurface: htmlSecurity.aiSurface,
     exposure: await analyzeExposure(finalUrl),
     corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders),
-    apiSurface: await analyzeApiSurface(finalUrl),
+    apiSurface: await analyzeApiSurface(finalUrl, htmlDocument),
     publicSignals,
   };
 }
