@@ -879,8 +879,11 @@ function isAccessDeniedHtml(headers, body) {
     server.includes("sucuri") ||
     bodyText.includes("website security - access denied") ||
     bodyText.includes("access denied") ||
+    bodyText.includes("403 forbidden") ||
+    bodyText.includes("request forbidden by administrative rules") ||
     bodyText.includes("request blocked") ||
-    title.includes("access denied")
+    title.includes("access denied") ||
+    title.includes("403 forbidden")
   ) {
     return true;
   }
@@ -1863,8 +1866,10 @@ async function analyzeExposure(finalUrl) {
         resolvedUrl = redirectData.finalUrl;
       } else {
         response = await requestOnce(probeUrl, "HEAD");
-        if (response.statusCode === 405 || response.statusCode === 403) {
+        if (response.statusCode === 405) {
           response = await requestOnce(probeUrl, "GET");
+        } else if (response.statusCode === 401 || response.statusCode === 403) {
+          response = await requestText(probeUrl);
         }
       }
 
@@ -1893,9 +1898,21 @@ async function analyzeExposure(finalUrl) {
         detail = "Sensitive path returned a successful response.";
         issues.push(`${probe.label} may be exposed at ${probe.path}.`);
       } else if (response.statusCode === 401 || response.statusCode === 403) {
-        finding = "interesting";
-        detail = "Sensitive path exists but is access-controlled.";
-        strengths.push(`${probe.label} appears access-controlled.`);
+        const contentType = headerValue(response.headers, "content-type") || "";
+        const blockedByGenericRules =
+          typeof response.body === "string" &&
+          contentType.includes("text/html") &&
+          isAccessDeniedHtml(response.headers, response.body);
+
+        if (blockedByGenericRules) {
+          finding = "blocked";
+          detail = "Probe was blocked by generic server or edge protection rules. This does not confirm the sensitive file exists.";
+          strengths.push(`${probe.label} probe was blocked by generic protection.`);
+        } else {
+          finding = "interesting";
+          detail = "Sensitive path may exist but is access-controlled.";
+          strengths.push(`${probe.label} appears access-controlled.`);
+        }
       } else if (response.statusCode >= 500) {
         finding = "error";
         detail = "Sensitive path triggered a server-side error, so the path may exist or be handled unexpectedly.";

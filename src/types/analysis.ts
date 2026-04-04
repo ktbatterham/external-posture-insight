@@ -224,7 +224,7 @@ export interface ExposureProbe {
   path: string;
   statusCode: number;
   finalUrl: string;
-  finding: "safe" | "interesting" | "exposed" | "error";
+  finding: "safe" | "interesting" | "blocked" | "exposed" | "error";
   detail: string;
 }
 
