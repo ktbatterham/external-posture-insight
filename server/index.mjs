@@ -1899,14 +1899,33 @@ function toCandidateLabel(pathname) {
     return "Homepage";
   }
 
-  return pathname
+  const segments = pathname
     .split("?")[0]
     .split("/")
     .filter(Boolean)
-    .slice(0, 2)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ")
-    .replace(/-/g, " ");
+    .map((segment) => decodeURIComponent(segment).replace(/[-_]+/g, " ").trim())
+    .filter(Boolean);
+
+  const uniqueSegments = segments.filter((segment, index) => {
+    return index === 0 || segment.toLowerCase() !== segments[index - 1].toLowerCase();
+  });
+
+  const preferredSegments =
+    uniqueSegments.length <= 2
+      ? uniqueSegments
+      : [uniqueSegments[0], uniqueSegments[uniqueSegments.length - 1]];
+
+  const label = preferredSegments
+    .map((segment) =>
+      segment
+        .split(/\s+/)
+        .slice(0, 3)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" "),
+    )
+    .join(" / ");
+
+  return label.length > 42 ? `${label.slice(0, 39).trimEnd()}...` : label;
 }
 
 function buildCrawlCandidates(result, discoveryPaths = []) {

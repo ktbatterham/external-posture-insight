@@ -30,6 +30,8 @@ const categoryConfig = {
   },
 } as const;
 
+const categoryOrder: Array<keyof typeof categoryConfig> = ["network", "hosting", "server", "frontend", "security"];
+
 export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
   if (!technologies.length) {
     return null;
@@ -49,7 +51,8 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {Object.entries(grouped).map(([category, items]) => {
+        {categoryOrder.filter((category) => grouped[category]?.length).map((category) => {
+          const items = grouped[category];
           const config = categoryConfig[category as keyof typeof categoryConfig];
           return (
             <div key={category} className="space-y-3">

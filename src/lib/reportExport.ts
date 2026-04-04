@@ -56,6 +56,21 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- HSTS preload status: ${analysis.publicSignals.hstsPreload.status}`,
     `- HSTS preload note: ${analysis.publicSignals.hstsPreload.summary}`,
     "",
+    "## Passive Discovery",
+    "",
+    `- Page title: ${analysis.htmlSecurity.pageTitle ?? "Unavailable"}`,
+    `- Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}`,
+    `- Same-origin paths discovered: ${analysis.htmlSecurity.firstPartyPaths.length}`,
+    ...(analysis.htmlSecurity.firstPartyPaths.length
+      ? analysis.htmlSecurity.firstPartyPaths.map((path) => `- Path: ${path}`)
+      : ["- No same-origin paths discovered from the fetched page."]),
+    "",
+    "## Detected Stack",
+    "",
+    ...(analysis.technologies.length
+      ? analysis.technologies.map((tech) => `- ${tech.name} (${tech.category})${tech.evidence ? `: ${tech.evidence}` : ""}`)
+      : ["- No stack signals recorded."]),
+    "",
     "## Low-Noise Exposure Checks",
     "",
     ...analysis.exposure.probes.map(
@@ -91,6 +106,14 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
         `<li><strong>${probe.label}</strong> (${probe.path}): ${probe.finding} (${probe.statusCode}) - ${probe.detail}</li>`,
     )
     .join("");
+  const technologyItems = analysis.technologies.length
+    ? analysis.technologies
+        .map((tech) => `<li><strong>${tech.name}</strong> (${tech.category})<br>${tech.evidence}</li>`)
+        .join("")
+    : "<li>No stack signals recorded.</li>";
+  const discoveryItems = analysis.htmlSecurity.firstPartyPaths.length
+    ? analysis.htmlSecurity.firstPartyPaths.map((path) => `<li>${path}</li>`).join("")
+    : "<li>No same-origin paths discovered from the fetched page.</li>";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -137,6 +160,16 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <h2>Public Trust Signals</h2>
       <p>HSTS preload status: ${analysis.publicSignals.hstsPreload.status}</p>
       <p>${analysis.publicSignals.hstsPreload.summary}</p>
+    </div>
+    <div class="card">
+      <h2>Passive Discovery</h2>
+      <p>Page title: ${analysis.htmlSecurity.pageTitle ?? "Unavailable"}</p>
+      <p>Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}</p>
+      <ul>${discoveryItems}</ul>
+    </div>
+    <div class="card">
+      <h2>Detected Stack</h2>
+      <ul>${technologyItems}</ul>
     </div>
     <div class="card">
       <h2>Low-Noise Exposure Checks</h2>

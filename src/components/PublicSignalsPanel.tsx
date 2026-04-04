@@ -14,6 +14,12 @@ const statusStyles = {
   unknown: "bg-slate-200 text-slate-800",
 } as const;
 
+const formatStatus = (status: PublicSignalsInfo["hstsPreload"]["status"]) =>
+  status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) => {
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -28,7 +34,7 @@ export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) =
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">HSTS preload dataset</p>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[publicSignals.hstsPreload.status]}`}>
-              {publicSignals.hstsPreload.status.replace(/_/g, " ")}
+              {formatStatus(publicSignals.hstsPreload.status)}
             </span>
           </div>
           <p className="mt-3 text-sm text-slate-700">{publicSignals.hstsPreload.summary}</p>
