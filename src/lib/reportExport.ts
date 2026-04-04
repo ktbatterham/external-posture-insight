@@ -42,7 +42,9 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- Warning findings: ${summary.warning}`,
     `- Informational findings: ${summary.info}`,
     "",
-    "## Area Scores",
+    "## Category Scores",
+    "",
+    "- These category scores are directional breakdowns by posture area. They explain where risk is concentrated, but they are not intended to exactly match the single overall score.",
     "",
     ...areas.map((area) => `- ${area.label}: ${area.score}/100 (${area.status})`),
     "",
@@ -211,7 +213,8 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <p>Informational findings: ${summary.info}</p>
     </div>
     <div class="card">
-      <h2>Area Scores</h2>
+      <h2>Category Scores</h2>
+      <p>These category scores are directional breakdowns by posture area. They explain where risk is concentrated, but they are not intended to exactly match the single overall score.</p>
       <ul>${areaItems}</ul>
     </div>
     <div class="card">

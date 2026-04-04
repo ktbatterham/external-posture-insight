@@ -36,7 +36,10 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
         </div>
 
         <div className="rounded-2xl bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Normalized area scores</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Category scores</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            These category scores are directional breakdowns of the posture by area. They help explain where risk is concentrated, but they are not intended to add up to or exactly match the single overall score.
+          </p>
           <div className="mt-3 grid gap-2">
             {areaScores.map((area) => (
               <div key={area.key} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
