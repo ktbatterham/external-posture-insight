@@ -1119,6 +1119,92 @@ function collectPassiveLeakSignals(html, finalUrl, metaGenerator, externalScript
   return signals;
 }
 
+function collectClientExposureSignals(html, finalUrl) {
+  const signals = [];
+  const htmlLower = html.toLowerCase();
+
+  const rawEndpoints = summarizeEvidence([
+    ...[...html.matchAll(/https?:\/\/[^"'`\s<>()]*(?:\/(?:api|graphql|trpc|socket\.io|rpc)[^"'`\s<>()]*)/gi)].map((match) => match[0]),
+    ...[...html.matchAll(/["'`](\/(?:api|graphql|trpc|socket\.io|_next\/data)[^"'`<>\s]*)["'`]/gi)].map((match) => match[1]),
+    ...[...html.matchAll(/["'`](\/[a-z0-9/_-]*(?:graphql|api|trpc)[^"'`<>\s]*)["'`]/gi)].map((match) => match[1]),
+  ], 6).map((value) => {
+    try {
+      return new URL(value, finalUrl).toString();
+    } catch {
+      return value;
+    }
+  });
+
+  if (rawEndpoints.length) {
+    signals.push({
+      category: "api_endpoint",
+      severity: "info",
+      title: "Client-visible API endpoints were referenced",
+      detail: "The fetched page exposes endpoint-style paths or URLs in markup or bootstrap data. That is often normal, but it makes the public application surface easier to enumerate.",
+      evidence: rawEndpoints,
+    });
+  }
+
+  const serviceMarkers = summarizeEvidence([
+    /supabase/i.test(html) ? "Supabase" : null,
+    /algolia/i.test(html) ? "Algolia" : null,
+    /sentry/i.test(html) ? "Sentry" : null,
+    /firebase/i.test(html) ? "Firebase" : null,
+    /segment/i.test(html) ? "Segment" : null,
+    /launchdarkly/i.test(html) ? "LaunchDarkly" : null,
+    /amplitude/i.test(html) ? "Amplitude" : null,
+  ]);
+
+  if (serviceMarkers.length) {
+    signals.push({
+      category: "service",
+      severity: "info",
+      title: "Client-integrated services were visible",
+      detail: "Public page content reveals named third-party or backend-adjacent client integrations. Review what configuration or identifiers are intentionally exposed.",
+      evidence: serviceMarkers,
+    });
+  }
+
+  const configMarkers = summarizeEvidence([
+    /apiBaseUrl/i.test(html) ? "apiBaseUrl" : null,
+    /graphqlEndpoint/i.test(html) ? "graphqlEndpoint" : null,
+    /sentryDsn/i.test(html) ? "sentryDsn" : null,
+    /supabaseUrl/i.test(html) ? "supabaseUrl" : null,
+    /projectId/i.test(html) && /apiKey/i.test(html) ? "projectId + apiKey" : null,
+    /environment["']?\s*:\s*["'][^"']+/i.test(html) ? "environment" : null,
+  ]);
+
+  if (configMarkers.length) {
+    signals.push({
+      category: "config",
+      severity: "info",
+      title: "Client configuration markers were visible",
+      detail: "The page includes configuration-style keys or bootstrap fields that may reveal how the client talks to backend services.",
+      evidence: configMarkers,
+    });
+  }
+
+  const environmentMarkers = summarizeEvidence([
+    /staging/i.test(htmlLower) ? "staging" : null,
+    /\bdev(elopment)?\b/i.test(htmlLower) ? "development" : null,
+    /internal/i.test(htmlLower) ? "internal" : null,
+    /sandbox/i.test(htmlLower) ? "sandbox" : null,
+    /preview/i.test(htmlLower) ? "preview" : null,
+  ]);
+
+  if (environmentMarkers.length) {
+    signals.push({
+      category: "environment",
+      severity: "warning",
+      title: "Environment naming was visible in client content",
+      detail: "The fetched page references environment-like labels such as staging, development, preview, or internal. That can be harmless, but it is worth checking for unintended environment leakage.",
+      evidence: environmentMarkers,
+    });
+  }
+
+  return signals;
+}
+
 function classifyHtmlApiFallback(probePath, finalUrl, resolvedUrl, body, homepageSignature, homepageTitle) {
   const looksLikeHtml = /<html[\s>]|<!doctype html/i.test(body);
   if (!looksLikeHtml) {
@@ -1848,6 +1934,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
         missingSriScriptUrls: [],
         firstPartyPaths: [],
         passiveLeakSignals: [],
+        clientExposureSignals: [],
         detectedTechnologies: [],
         aiSurface: {
           detected: false,
@@ -1939,6 +2026,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
       externalScriptUrls,
       externalStylesheetUrls,
     );
+    const clientExposureSignals = collectClientExposureSignals(html, finalUrl);
 
     if (forms.some((form) => form.hasPasswordField)) {
       strengths.push("Login-like form elements are present for passive inspection.");
@@ -1963,11 +2051,19 @@ function analyzeHtmlSecurity(finalUrl, document) {
         issues.push(signal.title);
       }
     }
+    for (const signal of clientExposureSignals) {
+      if (signal.severity === "warning") {
+        issues.push(signal.title);
+      }
+    }
     if (firstPartyPaths.length) {
       strengths.push(`Discovered ${firstPartyPaths.length} same-origin navigation paths for low-noise follow-up scans.`);
     }
     if (passiveLeakSignals.length) {
       strengths.push(`Passive pre-check identified ${passiveLeakSignals.length} leak or fingerprinting signal${passiveLeakSignals.length === 1 ? "" : "s"} worth review.`);
+    }
+    if (clientExposureSignals.length) {
+      strengths.push(`Client-side markup exposed ${clientExposureSignals.length} API or configuration signal${clientExposureSignals.length === 1 ? "" : "s"} for review.`);
     }
     if (!issues.length) {
       strengths.push("No obvious passive HTML transport/content risks detected on the fetched page.");
@@ -1987,6 +2083,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
       missingSriScriptUrls,
       firstPartyPaths,
       passiveLeakSignals,
+      clientExposureSignals,
       detectedTechnologies: detectHtmlTechnologies(
         html,
         finalUrl,
@@ -2013,6 +2110,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
       missingSriScriptUrls: [],
       firstPartyPaths: [],
       passiveLeakSignals: [],
+      clientExposureSignals: [],
       detectedTechnologies: [],
       aiSurface: {
         detected: false,
@@ -2387,9 +2485,9 @@ async function analyzeApiSurface(finalUrl, homepageContext = null) {
           classification = "restricted";
           detail = "Endpoint response appears to be a web application firewall or access-denied page.";
           strengths.push(`${probe.label} appears blocked by edge protection.`);
-        } else if (
-          (contentType || "").includes("text/html") &&
-          classifyHtmlApiFallback(
+        } else if ((contentType || "").includes("text/html")) {
+          classification = "fallback";
+          detail = classifyHtmlApiFallback(
             probe.path,
             finalUrl,
             resolvedUrl,
@@ -2397,9 +2495,8 @@ async function analyzeApiSurface(finalUrl, homepageContext = null) {
             homepageSignature,
             homepageTitle,
           )
-        ) {
-          classification = "fallback";
-          detail = "Endpoint appears to return the site's standard HTML page rather than an API response.";
+            ? "Endpoint appears to return the site's standard HTML page rather than an API response."
+            : "Endpoint returns an HTML page rather than a machine-readable API response.";
         } else {
           classification = "interesting";
           detail = "Endpoint responded successfully but does not clearly look like JSON.";

@@ -1,8 +1,9 @@
-import { startTransition, useState } from "react";
-import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { Activity, Clock3, Download, Link2, Presentation, Server } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
+import { ClientExposurePanel } from "@/components/ClientExposurePanel";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
 import { CrawlPanel } from "@/components/CrawlPanel";
@@ -13,6 +14,7 @@ import { ExecutiveSummaryPanel } from "@/components/ExecutiveSummaryPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { HomeDashboardPanel } from "@/components/HomeDashboardPanel";
 import { HtmlSecurityPanel } from "@/components/HtmlSecurityPanel";
 import { MonitoringPanel } from "@/components/MonitoringPanel";
 import { PostureSummaryPanel } from "@/components/PostureSummaryPanel";
@@ -20,6 +22,7 @@ import { PriorityActionsPanel } from "@/components/PriorityActionsPanel";
 import { PublicSignalsPanel } from "@/components/PublicSignalsPanel";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
+import { ReportModeBanner } from "@/components/ReportModeBanner";
 import { RedirectChain } from "@/components/RedirectChain";
 import { SecurityGrade } from "@/components/SecurityGrade";
 import { SecurityTxtPanel } from "@/components/SecurityTxtPanel";
@@ -241,6 +244,13 @@ const Index = () => {
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyDiff, setHistoryDiff] = useState<HistoryDiff | null>(null);
   const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>(loadMonitoredTargets);
+  const [reportMode, setReportMode] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return new URLSearchParams(window.location.search).get("view") === "report";
+  });
+  const autoScanRanRef = useRef(false);
 
   const persistAnalysis = (payload: AnalysisResult, setAsCurrent = true) => {
     startTransition(() => {
@@ -292,6 +302,28 @@ const Index = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || autoScanRanRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("target");
+    if (!target) {
+      return;
+    }
+
+    autoScanRanRef.current = true;
+    setIsLoading(true);
+    void analyzeUrl(target, true)
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
 
   const saveCurrentAsMonitored = (cadence: MonitoredTarget["cadence"]) => {
     if (!analysisData) {
@@ -397,9 +429,49 @@ const Index = () => {
     );
   };
 
+  const monitoredViews = monitoredTargets.map(toMonitoredTargetView);
+  const reportShareUrl =
+    typeof window !== "undefined" && analysisData
+      ? `${window.location.origin}${window.location.pathname}?view=report&target=${encodeURIComponent(analysisData.finalUrl)}`
+      : null;
+
+  const copyReportLink = async () => {
+    if (!reportShareUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(reportShareUrl);
+      toast.success("Report link copied.");
+    } catch {
+      toast.error("Could not copy the report link.");
+    }
+  };
+
+  const enterReportMode = () => {
+    setReportMode(true);
+    if (typeof window !== "undefined" && analysisData) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("view", "report");
+      url.searchParams.set("target", analysisData.finalUrl);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
+  const exitReportMode = () => {
+    setReportMode(false);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      url.searchParams.delete("target");
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(58,111,255,0.14),_transparent_30%),linear-gradient(180deg,_#f7fafc_0%,_#eef3f8_45%,_#f8fbfd_100%)]">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        {!reportMode && (
         <section className="rounded-[2rem] border border-white/70 bg-white/70 px-6 py-8 shadow-2xl shadow-slate-200/50 backdrop-blur sm:px-8">
           <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-6">
@@ -436,8 +508,9 @@ const Index = () => {
             </Card>
           </div>
         </section>
+        )}
 
-        {recentScans.length > 0 && (
+        {!reportMode && recentScans.length > 0 && (
           <section className="mt-8">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-600">
               <Clock3 className="h-4 w-4" />
@@ -462,9 +535,20 @@ const Index = () => {
           </section>
         )}
 
+        {!reportMode && (
+          <section className="mt-8">
+            <HomeDashboardPanel
+              monitoredCount={monitoredTargets.length}
+              dueCount={monitoredViews.filter((target) => target.due).length}
+              recentCount={recentScans.length}
+              lastScanAt={recentScans[0]?.scannedAt ?? null}
+            />
+          </section>
+        )}
+
         <section className="mt-8">
           <MonitoredTargetsPanel
-            targets={monitoredTargets.map(toMonitoredTargetView)}
+            targets={monitoredViews}
             currentUrl={analysisData?.finalUrl ?? null}
             onAddDaily={() => saveCurrentAsMonitored("daily")}
             onAddWeekly={() => saveCurrentAsMonitored("weekly")}
@@ -477,6 +561,17 @@ const Index = () => {
 
         {analysisData && (
           <section className="mt-8 space-y-8">
+            {reportMode ? (
+              <ReportModeBanner shareUrl={reportShareUrl} onCopy={copyReportLink} onExit={exitReportMode} />
+            ) : (
+              <div className="flex justify-end">
+                <Button variant="outline" className="rounded-2xl" onClick={enterReportMode}>
+                  <Presentation className="mr-2 h-4 w-4" />
+                  Report mode
+                </Button>
+              </div>
+            )}
+
             <div id="overview" className="space-y-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <SecurityGrade
@@ -622,6 +717,7 @@ const Index = () => {
             </div>
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
+            <ClientExposurePanel htmlSecurity={analysisData.htmlSecurity} />
 
             <div className="grid gap-8 xl:grid-cols-2">
               <AiSurfacePanel aiSurface={analysisData.aiSurface} />

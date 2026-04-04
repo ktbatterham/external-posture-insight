@@ -183,6 +183,14 @@ export interface PassiveLeakSignal {
   evidence: string[];
 }
 
+export interface ClientExposureSignal {
+  category: "api_endpoint" | "config" | "service" | "environment";
+  severity: "info" | "warning";
+  title: string;
+  detail: string;
+  evidence: string[];
+}
+
 export interface HtmlSecurityInfo {
   fetched: boolean;
   pageUrl: string | null;
@@ -197,6 +205,7 @@ export interface HtmlSecurityInfo {
   missingSriScriptUrls: string[];
   firstPartyPaths: string[];
   passiveLeakSignals: PassiveLeakSignal[];
+  clientExposureSignals: ClientExposureSignal[];
   detectedTechnologies: TechnologyResult[];
   issues: string[];
   strengths: string[];
