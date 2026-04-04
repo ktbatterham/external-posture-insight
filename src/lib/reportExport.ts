@@ -1,6 +1,7 @@
 import { getAiSurfaceClassificationSummary } from "@/lib/aiSurface";
 import { AnalysisResult } from "@/types/analysis";
 import { getAreaScores, getUnifiedIssueSummary } from "@/lib/posture";
+import { getAuthSurfaceSummary, getDataCollectionSummary } from "@/lib/passiveSurface";
 import { getPriorityActions } from "@/lib/priorities";
 import { getDisclosurePosture, getDominantThemes } from "@/lib/reportInsights";
 
@@ -43,6 +44,8 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
   const aiSummary = getAiSurfaceClassificationSummary(analysis.aiSurface);
   const taxonomy = getDominantThemes(analysis);
   const disclosure = getDisclosurePosture(analysis);
+  const authSurface = getAuthSurfaceSummary(analysis.htmlSecurity);
+  const dataCollection = getDataCollectionSummary(analysis.htmlSecurity);
 
   return [
     `# Security Report: ${analysis.host}`,
@@ -127,6 +130,27 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     ...buildDiscoveryLines(analysis),
     ...buildPassiveLeakLines(analysis),
     "",
+    "## Auth Surface",
+    "",
+    `- Summary: ${authSurface.summary}`,
+    `- Auth paths: ${authSurface.authPaths.length}`,
+    `- Password forms: ${authSurface.passwordFormCount}`,
+    `- External password form targets: ${authSurface.externalPasswordForms.length}`,
+    ...(authSurface.authPaths.length
+      ? authSurface.authPaths.map((item) => `- ${item.path} (${item.category})`)
+      : ["- No auth-adjacent paths discovered passively."]),
+    "",
+    "## Data Collection Surface",
+    "",
+    `- Summary: ${dataCollection.summary}`,
+    `- Public forms: ${dataCollection.totalForms}`,
+    `- POST forms: ${dataCollection.postForms}`,
+    `- External form targets: ${dataCollection.externalForms.length}`,
+    `- Insecure form submits: ${dataCollection.insecureForms}`,
+    ...(dataCollection.externalForms.length
+      ? dataCollection.externalForms.map((target) => `- External target: ${target}`)
+      : ["- No external form targets were detected."]),
+    "",
     "## Detected Stack",
     "",
     ...buildTechnologyLines(analysis),
@@ -166,6 +190,8 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const aiSummary = getAiSurfaceClassificationSummary(analysis.aiSurface);
   const taxonomy = getDominantThemes(analysis);
   const disclosure = getDisclosurePosture(analysis);
+  const authSurface = getAuthSurfaceSummary(analysis.htmlSecurity);
+  const dataCollection = getDataCollectionSummary(analysis.htmlSecurity);
   const issueItems = analysis.issues.length
     ? analysis.issues
         .map(
@@ -277,6 +303,27 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <ul>${discoveryItems}</ul>
       <p>Passive leak and fingerprinting signals:</p>
       <ul>${passiveLeakItems}</ul>
+    </div>
+    <div class="card">
+      <h2>Auth Surface</h2>
+      <p>${authSurface.summary}</p>
+      <p>Auth paths: ${authSurface.authPaths.length}</p>
+      <p>Password forms: ${authSurface.passwordFormCount}</p>
+      <p>External password targets: ${authSurface.externalPasswordForms.length}</p>
+      <ul>${authSurface.authPaths.length
+        ? authSurface.authPaths.map((item) => `<li>${item.path} (${item.category})</li>`).join("")
+        : "<li>No auth-adjacent paths discovered passively.</li>"}</ul>
+    </div>
+    <div class="card">
+      <h2>Data Collection Surface</h2>
+      <p>${dataCollection.summary}</p>
+      <p>Public forms: ${dataCollection.totalForms}</p>
+      <p>POST forms: ${dataCollection.postForms}</p>
+      <p>External form targets: ${dataCollection.externalForms.length}</p>
+      <p>Insecure form submits: ${dataCollection.insecureForms}</p>
+      <ul>${dataCollection.externalForms.length
+        ? dataCollection.externalForms.map((target) => `<li>${target}</li>`).join("")
+        : "<li>No external form targets were detected.</li>"}</ul>
     </div>
     <div class="card">
       <h2>Detected Stack</h2>

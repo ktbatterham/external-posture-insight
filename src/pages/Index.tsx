@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 import { Activity, Clock3, Download, Link2, Presentation, Server } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
@@ -7,6 +7,7 @@ import { ClientExposurePanel } from "@/components/ClientExposurePanel";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
 import { CrawlPanel } from "@/components/CrawlPanel";
+import { DataCollectionPanel } from "@/components/DataCollectionPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { DisclosureTrustPanel } from "@/components/DisclosureTrustPanel";
 import { ExposurePanel } from "@/components/ExposurePanel";
@@ -30,6 +31,7 @@ import { TechnologyStack } from "@/components/TechnologyStack";
 import { TaxonomySummaryPanel } from "@/components/TaxonomySummaryPanel";
 import { ThirdPartyTrustPanel } from "@/components/ThirdPartyTrustPanel";
 import { UrlForm } from "@/components/UrlForm";
+import { AuthSurfacePanel } from "@/components/AuthSurfacePanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
@@ -303,6 +305,17 @@ const Index = () => {
     }
   };
 
+  const runAutoScan = useEffectEvent(async (target: string) => {
+    setIsLoading(true);
+    try {
+      await analyzeUrl(target, true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
+    } finally {
+      setIsLoading(false);
+    }
+  });
+
   useEffect(() => {
     if (typeof window === "undefined" || autoScanRanRef.current) {
       return;
@@ -315,15 +328,8 @@ const Index = () => {
     }
 
     autoScanRanRef.current = true;
-    setIsLoading(true);
-    void analyzeUrl(target, true)
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, []);
+    void runAutoScan(target);
+  }, [runAutoScan]);
 
   const saveCurrentAsMonitored = (cadence: MonitoredTarget["cadence"]) => {
     if (!analysisData) {
@@ -718,6 +724,10 @@ const Index = () => {
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
             <ClientExposurePanel htmlSecurity={analysisData.htmlSecurity} />
+            <div className="grid gap-8 xl:grid-cols-2">
+              <AuthSurfacePanel htmlSecurity={analysisData.htmlSecurity} />
+              <DataCollectionPanel htmlSecurity={analysisData.htmlSecurity} />
+            </div>
 
             <div className="grid gap-8 xl:grid-cols-2">
               <AiSurfacePanel aiSurface={analysisData.aiSurface} />
