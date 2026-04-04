@@ -1626,6 +1626,9 @@ async function analyzeExposure(finalUrl) {
         } else if (response.statusCode === 401 || response.statusCode === 403) {
           finding = "interesting";
           detail = "Discovery file exists but is access-controlled.";
+        } else if (response.statusCode >= 500) {
+          finding = "error";
+          detail = "Discovery file path triggered a server-side error, so availability could not be determined cleanly.";
         } else {
           detail = "Discovery file not found.";
         }
@@ -1637,6 +1640,9 @@ async function analyzeExposure(finalUrl) {
         finding = "interesting";
         detail = "Sensitive path exists but is access-controlled.";
         strengths.push(`${probe.label} appears access-controlled.`);
+      } else if (response.statusCode >= 500) {
+        finding = "error";
+        detail = "Sensitive path triggered a server-side error, so the path may exist or be handled unexpectedly.";
       }
 
       probes.push({
@@ -1653,7 +1659,7 @@ async function analyzeExposure(finalUrl) {
         path: probe.path,
         statusCode: 0,
         finalUrl: probeUrl.toString(),
-        finding: "safe",
+        finding: "error",
         detail: error instanceof Error ? error.message : "Probe failed.",
       });
     }
@@ -1786,6 +1792,12 @@ async function analyzeApiSurface(finalUrl) {
         classification = "restricted";
         detail = "Endpoint exists but requires authorization or is blocked.";
         strengths.push(`${probe.label} appears access-controlled.`);
+      } else if (response.statusCode === 405) {
+        classification = "interesting";
+        detail = "Endpoint appears to exist, but it does not allow the request method used by this probe.";
+      } else if (response.statusCode === 429) {
+        classification = "restricted";
+        detail = "Endpoint appears rate-limited, so availability could not be assessed cleanly.";
       } else if (response.statusCode === 404) {
         classification = "absent";
         detail = "Endpoint not found.";

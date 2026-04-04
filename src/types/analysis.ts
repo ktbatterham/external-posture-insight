@@ -198,7 +198,7 @@ export interface ExposureProbe {
   path: string;
   statusCode: number;
   finalUrl: string;
-  finding: "safe" | "interesting" | "exposed";
+  finding: "safe" | "interesting" | "exposed" | "error";
   detail: string;
 }
 

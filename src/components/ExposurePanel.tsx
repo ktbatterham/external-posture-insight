@@ -11,6 +11,7 @@ const findingStyles = {
   safe: "bg-emerald-100 text-emerald-900",
   interesting: "bg-amber-100 text-amber-900",
   exposed: "bg-rose-100 text-rose-900",
+  error: "bg-orange-100 text-orange-900",
 } as const;
 
 export const ExposurePanel = ({ exposure }: ExposurePanelProps) => {
