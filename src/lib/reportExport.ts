@@ -70,7 +70,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     ...(analysis.issues.length
       ? analysis.issues.map(
           (issue) =>
-            `- [${issue.severity} | ${issue.confidence} confidence | ${issue.source}] ${issue.title}: ${issue.detail}`,
+            `- [${issue.severity} | ${issue.confidence} confidence | ${issue.source}${issue.owasp.length ? ` | OWASP: ${issue.owasp.join(", ")}` : ""}${issue.mitre.length ? ` | MITRE: ${issue.mitre.join(", ")}` : ""}] ${issue.title}: ${issue.detail}`,
         )
       : ["- No core findings recorded."]),
     "",
@@ -147,7 +147,7 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     ? analysis.issues
         .map(
           (issue) =>
-            `<li><strong>[${issue.severity} | ${issue.confidence} confidence | ${issue.source}] ${issue.title}</strong><br>${issue.detail}</li>`,
+            `<li><strong>[${issue.severity} | ${issue.confidence} confidence | ${issue.source}${issue.owasp.length ? ` | OWASP: ${issue.owasp.join(", ")}` : ""}${issue.mitre.length ? ` | MITRE: ${issue.mitre.join(", ")}` : ""}] ${issue.title}</strong><br>${issue.detail}</li>`,
         )
         .join("")
     : "<li>No core findings recorded.</li>";

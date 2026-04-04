@@ -337,6 +337,8 @@ function analyzeHeaders(headers, isHttps) {
     detail,
     confidence,
     source,
+    owasp: [],
+    mitre: [],
   });
 
   for (const definition of SECURITY_HEADERS) {
@@ -467,6 +469,101 @@ function buildRawHeaders(headers) {
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [key, Array.isArray(value) ? value.join(", ") : String(value)]),
   );
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function classifyIssueTaxonomy(issue) {
+  const text = `${issue.area} ${issue.title} ${issue.detail}`.toLowerCase();
+  const owasp = [];
+  const mitre = [];
+
+  if (
+    issue.area === "transport" ||
+    issue.area === "certificate" ||
+    text.includes("https") ||
+    text.includes("tls") ||
+    text.includes("certificate") ||
+    text.includes("hsts") ||
+    text.includes("secure flag")
+  ) {
+    owasp.push("A02 Cryptographic Failures");
+  }
+
+  if (
+    issue.area === "headers" ||
+    text.includes("missing") ||
+    text.includes("csp") ||
+    text.includes("referrer-policy") ||
+    text.includes("permissions-policy") ||
+    text.includes("cors") ||
+    text.includes("samesite") ||
+    text.includes("httponly") ||
+    text.includes("secure flag")
+  ) {
+    owasp.push("A05 Security Misconfiguration");
+  }
+
+  if (
+    text.includes("unsafe-inline") ||
+    text.includes("unsafe-eval") ||
+    text.includes("xss") ||
+    text.includes("inline script")
+  ) {
+    owasp.push("A03 Injection");
+  }
+
+  if (
+    text.includes("publicly reachable") ||
+    text.includes("exposed") ||
+    text.includes("authorization") ||
+    text.includes("access-controlled")
+  ) {
+    owasp.push("A01 Broken Access Control");
+  }
+
+  if (issue.area === "cookies" || text.includes("cookie")) {
+    owasp.push("A07 Identification and Authentication Failures");
+  }
+
+  if (
+    text.includes("publicly reachable") ||
+    text.includes("exposed") ||
+    text.includes("site is not using https") ||
+    text.includes("redirect chain")
+  ) {
+    mitre.push("Initial Access");
+  }
+
+  if (
+    text.includes("missing") ||
+    text.includes("version") ||
+    text.includes("certificate") ||
+    text.includes("cors") ||
+    text.includes("header")
+  ) {
+    mitre.push("Reconnaissance");
+  }
+
+  if (text.includes("cookie") || text.includes("password")) {
+    mitre.push("Credential Access");
+  }
+
+  if (text.includes("referrer") || text.includes("inline script") || text.includes("sri")) {
+    mitre.push("Collection");
+  }
+
+  if (text.includes("httponly") || text.includes("samesite") || text.includes("secure flag")) {
+    mitre.push("Defense Evasion");
+  }
+
+  return {
+    ...issue,
+    owasp: uniqueStrings(owasp),
+    mitre: uniqueStrings(mitre),
+  };
 }
 
 function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects }) {
@@ -2432,6 +2529,8 @@ async function analyzeUrlCore(input, options = {}) {
       detail,
       confidence: "high",
       source: "observed",
+      owasp: [],
+      mitre: [],
     })),
   );
 
@@ -2445,6 +2544,8 @@ async function analyzeUrlCore(input, options = {}) {
             detail: `This scan followed ${requestData.redirects.length - 1} redirect${requestData.redirects.length > 2 ? "s" : ""} before reaching the final URL.`,
             confidence: "high",
             source: "observed",
+            owasp: [],
+            mitre: [],
           },
         ]
       : [];
@@ -2459,9 +2560,13 @@ async function analyzeUrlCore(input, options = {}) {
         detail,
         confidence: /expires/i.test(detail) ? "high" : "medium",
         source: "observed",
+        owasp: [],
+        mitre: [],
       })),
     );
   }
+
+  const normalizedIssues = issues.map(classifyIssueTaxonomy);
 
   const summary =
     grade === "A+"
@@ -2489,7 +2594,7 @@ async function analyzeUrlCore(input, options = {}) {
     technologies,
     certificate,
     redirects: requestData.redirects,
-    issues,
+    issues: normalizedIssues,
     strengths,
     remediation: buildRemediation(headerResults),
   };

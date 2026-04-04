@@ -71,6 +71,16 @@ export const FindingsPanel = ({ issues, strengths }: FindingsPanelProps) => {
                   <Badge variant="outline" className="border-current/20 bg-transparent">
                     {issue.source}
                   </Badge>
+                  {issue.owasp.map((label) => (
+                    <Badge key={label} variant="outline" className="border-current/20 bg-transparent">
+                      {label}
+                    </Badge>
+                  ))}
+                  {issue.mitre.map((label) => (
+                    <Badge key={label} variant="outline" className="border-current/20 bg-transparent">
+                      MITRE: {label}
+                    </Badge>
+                  ))}
                 </div>
                 <p className="mt-1 opacity-90">{issue.detail}</p>
               </div>

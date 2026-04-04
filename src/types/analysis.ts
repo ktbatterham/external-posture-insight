@@ -1,6 +1,18 @@
 export type Severity = "good" | "info" | "warning" | "critical";
 export type IssueConfidence = "high" | "medium" | "low";
 export type IssueSource = "observed" | "heuristic" | "inferred";
+export type OwaspCategory =
+  | "A01 Broken Access Control"
+  | "A02 Cryptographic Failures"
+  | "A03 Injection"
+  | "A05 Security Misconfiguration"
+  | "A07 Identification and Authentication Failures";
+export type MitreRelevance =
+  | "Reconnaissance"
+  | "Initial Access"
+  | "Credential Access"
+  | "Collection"
+  | "Defense Evasion";
 
 export interface SecurityHeaderResult {
   key: string;
@@ -64,6 +76,8 @@ export interface ScanIssue {
   detail: string;
   confidence: IssueConfidence;
   source: IssueSource;
+  owasp: OwaspCategory[];
+  mitre: MitreRelevance[];
 }
 
 export interface RemediationSnippet {
