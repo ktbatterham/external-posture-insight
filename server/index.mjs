@@ -844,6 +844,106 @@ function extractHtmlTitle(body) {
   return title ? title.toLowerCase() : null;
 }
 
+function summarizeEvidence(values, limit = 3) {
+  return unique(values.filter(Boolean)).slice(0, limit);
+}
+
+function extractRedactedMatch(pattern, html, transform = (value) => value) {
+  const match = html.match(pattern);
+  return match ? transform(match[0]) : null;
+}
+
+function redactToken(value, visible = 8) {
+  if (!value || value.length <= visible * 2) {
+    return value;
+  }
+  return `${value.slice(0, visible)}...${value.slice(-visible)}`;
+}
+
+function collectPassiveLeakSignals(html, finalUrl, metaGenerator, externalScriptUrls, externalStylesheetUrls) {
+  const signals = [];
+  const sourceMapReferences = summarizeEvidence([
+    ...[...html.matchAll(/sourceMappingURL\s*=\s*([^\s"'<>]+)/gi)].map((match) => match[1]),
+    ...externalScriptUrls.filter((url) => /\.map(?:$|[?#])/i.test(url)),
+    ...externalStylesheetUrls.filter((url) => /\.map(?:$|[?#])/i.test(url)),
+  ]).map((value) => {
+    try {
+      return new URL(value, finalUrl).toString();
+    } catch {
+      return value;
+    }
+  });
+
+  if (sourceMapReferences.length) {
+    signals.push({
+      category: "source_map",
+      severity: "warning",
+      title: "Source map references visible",
+      detail: "Production page markup exposes source map references. Review whether any public source maps reveal internal code comments, paths, or debugging detail.",
+      evidence: sourceMapReferences,
+    });
+  }
+
+  const configMarkers = summarizeEvidence([
+    /__NEXT_DATA__/.test(html) ? "__NEXT_DATA__" : null,
+    /__NUXT__/.test(html) ? "__NUXT__" : null,
+    /window\.__INITIAL_STATE__/.test(html) ? "window.__INITIAL_STATE__" : null,
+    /window\.__PRELOADED_STATE__/.test(html) ? "window.__PRELOADED_STATE__" : null,
+    /window\.__APOLLO_STATE__/.test(html) ? "window.__APOLLO_STATE__" : null,
+    /window\.__ENV\b/.test(html) ? "window.__ENV" : null,
+    /drupalSettings/.test(html) ? "drupalSettings" : null,
+    /window\.__remixContext/.test(html) ? "window.__remixContext" : null,
+  ]);
+
+  if (configMarkers.length) {
+    signals.push({
+      category: "client_config",
+      severity: "info",
+      title: "Client bootstrap data is visible",
+      detail: "The page exposes client-side bootstrap or state objects. That is often normal, but it is worth reviewing for internal URLs, feature flags, and environment metadata that should stay private.",
+      evidence: configMarkers,
+    });
+  }
+
+  const publicTokenEvidence = summarizeEvidence([
+    extractRedactedMatch(/pk_(live|test)_[A-Za-z0-9]{16,}/, html, redactToken),
+    extractRedactedMatch(/AIza[0-9A-Za-z\-_]{20,}/, html, redactToken),
+    extractRedactedMatch(/pk\.[A-Za-z0-9\-_]{20,}/, html, redactToken),
+    extractRedactedMatch(/https:\/\/[A-Za-z0-9_-]+@[A-Za-z0-9.-]+\.ingest\.sentry\.io\/\d+/, html, redactToken),
+    /apiKey["']?\s*:\s*["'][^"']{16,}["']/.test(html) && /projectId["']?\s*:\s*["'][^"']+["']/.test(html)
+      ? "Firebase-style client config"
+      : null,
+  ]);
+
+  if (publicTokenEvidence.length) {
+    signals.push({
+      category: "public_token",
+      severity: "warning",
+      title: "Public client-side tokens or DSNs were visible",
+      detail: "The page markup includes token- or DSN-like values that may be intended for public use. Review scopes and restrictions so they cannot be misused or confused with secrets.",
+      evidence: publicTokenEvidence,
+    });
+  }
+
+  const versionEvidence = summarizeEvidence([
+    metaGenerator && /\d/.test(metaGenerator) ? metaGenerator : null,
+    extractRedactedMatch(/\/wp-(?:content|includes)\/[^"' ]+\?ver=\d[\w.-]*/i, html),
+    extractRedactedMatch(/content\s*=\s*["'][^"']*(wordpress|drupal|joomla|ghost)[^"']*\d[^"']*["']/i, html),
+  ]);
+
+  if (versionEvidence.length) {
+    signals.push({
+      category: "version_leak",
+      severity: "info",
+      title: "Version metadata is publicly visible",
+      detail: "The fetched page exposes framework or asset version markers. These can help maintenance, but they also make public fingerprinting easier.",
+      evidence: versionEvidence,
+    });
+  }
+
+  return signals;
+}
+
 function classifyHtmlApiFallback(probePath, finalUrl, resolvedUrl, body, homepageSignature, homepageTitle) {
   const looksLikeHtml = /<html[\s>]|<!doctype html/i.test(body);
   if (!looksLikeHtml) {
@@ -1552,6 +1652,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
         inlineStyleCount: 0,
         missingSriScriptUrls: [],
         firstPartyPaths: [],
+        passiveLeakSignals: [],
         detectedTechnologies: [],
         aiSurface: {
           detected: false,
@@ -1636,6 +1737,13 @@ function analyzeHtmlSecurity(finalUrl, document) {
         return resolved && resolved.hostname !== finalUrl.hostname && !getAttribute(tag, "integrity");
       })
       .map((tag) => new URL(getAttribute(tag, "src"), finalUrl).toString());
+    const passiveLeakSignals = collectPassiveLeakSignals(
+      html,
+      finalUrl,
+      metaGenerator || null,
+      externalScriptUrls,
+      externalStylesheetUrls,
+    );
 
     if (forms.some((form) => form.hasPasswordField)) {
       strengths.push("Login-like form elements are present for passive inspection.");
@@ -1655,8 +1763,16 @@ function analyzeHtmlSecurity(finalUrl, document) {
     if (missingSriScriptUrls.length) {
       issues.push("Some third-party scripts are missing Subresource Integrity attributes.");
     }
+    for (const signal of passiveLeakSignals) {
+      if (signal.severity === "warning") {
+        issues.push(signal.title);
+      }
+    }
     if (firstPartyPaths.length) {
       strengths.push(`Discovered ${firstPartyPaths.length} same-origin navigation paths for low-noise follow-up scans.`);
+    }
+    if (passiveLeakSignals.length) {
+      strengths.push(`Passive pre-check identified ${passiveLeakSignals.length} leak or fingerprinting signal${passiveLeakSignals.length === 1 ? "" : "s"} worth review.`);
     }
     if (!issues.length) {
       strengths.push("No obvious passive HTML transport/content risks detected on the fetched page.");
@@ -1675,6 +1791,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
       inlineStyleCount,
       missingSriScriptUrls,
       firstPartyPaths,
+      passiveLeakSignals,
       detectedTechnologies: detectHtmlTechnologies(
         html,
         finalUrl,
@@ -1700,6 +1817,7 @@ function analyzeHtmlSecurity(finalUrl, document) {
       inlineStyleCount: 0,
       missingSriScriptUrls: [],
       firstPartyPaths: [],
+      passiveLeakSignals: [],
       detectedTechnologies: [],
       aiSurface: {
         detected: false,

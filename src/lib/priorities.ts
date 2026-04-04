@@ -71,6 +71,15 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     });
   }
 
+  if (analysis.htmlSecurity.passiveLeakSignals.some((signal) => signal.severity === "warning")) {
+    addAction({
+      title: "Review passive leak signals in page markup",
+      detail: "The fetched page exposed source-map references or public token-like values that deserve a quick review before deeper testing.",
+      severity: "warning",
+      area: "Content",
+    });
+  }
+
   if (analysis.thirdPartyTrust.highRiskProviders > 0) {
     addAction({
       title: "Review high-trust third-party providers",

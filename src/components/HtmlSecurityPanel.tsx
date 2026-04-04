@@ -8,6 +8,8 @@ interface HtmlSecurityPanelProps {
 }
 
 export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
+  const warningLeakSignals = htmlSecurity.passiveLeakSignals.filter((signal) => signal.severity === "warning");
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
@@ -17,7 +19,7 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Page title</p>
             <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950">
@@ -39,6 +41,13 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Missing SRI</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.missingSriScriptUrls.length}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Passive leak signals</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.passiveLeakSignals.length}</p>
+            {warningLeakSignals.length ? (
+              <p className="mt-1 text-xs text-amber-700">{warningLeakSignals.length} higher-priority review item{warningLeakSignals.length === 1 ? "" : "s"}</p>
+            ) : null}
           </div>
         </div>
 
@@ -98,6 +107,30 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
                   <Badge key={domain} variant="outline">{domain}</Badge>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {htmlSecurity.passiveLeakSignals.length > 0 && (
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Passive leak and fingerprinting signals</p>
+            <div className="mt-3 space-y-3">
+              {htmlSecurity.passiveLeakSignals.map((signal) => (
+                <div key={`${signal.category}-${signal.title}`} className="rounded-xl bg-white p-4 text-sm text-slate-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-slate-950">{signal.title}</p>
+                    <Badge variant={signal.severity === "warning" ? "destructive" : "secondary"}>
+                      {signal.severity}
+                    </Badge>
+                  </div>
+                  <p className="mt-2">{signal.detail}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {signal.evidence.map((item) => (
+                      <Badge key={item} variant="outline">{item}</Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

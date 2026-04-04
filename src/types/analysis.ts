@@ -159,6 +159,14 @@ export interface HtmlFormInfo {
   hasPasswordField: boolean;
 }
 
+export interface PassiveLeakSignal {
+  category: "source_map" | "client_config" | "public_token" | "version_leak";
+  severity: "info" | "warning";
+  title: string;
+  detail: string;
+  evidence: string[];
+}
+
 export interface HtmlSecurityInfo {
   fetched: boolean;
   pageUrl: string | null;
@@ -172,6 +180,7 @@ export interface HtmlSecurityInfo {
   inlineStyleCount: number;
   missingSriScriptUrls: string[];
   firstPartyPaths: string[];
+  passiveLeakSignals: PassiveLeakSignal[];
   detectedTechnologies: TechnologyResult[];
   issues: string[];
   strengths: string[];

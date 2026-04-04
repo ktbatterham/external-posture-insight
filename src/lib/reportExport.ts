@@ -18,6 +18,13 @@ const buildDiscoveryLines = (analysis: AnalysisResult) =>
     ? analysis.htmlSecurity.firstPartyPaths.map((path) => `- Path: ${path}`)
     : ["- No same-origin paths discovered from the fetched page."];
 
+const buildPassiveLeakLines = (analysis: AnalysisResult) =>
+  analysis.htmlSecurity.passiveLeakSignals.length
+    ? analysis.htmlSecurity.passiveLeakSignals.map(
+        (signal) => `- [${signal.severity}] ${signal.title}: ${signal.detail}${signal.evidence.length ? ` Evidence: ${signal.evidence.join(", ")}` : ""}`,
+      )
+    : ["- No passive leak or fingerprinting signals recorded."];
+
 const buildThirdPartyLines = (analysis: AnalysisResult) =>
   analysis.thirdPartyTrust.providers.length
     ? analysis.thirdPartyTrust.providers.map(
@@ -97,6 +104,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}`,
     `- Same-origin paths discovered: ${analysis.htmlSecurity.firstPartyPaths.length}`,
     ...buildDiscoveryLines(analysis),
+    ...buildPassiveLeakLines(analysis),
     "",
     "## Detected Stack",
     "",
@@ -162,6 +170,9 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const discoveryItems = analysis.htmlSecurity.firstPartyPaths.length
     ? analysis.htmlSecurity.firstPartyPaths.map((path) => `<li>${path}</li>`).join("")
     : "<li>No same-origin paths discovered from the fetched page.</li>";
+  const passiveLeakItems = buildPassiveLeakLines(analysis)
+    .map((line) => `<li>${line.slice(2)}</li>`)
+    .join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -221,6 +232,8 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <p>Page title: ${analysis.htmlSecurity.pageTitle ?? "Unavailable"}</p>
       <p>Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}</p>
       <ul>${discoveryItems}</ul>
+      <p>Passive leak and fingerprinting signals:</p>
+      <ul>${passiveLeakItems}</ul>
     </div>
     <div class="card">
       <h2>Detected Stack</h2>
