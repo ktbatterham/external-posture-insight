@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useState } from "react";
 import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
@@ -67,8 +67,11 @@ const loadRecentScans = (): RecentScan[] => {
   }
 };
 
-const saveRecentScan = (scan: RecentScan) => {
-  const next = [scan, ...loadRecentScans().filter((item) => item.url !== scan.url)].slice(0, 6);
+const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
+  [scan, ...current.filter((item) => item.url !== scan.url)].slice(0, 6);
+
+const saveRecentScan = (current: RecentScan[], scan: RecentScan) => {
+  const next = buildRecentScans(current, scan);
   window.localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(next));
   return next;
 };
@@ -181,6 +184,16 @@ const saveHistorySnapshot = (analysis: AnalysisResult) => {
   return nextForHost;
 };
 
+const downloadFile = (filename: string, content: BlobPart, type: string) => {
+  const blob = new Blob([content], { type });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(objectUrl);
+};
+
 const buildHistoryDiff = (history: HistorySnapshot[]): HistoryDiff | null => {
   if (history.length < 2) {
     return null;
@@ -210,23 +223,18 @@ const buildHistoryDiff = (history: HistorySnapshot[]): HistoryDiff | null => {
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
-  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>(loadRecentScans);
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyDiff, setHistoryDiff] = useState<HistoryDiff | null>(null);
-  const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>([]);
-
-  useEffect(() => {
-    setRecentScans(loadRecentScans());
-    setMonitoredTargets(loadMonitoredTargets());
-  }, []);
+  const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>(loadMonitoredTargets);
 
   const persistAnalysis = (payload: AnalysisResult, setAsCurrent = true) => {
     startTransition(() => {
       if (setAsCurrent) {
         setAnalysisData(payload);
       }
-      setRecentScans(
-        saveRecentScan({
+      setRecentScans((current) =>
+        saveRecentScan(current, {
           url: payload.finalUrl,
           grade: payload.grade,
           scannedAt: payload.scannedAt,
@@ -350,30 +358,16 @@ const Index = () => {
       return;
     }
 
-    const blob = new Blob([JSON.stringify(analysisData, null, 2)], {
-      type: "application/json;charset=utf-8",
-    });
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = `security-report-${analysisData.host}.json`;
-    link.click();
-    URL.revokeObjectURL(objectUrl);
-  };
-
-  const downloadTextFile = (filename: string, content: string, type: string) => {
-    const blob = new Blob([content], { type });
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(objectUrl);
+    downloadFile(
+      `security-report-${analysisData.host}.json`,
+      JSON.stringify(analysisData, null, 2),
+      "application/json;charset=utf-8",
+    );
   };
 
   const exportMarkdown = () => {
     if (!analysisData) return;
-    downloadTextFile(
+    downloadFile(
       `security-report-${analysisData.host}.md`,
       buildMarkdownReport(analysisData),
       "text/markdown;charset=utf-8",
@@ -382,7 +376,7 @@ const Index = () => {
 
   const exportHtml = () => {
     if (!analysisData) return;
-    downloadTextFile(
+    downloadFile(
       `security-report-${analysisData.host}.html`,
       buildHtmlReport(analysisData),
       "text/html;charset=utf-8",

@@ -1,25 +1,35 @@
+import { getAiSurfaceClassificationSummary } from "@/lib/aiSurface";
 import { AnalysisResult } from "@/types/analysis";
 import { getAreaScores, getUnifiedIssueSummary } from "@/lib/posture";
 import { getPriorityActions } from "@/lib/priorities";
+
+const buildExposureLines = (analysis: AnalysisResult) =>
+  analysis.exposure.probes.map(
+    (probe) => `- ${probe.label} (${probe.path}): ${probe.finding} (${probe.statusCode}) - ${probe.detail}`,
+  );
+
+const buildTechnologyLines = (analysis: AnalysisResult) =>
+  analysis.technologies.length
+    ? analysis.technologies.map((tech) => `- ${tech.name} (${tech.category})${tech.evidence ? `: ${tech.evidence}` : ""}`)
+    : ["- No stack signals recorded."];
+
+const buildDiscoveryLines = (analysis: AnalysisResult) =>
+  analysis.htmlSecurity.firstPartyPaths.length
+    ? analysis.htmlSecurity.firstPartyPaths.map((path) => `- Path: ${path}`)
+    : ["- No same-origin paths discovered from the fetched page."];
+
+const buildThirdPartyLines = (analysis: AnalysisResult) =>
+  analysis.thirdPartyTrust.providers.length
+    ? analysis.thirdPartyTrust.providers.map(
+        (provider) => `- ${provider.name} [${provider.category} | ${provider.risk} risk] ${provider.domain}`,
+      )
+    : ["- No third-party providers recorded."];
 
 export const buildMarkdownReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
   const priorityActions = getPriorityActions(analysis);
-  const hasAiVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "ai_vendor");
-  const hasAutomationVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "support_automation");
-  const hasAssistantUi =
-    analysis.aiSurface.assistantVisible ||
-    analysis.aiSurface.vendors.some((vendor) => vendor.category === "assistant_ui");
-  const aiSummary = !analysis.aiSurface.detected
-    ? "No visible AI or automation surface detected"
-    : hasAiVendor
-      ? "AI vendor signals detected"
-      : hasAssistantUi
-        ? "Assistant UI signals detected"
-        : hasAutomationVendor
-          ? "Support automation signals detected"
-          : "AI-adjacent signals detected";
+  const aiSummary = getAiSurfaceClassificationSummary(analysis.aiSurface);
 
   return [
     `# Security Report: ${analysis.host}`,
@@ -86,24 +96,18 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- Page title: ${analysis.htmlSecurity.pageTitle ?? "Unavailable"}`,
     `- Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}`,
     `- Same-origin paths discovered: ${analysis.htmlSecurity.firstPartyPaths.length}`,
-    ...(analysis.htmlSecurity.firstPartyPaths.length
-      ? analysis.htmlSecurity.firstPartyPaths.map((path) => `- Path: ${path}`)
-      : ["- No same-origin paths discovered from the fetched page."]),
+    ...buildDiscoveryLines(analysis),
     "",
     "## Detected Stack",
     "",
-    ...(analysis.technologies.length
-      ? analysis.technologies.map((tech) => `- ${tech.name} (${tech.category})${tech.evidence ? `: ${tech.evidence}` : ""}`)
-      : ["- No stack signals recorded."]),
+    ...buildTechnologyLines(analysis),
     "",
     "## Third-Party Trust",
     "",
     `- Providers detected: ${analysis.thirdPartyTrust.totalProviders}`,
     `- Higher-risk providers: ${analysis.thirdPartyTrust.highRiskProviders}`,
     `- Summary: ${analysis.thirdPartyTrust.summary}`,
-    ...(analysis.thirdPartyTrust.providers.length
-      ? analysis.thirdPartyTrust.providers.map((provider) => `- ${provider.name} [${provider.category} | ${provider.risk} risk] ${provider.domain}`)
-      : ["- No third-party providers recorded."]),
+    ...buildThirdPartyLines(analysis),
     ...(analysis.thirdPartyTrust.issues.length
       ? analysis.thirdPartyTrust.issues.map((issue) => `- ${issue}`)
       : ["- No third-party trust issues recorded."]),
@@ -121,9 +125,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     "",
     "## Low-Noise Exposure Checks",
     "",
-    ...analysis.exposure.probes.map(
-      (probe) => `- ${probe.label} (${probe.path}): ${probe.finding} (${probe.statusCode}) - ${probe.detail}`,
-    ),
+    ...buildExposureLines(analysis),
     "",
   ].join("\n");
 };
@@ -132,20 +134,7 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
   const priorityActions = getPriorityActions(analysis);
-  const hasAiVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "ai_vendor");
-  const hasAutomationVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "support_automation");
-  const hasAssistantUi =
-    analysis.aiSurface.assistantVisible ||
-    analysis.aiSurface.vendors.some((vendor) => vendor.category === "assistant_ui");
-  const aiSummary = !analysis.aiSurface.detected
-    ? "No visible AI or automation surface detected"
-    : hasAiVendor
-      ? "AI vendor signals detected"
-      : hasAssistantUi
-        ? "Assistant UI signals detected"
-        : hasAutomationVendor
-          ? "Support automation signals detected"
-          : "AI-adjacent signals detected";
+  const aiSummary = getAiSurfaceClassificationSummary(analysis.aiSurface);
   const issueItems = analysis.issues.length
     ? analysis.issues
         .map(
@@ -162,11 +151,8 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
         .map((action) => `<li><strong>[${action.severity}] ${action.title}</strong><br>${action.detail}</li>`)
         .join("")
     : "<li>No priority actions generated.</li>";
-  const exposureItems = analysis.exposure.probes
-    .map(
-      (probe) =>
-        `<li><strong>${probe.label}</strong> (${probe.path}): ${probe.finding} (${probe.statusCode}) - ${probe.detail}</li>`,
-    )
+  const exposureItems = buildExposureLines(analysis)
+    .map((line) => `<li>${line.slice(2)}</li>`)
     .join("");
   const technologyItems = analysis.technologies.length
     ? analysis.technologies

@@ -17,17 +17,23 @@ const statusForScore = (score: number): AreaScore["status"] => {
 };
 
 export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
+  const missingHeaderCount = analysis.headers.filter((header) => header.status === "missing").length;
+  const warningHeaderCount = analysis.headers.filter((header) => header.status === "warning").length;
+  const cookieIssueCount = analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0);
+  const exposureInterestingCount = analysis.exposure.probes.filter((probe) => probe.finding !== "safe").length;
+  const apiRespondedCount = analysis.apiSurface.probes.filter((probe) => probe.classification !== "absent").length;
+  const apiFallbackCount = analysis.apiSurface.probes.filter((probe) => probe.classification === "fallback").length;
+  const redirectPenalty = analysis.redirects.length > 1 ? Math.max(analysis.redirects.length - 1, 0) * 2 : 0;
+
   const edgePenalty =
-    analysis.headers.filter((header) => header.status === "missing").length * 8 +
-    analysis.headers.filter((header) => header.status === "warning").length * 4 +
+    missingHeaderCount * 8 +
+    warningHeaderCount * 4 +
     analysis.corsSecurity.issues.length * 8 +
-    analysis.redirects.length > 1
-      ? Math.max(analysis.redirects.length - 1, 0) * 2
-      : 0;
+    redirectPenalty;
 
   const contentPenalty =
     analysis.htmlSecurity.issues.length * 8 +
-    analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0) * 4;
+    cookieIssueCount * 4;
 
   const domainPenalty =
     analysis.domainSecurity.issues.length * 8 +
@@ -57,7 +63,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       score: clamp(100 - edgePenalty),
       status: statusForScore(clamp(100 - edgePenalty)),
       notes: [
-        `${analysis.headers.filter((header) => header.status !== "present").length} header findings`,
+        `${missingHeaderCount + warningHeaderCount} header findings`,
         `${analysis.corsSecurity.issues.length} CORS findings`,
       ],
     },
@@ -68,7 +74,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       status: statusForScore(clamp(100 - contentPenalty)),
       notes: [
         `${analysis.htmlSecurity.issues.length} page-content findings`,
-        `${analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0)} cookie findings`,
+        `${cookieIssueCount} cookie findings`,
       ],
     },
     {
@@ -88,7 +94,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       score: clamp(100 - exposurePenalty),
       status: statusForScore(clamp(100 - exposurePenalty)),
       notes: [
-        `${analysis.exposure.probes.filter((probe) => probe.finding !== "safe").length} interesting exposure responses`,
+        `${exposureInterestingCount} interesting exposure responses`,
       ],
     },
     {
@@ -97,8 +103,8 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       score: clamp(100 - apiPenalty),
       status: statusForScore(clamp(100 - apiPenalty)),
       notes: [
-        `${analysis.apiSurface.probes.filter((probe) => probe.classification !== "absent").length} endpoints responded`,
-        `${analysis.apiSurface.probes.filter((probe) => probe.classification === "fallback").length} looked like frontend fallbacks`,
+        `${apiRespondedCount} endpoints responded`,
+        `${apiFallbackCount} looked like frontend fallbacks`,
       ],
     },
     {

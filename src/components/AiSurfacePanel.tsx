@@ -1,6 +1,7 @@
 import { Bot, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAiSurfaceClassificationSummary } from "@/lib/aiSurface";
 import { AiSurfaceInfo } from "@/types/analysis";
 
 interface AiSurfacePanelProps {
@@ -20,18 +21,7 @@ export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
     low: "bg-sky-100 text-sky-900",
   } as const;
 
-  const hasAiVendor = aiSurface.vendors.some((vendor) => vendor.category === "ai_vendor");
-  const hasAutomationVendor = aiSurface.vendors.some((vendor) => vendor.category === "support_automation");
-  const hasAssistantUi = aiSurface.assistantVisible || aiSurface.vendors.some((vendor) => vendor.category === "assistant_ui");
-  const classificationSummary = !aiSurface.detected
-    ? "No visible AI or automation surface detected"
-    : hasAiVendor
-      ? "AI vendor signals detected"
-      : hasAssistantUi
-        ? "Assistant UI signals detected"
-        : hasAutomationVendor
-          ? "Support automation signals detected"
-          : "AI-adjacent signals detected";
+  const classificationSummary = getAiSurfaceClassificationSummary(aiSurface);
 
   return (
     <Card className="border-slate-200 shadow-sm">
