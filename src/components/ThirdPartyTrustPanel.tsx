@@ -28,6 +28,13 @@ const categoryLabel = {
 } as const;
 
 export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelProps) => {
+  const highlightedProviders = [...thirdPartyTrust.providers]
+    .sort((left, right) => {
+      const riskRank = { high: 0, medium: 1, low: 2 } as const;
+      return riskRank[left.risk] - riskRank[right.risk];
+    })
+    .slice(0, 6);
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
@@ -37,7 +44,7 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
           <p className="text-sm text-slate-700">{thirdPartyTrust.summary}</p>
         </div>
 
@@ -58,9 +65,9 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
           </div>
         </div>
 
-        {thirdPartyTrust.providers.length > 0 && (
+        {highlightedProviders.length > 0 && (
           <div className="grid gap-3">
-            {thirdPartyTrust.providers.map((provider) => (
+            {highlightedProviders.map((provider) => (
               <div key={provider.domain} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-slate-900">{provider.name}</span>
@@ -73,6 +80,11 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
                 <p className="mt-1 text-xs text-slate-500">{provider.evidence}</p>
               </div>
             ))}
+            {thirdPartyTrust.providers.length > highlightedProviders.length && (
+              <p className="text-sm text-slate-500">
+                Showing the most important {highlightedProviders.length} providers from a total of {thirdPartyTrust.providers.length}.
+              </p>
+            )}
           </div>
         )}
 

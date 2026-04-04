@@ -1474,12 +1474,12 @@ function buildExecutiveSummary(result) {
   );
   takeaways.push(
     result.thirdPartyTrust.totalProviders > 0
-      ? `${result.thirdPartyTrust.totalProviders} third-party provider${result.thirdPartyTrust.totalProviders === 1 ? "" : "s"} were detected, including ${highRiskThirdParties} higher-risk integration${highRiskThirdParties === 1 ? "" : "s"}.`
+      ? `${result.thirdPartyTrust.totalProviders} third-party provider${result.thirdPartyTrust.totalProviders === 1 ? " was" : "s were"} detected, including ${highRiskThirdParties} higher-risk integration${highRiskThirdParties === 1 ? "" : "s"}.`
       : "No obvious third-party script or stylesheet providers were detected on the fetched page.",
   );
   takeaways.push(
     result.aiSurface.detected
-      ? `${result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length} public AI or automation signal${(result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length) === 1 ? "" : "s"} were detected.`
+      ? `${result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length} public AI or automation signal${(result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length) === 1 ? " was" : "s were"} detected.`
       : "No obvious public-facing AI or automation surface was detected.",
   );
 

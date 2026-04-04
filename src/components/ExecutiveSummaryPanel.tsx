@@ -1,4 +1,4 @@
-import { BriefcaseBusiness } from "lucide-react";
+import { BriefcaseBusiness, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExecutiveSummaryInfo } from "@/types/analysis";
 
@@ -21,24 +21,30 @@ export const ExecutiveSummaryPanel = ({ summary }: ExecutiveSummaryPanelProps) =
           Executive Readout
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className={`rounded-2xl border px-4 py-4 ${postureStyles[summary.posture]}`}>
-          <p className="text-xs uppercase tracking-[0.18em] opacity-75">Overall read</p>
-          <p className="mt-2 text-lg font-semibold">{summary.overview}</p>
+      <CardContent className="space-y-5">
+        <div className={`rounded-[1.5rem] border px-5 py-5 ${postureStyles[summary.posture]}`}>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] opacity-75">
+            <Sparkles className="h-4 w-4" />
+            Overall read
+          </div>
+          <p className="mt-3 text-xl font-semibold leading-8">{summary.overview}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="rounded-[1.5rem] bg-slate-50 p-5">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Main visible risk</p>
-          <p className="mt-2 text-sm font-medium text-slate-900">{summary.mainRisk}</p>
+          <p className="mt-3 text-base font-medium leading-7 text-slate-900">{summary.mainRisk}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="rounded-[1.5rem] bg-slate-50 p-5">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Top takeaways</p>
-          <div className="mt-3 space-y-2">
-            {summary.takeaways.map((takeaway) => (
-              <p key={takeaway} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
-                {takeaway}
-              </p>
+          <div className="mt-4 space-y-3">
+            {summary.takeaways.map((takeaway, index) => (
+              <div key={takeaway} className="flex gap-3 rounded-2xl bg-white px-4 py-4 text-sm text-slate-700">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                  {index + 1}
+                </div>
+                <p className="leading-6">{takeaway}</p>
+              </div>
             ))}
           </div>
         </div>
