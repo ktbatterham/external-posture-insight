@@ -1220,7 +1220,7 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
     },
     {
       name: "Crisp",
-      pattern: /crisp\.chat|crisp/i,
+      pattern: /\$crisp|crisp\.chat|client\.crisp|go\.crisp|crisp-im/i,
       evidence: "Detected from Crisp widget assets or markup",
       category: "support_automation",
       confidence: "high",
