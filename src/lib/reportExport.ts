@@ -74,6 +74,14 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
       ? analysis.technologies.map((tech) => `- ${tech.name} (${tech.category})${tech.evidence ? `: ${tech.evidence}` : ""}`)
       : ["- No stack signals recorded."]),
     "",
+    "## AI Surface",
+    "",
+    `- AI detected: ${analysis.aiSurface.detected ? "Yes" : "No"}`,
+    `- Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}`,
+    `- Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}`,
+    `- AI paths: ${analysis.aiSurface.discoveredPaths.length ? analysis.aiSurface.discoveredPaths.join(", ") : "None detected"}`,
+    ...(analysis.aiSurface.issues.length ? analysis.aiSurface.issues.map((issue) => `- ${issue}`) : ["- No AI-surface issues recorded."]),
+    "",
     "## Low-Noise Exposure Checks",
     "",
     ...analysis.exposure.probes.map(
@@ -173,6 +181,13 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     <div class="card">
       <h2>Detected Stack</h2>
       <ul>${technologyItems}</ul>
+    </div>
+    <div class="card">
+      <h2>AI Surface</h2>
+      <p>AI detected: ${analysis.aiSurface.detected ? "Yes" : "No"}</p>
+      <p>Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}</p>
+      <p>Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}</p>
+      <p>AI paths: ${analysis.aiSurface.discoveredPaths.length ? analysis.aiSurface.discoveredPaths.join(", ") : "None detected"}</p>
     </div>
     <div class="card">
       <h2>Low-Noise Exposure Checks</h2>

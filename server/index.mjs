@@ -1109,6 +1109,78 @@ function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrl
   return technologies;
 }
 
+function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
+  const htmlLower = html.toLowerCase();
+  const vendors = [];
+  const seen = new Set();
+  const addVendor = (name, evidence) => {
+    if (seen.has(name)) {
+      return;
+    }
+    seen.add(name);
+    vendors.push({ name, evidence });
+  };
+
+  const vendorMatchers = [
+    { name: "Intercom Fin", pattern: /intercom/i, evidence: "Detected from Intercom-related assets or markup" },
+    { name: "Drift", pattern: /drift\.com|driftt/i, evidence: "Detected from Drift assets or widget markup" },
+    { name: "Zendesk AI", pattern: /zendesk|zopim/i, evidence: "Detected from Zendesk widget assets or markup" },
+    { name: "HubSpot Chat", pattern: /hubspot|hs-scripts/i, evidence: "Detected from HubSpot assets or chat markup" },
+    { name: "Salesforce Einstein", pattern: /einstein|salesforce/i, evidence: "Detected from Salesforce or Einstein signals" },
+    { name: "Crisp", pattern: /crisp\.chat|crisp/i, evidence: "Detected from Crisp widget assets or markup" },
+    { name: "Freshchat", pattern: /freshchat|freshworks/i, evidence: "Detected from Freshchat assets or markup" },
+    { name: "OpenAI", pattern: /openai/i, evidence: "Detected from OpenAI-related assets or markup" },
+    { name: "Anthropic", pattern: /anthropic|claude/i, evidence: "Detected from Anthropic-related assets or markup" },
+    { name: "Google Gemini", pattern: /gemini|generativelanguage|vertex ai/i, evidence: "Detected from Google AI-related assets or markup" },
+    { name: "Microsoft Copilot", pattern: /copilot|microsoft ai/i, evidence: "Detected from Copilot-related assets or markup" },
+  ];
+
+  const combinedSignals = `${htmlLower} ${externalScriptUrls.join(" ").toLowerCase()}`;
+  for (const matcher of vendorMatchers) {
+    if (matcher.pattern.test(combinedSignals)) {
+      addVendor(matcher.name, matcher.evidence);
+    }
+  }
+
+  const assistantVisible =
+    /chat with|ask ai|ai assistant|virtual assistant|copilot|assistant/i.test(html) ||
+    /aria-label=["'][^"']*(chat|assistant|copilot|ask ai)[^"']*["']/i.test(html);
+
+  const aiPageSignals = firstPartyPaths.filter((path) => /\/(ai|assistant|copilot|chat|ask-ai|automation)(\/|$)/i.test(path));
+  const disclosures = [];
+
+  if (/do not share sensitive|may be inaccurate|ai-generated|generative ai|assistant may/i.test(htmlLower)) {
+    disclosures.push("The page appears to include AI usage or safety disclosure language.");
+  }
+  if (/privacy policy/i.test(htmlLower) && /ai/i.test(htmlLower)) {
+    disclosures.push("AI-related language appears alongside privacy-policy content.");
+  }
+
+  const issues = [];
+  const strengths = [];
+
+  if (assistantVisible || vendors.length || aiPageSignals.length) {
+    strengths.push("Public-facing AI or automation signals were detected passively.");
+  }
+  if ((assistantVisible || vendors.length) && !disclosures.length) {
+    issues.push("Visible AI-like features were detected, but no obvious AI disclosure language was found on the fetched page.");
+  }
+  if (!assistantVisible && !vendors.length && !aiPageSignals.length) {
+    strengths.push("No obvious public-facing AI assistant or automation surface was detected on the fetched page.");
+  }
+
+  return {
+    detected: Boolean(assistantVisible || vendors.length || aiPageSignals.length),
+    assistantVisible,
+    aiPageSignals,
+    vendors,
+    discoveredPaths: aiPageSignals,
+    disclosures,
+    issues,
+    strengths,
+  };
+}
+
 function mergeTechnologies(...groups) {
   const merged = [];
   const seen = new Set();
@@ -1148,6 +1220,16 @@ async function analyzeHtmlSecurity(finalUrl) {
         missingSriScriptUrls: [],
         firstPartyPaths: [],
         detectedTechnologies: [],
+        aiSurface: {
+          detected: false,
+          assistantVisible: false,
+          aiPageSignals: [],
+          vendors: [],
+          discoveredPaths: [],
+          disclosures: [],
+          issues: ["Primary response was not HTML, so AI surface inspection was skipped."],
+          strengths: [],
+        },
         issues: ["Primary response was not HTML, so page content inspection was skipped."],
         strengths: [],
       };
@@ -1265,6 +1347,7 @@ async function analyzeHtmlSecurity(finalUrl) {
         externalScriptUrls,
         externalStylesheetUrls,
       ),
+      aiSurface: analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths),
       issues,
       strengths,
     };
@@ -1283,6 +1366,16 @@ async function analyzeHtmlSecurity(finalUrl) {
       missingSriScriptUrls: [],
       firstPartyPaths: [],
       detectedTechnologies: [],
+      aiSurface: {
+        detected: false,
+        assistantVisible: false,
+        aiPageSignals: [],
+        vendors: [],
+        discoveredPaths: [],
+        disclosures: [],
+        issues: [error instanceof Error ? error.message : "AI surface inspection failed."],
+        strengths: [],
+      },
       issues: [error instanceof Error ? error.message : "HTML inspection failed."],
       strengths: [],
     };
@@ -2084,6 +2177,7 @@ async function analyzeUrl(input) {
     securityTxt: await fetchSecurityTxt(finalUrl),
     domainSecurity: await analyzeDomainSecurity(result.host),
     htmlSecurity,
+    aiSurface: htmlSecurity.aiSurface,
     exposure: await analyzeExposure(finalUrl),
     corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders),
     apiSurface: await analyzeApiSurface(finalUrl),

@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
 import { ApiSurfacePanel } from "@/components/ApiSurfacePanel";
+import { AiSurfacePanel } from "@/components/AiSurfacePanel";
 import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
 
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
@@ -501,6 +502,8 @@ const Index = () => {
             </div>
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
+
+            <AiSurfacePanel aiSurface={analysisData.aiSurface} />
 
             <ExposurePanel exposure={analysisData.exposure} />
 

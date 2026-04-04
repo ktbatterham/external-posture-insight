@@ -177,6 +177,20 @@ export interface HtmlSecurityInfo {
   strengths: string[];
 }
 
+export interface AiSurfaceInfo {
+  detected: boolean;
+  assistantVisible: boolean;
+  aiPageSignals: string[];
+  vendors: Array<{
+    name: string;
+    evidence: string;
+  }>;
+  discoveredPaths: string[];
+  disclosures: string[];
+  issues: string[];
+  strengths: string[];
+}
+
 export interface ExposureProbe {
   label: string;
   path: string;
@@ -254,6 +268,7 @@ export interface AnalysisResult {
   securityTxt: SecurityTxtInfo;
   domainSecurity: DomainSecurityInfo;
   htmlSecurity: HtmlSecurityInfo;
+  aiSurface: AiSurfaceInfo;
   exposure: ExposureSummary;
   corsSecurity: CorsSecurityInfo;
   apiSurface: ApiSurfaceInfo;
