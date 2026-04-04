@@ -1113,38 +1113,105 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
   const htmlLower = html.toLowerCase();
   const vendors = [];
   const seen = new Set();
-  const addVendor = (name, evidence) => {
-    if (seen.has(name)) {
+  const addVendor = (name, evidence, category, confidence) => {
+    const key = `${name}:${category}`;
+    if (seen.has(key)) {
       return;
     }
-    seen.add(name);
-    vendors.push({ name, evidence });
+    seen.add(key);
+    vendors.push({ name, evidence, category, confidence });
   };
 
   const vendorMatchers = [
-    { name: "Intercom Fin", pattern: /intercom/i, evidence: "Detected from Intercom-related assets or markup" },
-    { name: "Drift", pattern: /drift\.com|driftt/i, evidence: "Detected from Drift assets or widget markup" },
-    { name: "Zendesk AI", pattern: /zendesk|zopim/i, evidence: "Detected from Zendesk widget assets or markup" },
-    { name: "HubSpot Chat", pattern: /hubspot|hs-scripts/i, evidence: "Detected from HubSpot assets or chat markup" },
-    { name: "Salesforce Einstein", pattern: /einstein|salesforce/i, evidence: "Detected from Salesforce or Einstein signals" },
-    { name: "Crisp", pattern: /crisp\.chat|crisp/i, evidence: "Detected from Crisp widget assets or markup" },
-    { name: "Freshchat", pattern: /freshchat|freshworks/i, evidence: "Detected from Freshchat assets or markup" },
-    { name: "OpenAI", pattern: /openai/i, evidence: "Detected from OpenAI-related assets or markup" },
-    { name: "Anthropic", pattern: /anthropic|claude/i, evidence: "Detected from Anthropic-related assets or markup" },
-    { name: "Google Gemini", pattern: /gemini|generativelanguage|vertex ai/i, evidence: "Detected from Google AI-related assets or markup" },
-    { name: "Microsoft Copilot", pattern: /copilot|microsoft ai/i, evidence: "Detected from Copilot-related assets or markup" },
+    {
+      name: "Intercom Fin",
+      pattern: /intercom.*fin|fin ai|intercom/i,
+      evidence: "Detected from Intercom-related assets or markup",
+      category: "support_automation",
+      confidence: "medium",
+    },
+    {
+      name: "Drift",
+      pattern: /drift\.com|driftt/i,
+      evidence: "Detected from Drift assets or widget markup",
+      category: "support_automation",
+      confidence: "high",
+    },
+    {
+      name: "Zendesk AI",
+      pattern: /zendesk|zopim/i,
+      evidence: "Detected from Zendesk widget assets or markup",
+      category: "support_automation",
+      confidence: "medium",
+    },
+    {
+      name: "HubSpot Chat",
+      pattern: /hubspot|hs-scripts/i,
+      evidence: "Detected from HubSpot assets or chat markup",
+      category: "support_automation",
+      confidence: "medium",
+    },
+    {
+      name: "Salesforce Einstein",
+      pattern: /einstein|salesforce ai/i,
+      evidence: "Detected from Salesforce or Einstein signals",
+      category: "ai_vendor",
+      confidence: "medium",
+    },
+    {
+      name: "Crisp",
+      pattern: /crisp\.chat|crisp/i,
+      evidence: "Detected from Crisp widget assets or markup",
+      category: "support_automation",
+      confidence: "high",
+    },
+    {
+      name: "Freshchat",
+      pattern: /freshchat|freshworks/i,
+      evidence: "Detected from Freshchat assets or markup",
+      category: "support_automation",
+      confidence: "high",
+    },
+    {
+      name: "OpenAI",
+      pattern: /openai/i,
+      evidence: "Detected from OpenAI-related assets or markup",
+      category: "ai_vendor",
+      confidence: "high",
+    },
+    {
+      name: "Anthropic",
+      pattern: /anthropic|claude/i,
+      evidence: "Detected from Anthropic-related assets or markup",
+      category: "ai_vendor",
+      confidence: "high",
+    },
+    {
+      name: "Google Gemini",
+      pattern: /gemini|generativelanguage|vertex ai/i,
+      evidence: "Detected from Google AI-related assets or markup",
+      category: "ai_vendor",
+      confidence: "medium",
+    },
+    {
+      name: "Microsoft Copilot",
+      pattern: /\bmicrosoft copilot\b|copilot for|copilot studio|copilot.microsoft/i,
+      evidence: "Detected from Copilot-specific assets or markup",
+      category: "assistant_ui",
+      confidence: "medium",
+    },
   ];
 
   const combinedSignals = `${htmlLower} ${externalScriptUrls.join(" ").toLowerCase()}`;
   for (const matcher of vendorMatchers) {
     if (matcher.pattern.test(combinedSignals)) {
-      addVendor(matcher.name, matcher.evidence);
+      addVendor(matcher.name, matcher.evidence, matcher.category, matcher.confidence);
     }
   }
 
   const assistantVisible =
-    /chat with|ask ai|ai assistant|virtual assistant|copilot|assistant/i.test(html) ||
-    /aria-label=["'][^"']*(chat|assistant|copilot|ask ai)[^"']*["']/i.test(html);
+    /chat with (ai|our ai)|ask ai|ai assistant|virtual assistant|talk to our assistant|assistant for/i.test(htmlLower) ||
+    /aria-label=["'][^"']*(chat with ai|ai assistant|ask ai|virtual assistant)[^"']*["']/i.test(html);
 
   const aiPageSignals = firstPartyPaths.filter((path) => /\/(ai|assistant|copilot|chat|ask-ai|automation)(\/|$)/i.test(path));
   const disclosures = [];
@@ -1158,12 +1225,23 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
 
   const issues = [];
   const strengths = [];
+  const automationOnly = vendors.length > 0 && vendors.every((vendor) => vendor.category === "support_automation");
+  const highConfidenceAiSignals =
+    assistantVisible ||
+    vendors.some((vendor) => vendor.category === "ai_vendor" && vendor.confidence === "high") ||
+    aiPageSignals.length > 0;
 
   if (assistantVisible || vendors.length || aiPageSignals.length) {
-    strengths.push("Public-facing AI or automation signals were detected passively.");
+    strengths.push(
+      automationOnly && !assistantVisible && !aiPageSignals.length
+        ? "Public-facing support automation signals were detected passively."
+        : "Public-facing AI or automation signals were detected passively.",
+    );
   }
-  if ((assistantVisible || vendors.length) && !disclosures.length) {
-    issues.push("Visible AI-like features were detected, but no obvious AI disclosure language was found on the fetched page.");
+  if (highConfidenceAiSignals && !disclosures.length) {
+    issues.push("AI-related signals were detected, but no obvious AI disclosure language was found on the fetched page.");
+  } else if (automationOnly && !disclosures.length) {
+    issues.push("Support automation signals were detected, but no obvious disclosure language was found on the fetched page.");
   }
   if (!assistantVisible && !vendors.length && !aiPageSignals.length) {
     strengths.push("No obvious public-facing AI assistant or automation surface was detected on the fetched page.");

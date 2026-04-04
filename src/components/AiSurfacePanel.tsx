@@ -8,6 +8,31 @@ interface AiSurfacePanelProps {
 }
 
 export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
+  const categoryLabel = {
+    ai_vendor: "AI vendor",
+    support_automation: "Support automation",
+    assistant_ui: "Assistant UI",
+  } as const;
+
+  const confidenceStyles = {
+    high: "bg-slate-200 text-slate-800",
+    medium: "bg-amber-100 text-amber-900",
+    low: "bg-sky-100 text-sky-900",
+  } as const;
+
+  const hasAiVendor = aiSurface.vendors.some((vendor) => vendor.category === "ai_vendor");
+  const hasAutomationVendor = aiSurface.vendors.some((vendor) => vendor.category === "support_automation");
+  const hasAssistantUi = aiSurface.assistantVisible || aiSurface.vendors.some((vendor) => vendor.category === "assistant_ui");
+  const classificationSummary = !aiSurface.detected
+    ? "No visible AI or automation surface detected"
+    : hasAiVendor
+      ? "AI vendor signals detected"
+      : hasAssistantUi
+        ? "Assistant UI signals detected"
+        : hasAutomationVendor
+          ? "Support automation signals detected"
+          : "AI-adjacent signals detected";
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
@@ -17,6 +42,11 @@ export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-sky-700">Classification</p>
+          <p className="mt-2 text-lg font-semibold text-sky-950">{classificationSummary}</p>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">AI detected</p>
@@ -39,9 +69,18 @@ export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
         {aiSurface.vendors.length > 0 && (
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Detected vendors</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 grid gap-3">
               {aiSurface.vendors.map((vendor) => (
-                <Badge key={vendor.name} variant="outline">{vendor.name}</Badge>
+                <div key={`${vendor.name}-${vendor.category}`} className="rounded-xl bg-white px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-slate-900">{vendor.name}</span>
+                    <Badge variant="outline">{categoryLabel[vendor.category]}</Badge>
+                    <Badge variant="secondary" className={confidenceStyles[vendor.confidence]}>
+                      {vendor.confidence} confidence
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{vendor.evidence}</p>
+                </div>
               ))}
             </div>
           </div>

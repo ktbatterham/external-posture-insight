@@ -184,6 +184,8 @@ export interface AiSurfaceInfo {
   vendors: Array<{
     name: string;
     evidence: string;
+    category: "ai_vendor" | "support_automation" | "assistant_ui";
+    confidence: IssueConfidence;
   }>;
   discoveredPaths: string[];
   disclosures: string[];

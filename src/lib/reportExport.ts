@@ -6,6 +6,20 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
   const priorityActions = getPriorityActions(analysis);
+  const hasAiVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "ai_vendor");
+  const hasAutomationVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "support_automation");
+  const hasAssistantUi =
+    analysis.aiSurface.assistantVisible ||
+    analysis.aiSurface.vendors.some((vendor) => vendor.category === "assistant_ui");
+  const aiSummary = !analysis.aiSurface.detected
+    ? "No visible AI or automation surface detected"
+    : hasAiVendor
+      ? "AI vendor signals detected"
+      : hasAssistantUi
+        ? "Assistant UI signals detected"
+        : hasAutomationVendor
+          ? "Support automation signals detected"
+          : "AI-adjacent signals detected";
 
   return [
     `# Security Report: ${analysis.host}`,
@@ -76,6 +90,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     "",
     "## AI Surface",
     "",
+    `- Classification: ${aiSummary}`,
     `- AI detected: ${analysis.aiSurface.detected ? "Yes" : "No"}`,
     `- Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}`,
     `- Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}`,
@@ -95,6 +110,20 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
   const priorityActions = getPriorityActions(analysis);
+  const hasAiVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "ai_vendor");
+  const hasAutomationVendor = analysis.aiSurface.vendors.some((vendor) => vendor.category === "support_automation");
+  const hasAssistantUi =
+    analysis.aiSurface.assistantVisible ||
+    analysis.aiSurface.vendors.some((vendor) => vendor.category === "assistant_ui");
+  const aiSummary = !analysis.aiSurface.detected
+    ? "No visible AI or automation surface detected"
+    : hasAiVendor
+      ? "AI vendor signals detected"
+      : hasAssistantUi
+        ? "Assistant UI signals detected"
+        : hasAutomationVendor
+          ? "Support automation signals detected"
+          : "AI-adjacent signals detected";
   const issueItems = analysis.issues.length
     ? analysis.issues
         .map(
@@ -184,6 +213,7 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     </div>
     <div class="card">
       <h2>AI Surface</h2>
+      <p>Classification: ${aiSummary}</p>
       <p>AI detected: ${analysis.aiSurface.detected ? "Yes" : "No"}</p>
       <p>Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}</p>
       <p>Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}</p>
