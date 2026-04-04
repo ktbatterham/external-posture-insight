@@ -11,7 +11,10 @@ import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { HtmlSecurityPanel } from "@/components/HtmlSecurityPanel";
+import { MonitoringPanel } from "@/components/MonitoringPanel";
 import { PostureSummaryPanel } from "@/components/PostureSummaryPanel";
+import { PriorityActionsPanel } from "@/components/PriorityActionsPanel";
+import { PublicSignalsPanel } from "@/components/PublicSignalsPanel";
 import { RawHeadersPanel } from "@/components/RawHeadersPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
 import { RedirectChain } from "@/components/RedirectChain";
@@ -333,13 +336,21 @@ const Index = () => {
 
             <PostureSummaryPanel analysis={analysisData} />
 
+            <div className="grid gap-8 xl:grid-cols-2">
+              <PriorityActionsPanel analysis={analysisData} />
+              <MonitoringPanel analysis={analysisData} diff={historyDiff} />
+            </div>
+
             <RemediationPanel remediation={analysisData.remediation} />
 
             <CrawlPanel crawl={analysisData.crawl} />
 
             <HistoryPanel history={history} diff={historyDiff} />
 
-            <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
+            <div className="grid gap-8 xl:grid-cols-2">
+              <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
+              <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
+            </div>
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
 

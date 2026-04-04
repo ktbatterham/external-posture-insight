@@ -42,6 +42,17 @@ export const CrawlPanel = ({ crawl }: CrawlPanelProps) => {
           </div>
         </div>
 
+        {crawl.discoverySources.length > 0 && (
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Discovery sources</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {crawl.discoverySources.map((source) => (
+                <Badge key={source} variant="outline">{source}</Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
         {crawl.inconsistentHeaders.length > 0 && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">

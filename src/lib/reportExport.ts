@@ -1,9 +1,11 @@
 import { AnalysisResult } from "@/types/analysis";
 import { getAreaScores, getUnifiedIssueSummary } from "@/lib/posture";
+import { getPriorityActions } from "@/lib/priorities";
 
 export const buildMarkdownReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
+  const priorityActions = getPriorityActions(analysis);
 
   return [
     `# Security Report: ${analysis.host}`,
@@ -30,6 +32,12 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
       ? analysis.issues.map((issue) => `- [${issue.severity}] ${issue.title}: ${issue.detail}`)
       : ["- No core findings recorded."]),
     "",
+    "## Priority Actions",
+    "",
+    ...(priorityActions.length
+      ? priorityActions.map((action, index) => `- ${index + 1}. [${action.severity}] ${action.title}: ${action.detail}`)
+      : ["- No priority actions generated."]),
+    "",
     "## security.txt",
     "",
     `- Status: ${analysis.securityTxt.status}`,
@@ -43,6 +51,11 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- MX count: ${analysis.domainSecurity.mxRecords.length}`,
     `- CAA count: ${analysis.domainSecurity.caaRecords.length}`,
     "",
+    "## Public Trust Signals",
+    "",
+    `- HSTS preload status: ${analysis.publicSignals.hstsPreload.status}`,
+    `- HSTS preload note: ${analysis.publicSignals.hstsPreload.summary}`,
+    "",
     "## Low-Noise Exposure Checks",
     "",
     ...analysis.exposure.probes.map(
@@ -55,6 +68,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
 export const buildHtmlReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
+  const priorityActions = getPriorityActions(analysis);
   const issueItems = analysis.issues.length
     ? analysis.issues
         .map(
@@ -66,6 +80,11 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const areaItems = areas
     .map((area) => `<li><strong>${area.label}</strong>: ${area.score}/100 (${area.status})</li>`)
     .join("");
+  const priorityItems = priorityActions.length
+    ? priorityActions
+        .map((action) => `<li><strong>[${action.severity}] ${action.title}</strong><br>${action.detail}</li>`)
+        .join("")
+    : "<li>No priority actions generated.</li>";
   const exposureItems = analysis.exposure.probes
     .map(
       (probe) =>
@@ -109,6 +128,15 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     <div class="card">
       <h2>Key Findings</h2>
       <ul>${issueItems}</ul>
+    </div>
+    <div class="card">
+      <h2>Priority Actions</h2>
+      <ul>${priorityItems}</ul>
+    </div>
+    <div class="card">
+      <h2>Public Trust Signals</h2>
+      <p>HSTS preload status: ${analysis.publicSignals.hstsPreload.status}</p>
+      <p>${analysis.publicSignals.hstsPreload.summary}</p>
     </div>
     <div class="card">
       <h2>Low-Noise Exposure Checks</h2>

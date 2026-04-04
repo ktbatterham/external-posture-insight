@@ -89,6 +89,7 @@ export interface CrawlSummary {
   weakestPage: string | null;
   strongestPage: string | null;
   inconsistentHeaders: string[];
+  discoverySources: string[];
 }
 
 export interface HistorySnapshot {
@@ -157,6 +158,8 @@ export interface HtmlFormInfo {
 export interface HtmlSecurityInfo {
   fetched: boolean;
   pageUrl: string | null;
+  pageTitle: string | null;
+  metaGenerator: string | null;
   forms: HtmlFormInfo[];
   externalScriptDomains: string[];
   externalStylesheetDomains: string[];
@@ -164,6 +167,8 @@ export interface HtmlSecurityInfo {
   inlineScriptCount: number;
   inlineStyleCount: number;
   missingSriScriptUrls: string[];
+  firstPartyPaths: string[];
+  detectedTechnologies: TechnologyResult[];
   issues: string[];
   strengths: string[];
 }
@@ -211,6 +216,16 @@ export interface ApiSurfaceInfo {
   strengths: string[];
 }
 
+export interface PublicSignalsInfo {
+  hstsPreload: {
+    status: "preloaded" | "pending" | "eligible" | "not_preloaded" | "unknown";
+    summary: string;
+    sourceUrl: string;
+  };
+  issues: string[];
+  strengths: string[];
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;
@@ -238,4 +253,5 @@ export interface AnalysisResult {
   exposure: ExposureSummary;
   corsSecurity: CorsSecurityInfo;
   apiSurface: ApiSurfaceInfo;
+  publicSignals: PublicSignalsInfo;
 }

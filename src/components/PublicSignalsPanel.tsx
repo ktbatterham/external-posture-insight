@@ -1,0 +1,58 @@
+import { Radar } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PublicSignalsInfo } from "@/types/analysis";
+
+interface PublicSignalsPanelProps {
+  publicSignals: PublicSignalsInfo;
+}
+
+const statusStyles = {
+  preloaded: "bg-emerald-100 text-emerald-900",
+  pending: "bg-sky-100 text-sky-900",
+  eligible: "bg-amber-100 text-amber-900",
+  not_preloaded: "bg-slate-200 text-slate-800",
+  unknown: "bg-slate-200 text-slate-800",
+} as const;
+
+export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) => {
+  return (
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Radar className="h-5 w-5" />
+          Public Trust Signals
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">HSTS preload dataset</p>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[publicSignals.hstsPreload.status]}`}>
+              {publicSignals.hstsPreload.status.replace(/_/g, " ")}
+            </span>
+          </div>
+          <p className="mt-3 text-sm text-slate-700">{publicSignals.hstsPreload.summary}</p>
+          <a
+            href={publicSignals.hstsPreload.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex text-sm font-medium text-sky-700 hover:text-sky-900"
+          >
+            Open dataset reference
+          </a>
+        </div>
+
+        {publicSignals.strengths.map((strength) => (
+          <div key={strength} className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {strength}
+          </div>
+        ))}
+        {publicSignals.issues.map((issue) => (
+          <div key={issue} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {issue}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+};

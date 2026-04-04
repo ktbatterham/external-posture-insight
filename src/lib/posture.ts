@@ -31,7 +31,8 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
 
   const domainPenalty =
     analysis.domainSecurity.issues.length * 8 +
-    analysis.securityTxt.issues.length * 5;
+    analysis.securityTxt.issues.length * 5 +
+    analysis.publicSignals.issues.length * 4;
 
   const exposurePenalty =
     analysis.exposure.issues.length * 20 +
@@ -70,6 +71,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       notes: [
         `${analysis.domainSecurity.issues.length} DNS/mail findings`,
         `${analysis.securityTxt.issues.length} security.txt findings`,
+        `${analysis.publicSignals.issues.length} public trust findings`,
       ],
     },
     {
@@ -105,7 +107,8 @@ export const getUnifiedIssueSummary = (analysis: AnalysisResult) => {
       analysis.htmlSecurity.issues.length +
       analysis.corsSecurity.issues.length +
       analysis.apiSurface.issues.length +
-      analysis.securityTxt.issues.length,
+      analysis.securityTxt.issues.length +
+      analysis.publicSignals.issues.length,
     info:
       analysis.issues.filter((issue) => issue.severity === "info").length +
       analysis.exposure.probes.filter((probe) => probe.finding === "interesting").length,

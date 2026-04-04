@@ -1,0 +1,166 @@
+import { AnalysisResult, HistoryDiff } from "@/types/analysis";
+
+export interface PrioritizedAction {
+  title: string;
+  detail: string;
+  severity: "critical" | "warning" | "info";
+  area: string;
+}
+
+export interface MonitoringAlert {
+  title: string;
+  detail: string;
+  severity: "warning" | "info";
+}
+
+const severityOrder: Record<PrioritizedAction["severity"], number> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+};
+
+export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[] => {
+  const actions: PrioritizedAction[] = [];
+  const seen = new Set<string>();
+
+  const addAction = (action: PrioritizedAction) => {
+    const key = `${action.title}:${action.area}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    actions.push(action);
+  };
+
+  const hasHeaderIssue = (key: string, status?: "missing" | "warning") =>
+    analysis.headers.some((header) => header.key === key && (status ? header.status === status : header.status !== "present"));
+
+  if (hasHeaderIssue("strict-transport-security")) {
+    addAction({
+      title: "Strengthen HTTPS persistence",
+      detail: "Add or harden HSTS with a long max-age, includeSubDomains, and preload readiness where appropriate.",
+      severity: "critical",
+      area: "Transport",
+    });
+  }
+
+  if (hasHeaderIssue("content-security-policy")) {
+    addAction({
+      title: "Tighten the content security policy",
+      detail: "A stronger CSP will reduce script injection and unsafe resource loading risk.",
+      severity: "critical",
+      area: "Headers",
+    });
+  }
+
+  if (analysis.crawl.inconsistentHeaders.length > 0) {
+    addAction({
+      title: "Normalize protections across routes",
+      detail: `Header behavior varies across ${analysis.crawl.inconsistentHeaders.length} protections, which usually points to inconsistent middleware or CDN rules.`,
+      severity: "warning",
+      area: "Crawl",
+    });
+  }
+
+  if (analysis.htmlSecurity.missingSriScriptUrls.length > 0) {
+    addAction({
+      title: "Add integrity checks for third-party scripts",
+      detail: "Subresource Integrity would reduce tampering risk on externally hosted scripts.",
+      severity: "warning",
+      area: "Content",
+    });
+  }
+
+  if (analysis.securityTxt.status !== "present") {
+    addAction({
+      title: "Publish a security.txt file",
+      detail: "A valid security.txt gives researchers and partners a clear disclosure route.",
+      severity: "info",
+      area: "Disclosure",
+    });
+  }
+
+  if (!analysis.domainSecurity.dmarc || !/p=(reject|quarantine)/i.test(analysis.domainSecurity.dmarc)) {
+    addAction({
+      title: "Improve email-domain enforcement",
+      detail: "Stronger DMARC helps reduce spoofing and improves overall trust posture.",
+      severity: "warning",
+      area: "Domain",
+    });
+  }
+
+  if (analysis.domainSecurity.issues.some((issue) => issue.includes("MTA-STS"))) {
+    addAction({
+      title: "Add MTA-STS if email matters for this domain",
+      detail: "MTA-STS improves SMTP transport integrity for domains that receive mail.",
+      severity: "info",
+      area: "Domain",
+    });
+  }
+
+  if (analysis.apiSurface.issues.length > 0) {
+    addAction({
+      title: "Review public API exposure",
+      detail: "A limited set of API-style endpoints looked publicly reachable and should be reviewed.",
+      severity: "warning",
+      area: "API",
+    });
+  }
+
+  if (analysis.publicSignals.hstsPreload.status === "eligible") {
+    addAction({
+      title: "Consider HSTS preload submission",
+      detail: "Public preload data suggests the domain may be close to preload-ready.",
+      severity: "info",
+      area: "Public Signals",
+    });
+  }
+
+  return actions.sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity]).slice(0, 5);
+};
+
+export const getMonitoringAlerts = (analysis: AnalysisResult, diff: HistoryDiff | null): MonitoringAlert[] => {
+  const alerts: MonitoringAlert[] = [];
+
+  if (diff?.scoreDelta && diff.scoreDelta < 0) {
+    alerts.push({
+      title: "Score regressed",
+      detail: `This scan dropped ${Math.abs(diff.scoreDelta)} points versus the previous local snapshot.`,
+      severity: "warning",
+    });
+  }
+
+  if (diff?.newIssues.length) {
+    alerts.push({
+      title: "New findings appeared",
+      detail: `${diff.newIssues.length} issue${diff.newIssues.length === 1 ? "" : "s"} were not present in the previous snapshot.`,
+      severity: "warning",
+    });
+  }
+
+  if (diff?.headerChanges.length) {
+    alerts.push({
+      title: "Header posture changed",
+      detail: `${diff.headerChanges.length} header status change${diff.headerChanges.length === 1 ? "" : "s"} detected since the last scan.`,
+      severity: "info",
+    });
+  }
+
+  if (analysis.certificate.daysRemaining !== null && analysis.certificate.daysRemaining <= 30) {
+    alerts.push({
+      title: "Certificate expiry window is approaching",
+      detail: `The current TLS certificate expires in about ${analysis.certificate.daysRemaining} days.`,
+      severity: analysis.certificate.daysRemaining <= 14 ? "warning" : "info",
+    });
+  }
+
+  if (analysis.publicSignals.hstsPreload.status === "pending") {
+    alerts.push({
+      title: "HSTS preload submission appears pending",
+      detail: "Public preload data suggests the domain may already be in the submission queue.",
+      severity: "info",
+    });
+  }
+
+  return alerts.slice(0, 4);
+};

@@ -97,6 +97,20 @@ const API_SURFACE_PROBES = [
   { label: "Versioned API", path: "/api/v1" },
 ];
 
+const PAGE_PATH_PRIORITY_PATTERNS = [
+  /\/login/i,
+  /\/account/i,
+  /\/dashboard/i,
+  /\/admin/i,
+  /\/app/i,
+  /\/portal/i,
+  /\/signin/i,
+  /\/auth/i,
+  /\/support/i,
+  /\/contact/i,
+  /\/security/i,
+];
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -233,7 +247,7 @@ function detectTechnologies(headers, finalUrl) {
   const seen = new Set();
 
   const addTechnology = (name, category, evidence, version) => {
-    const key = `${name}:${category}:${version || ""}`;
+    const key = `${name}:${category}`;
     if (seen.has(key)) {
       return;
     }
@@ -249,6 +263,12 @@ function detectTechnologies(headers, finalUrl) {
     const serverLower = server.toLowerCase();
     if (serverLower.includes("cloudflare")) {
       addTechnology("Cloudflare", "network", "Detected from Server header", server);
+    } else if (serverLower.includes("sucuri")) {
+      addTechnology("Sucuri", "network", "Detected from Server header", server);
+    } else if (serverLower.includes("akamai")) {
+      addTechnology("Akamai", "network", "Detected from Server header", server);
+    } else if (serverLower.includes("fastly")) {
+      addTechnology("Fastly", "network", "Detected from Server header", server);
     } else if (serverLower.includes("nginx")) {
       addTechnology("Nginx", "server", "Detected from Server header", server);
     } else if (serverLower.includes("apache")) {
@@ -276,6 +296,15 @@ function detectTechnologies(headers, finalUrl) {
   }
   if (headerValue(headers, "cf-ray") || cache) {
     addTechnology("Cloudflare", "network", "Detected from Cloudflare response headers");
+  }
+  if (headerValue(headers, "x-sucuri-id") || headerValue(headers, "x-sucuri-cache")) {
+    addTechnology("Sucuri", "network", "Detected from Sucuri edge headers");
+  }
+  if (headerValue(headers, "x-akamai-transformed") || headerValue(headers, "akamai-cache-status")) {
+    addTechnology("Akamai", "network", "Detected from Akamai response headers");
+  }
+  if (headerValue(headers, "x-served-by")?.toLowerCase().includes("cache-")) {
+    addTechnology("Fastly", "network", "Detected from X-Served-By cache headers");
   }
   if (headerValue(headers, "server-timing")?.toLowerCase().includes("cdn-cache")) {
     addTechnology("CDN", "network", "Detected from Server-Timing header");
@@ -742,9 +771,14 @@ function normalizeHtmlSignature(body) {
     .slice(0, 280);
 }
 
-function extractHtmlTitle(body) {
+function getHtmlTitle(body) {
   const match = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return match ? match[1].replace(/\s+/g, " ").trim().toLowerCase() : null;
+  return match ? match[1].replace(/\s+/g, " ").trim() : null;
+}
+
+function extractHtmlTitle(body) {
+  const title = getHtmlTitle(body);
+  return title ? title.toLowerCase() : null;
 }
 
 function classifyHtmlApiFallback(probePath, finalUrl, resolvedUrl, body, homepageSignature, homepageTitle) {
@@ -934,6 +968,143 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function isLikelyPagePath(pathname) {
+  if (!pathname || pathname === "/") {
+    return false;
+  }
+
+  return !/\.(?:css|js|mjs|json|xml|txt|ico|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot|map|pdf|zip|gz|mp4|webm)$/i.test(
+    pathname,
+  );
+}
+
+function scorePagePath(pathname) {
+  return PAGE_PATH_PRIORITY_PATTERNS.reduce((score, pattern, index) => {
+    if (pattern.test(pathname)) {
+      return score + (PAGE_PATH_PRIORITY_PATTERNS.length - index) * 10;
+    }
+    return score;
+  }, pathname.split("/").filter(Boolean).length <= 2 ? 5 : 0);
+}
+
+function normalizeDiscoveredPath(value, finalUrl) {
+  if (!value || /^(mailto|tel|javascript):/i.test(value)) {
+    return null;
+  }
+
+  try {
+    const resolved = new URL(value, finalUrl);
+    if (resolved.origin !== finalUrl.origin || !isLikelyPagePath(resolved.pathname)) {
+      return null;
+    }
+
+    const normalizedPath = `${resolved.pathname}${resolved.search}`;
+    return normalizedPath.length <= 120 ? normalizedPath : resolved.pathname;
+  } catch {
+    return null;
+  }
+}
+
+function rankDiscoveredPaths(paths) {
+  return unique(paths)
+    .sort((left, right) => scorePagePath(right) - scorePagePath(left))
+    .slice(0, 10);
+}
+
+function addDetectedTechnology(target, seen, name, category, evidence, version) {
+  const key = `${name}:${category}`;
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  target.push({ name, category, evidence, version: version || null });
+}
+
+function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrls, externalStylesheetUrls) {
+  const technologies = [];
+  const seen = new Set();
+  const htmlLower = html.toLowerCase();
+  const allUrls = [...externalScriptUrls, ...externalStylesheetUrls].map((url) => url.toLowerCase());
+  const generator = metaGenerator?.toLowerCase() || "";
+
+  if (generator.includes("wordpress") || htmlLower.includes("/wp-content/") || htmlLower.includes("/wp-includes/")) {
+    addDetectedTechnology(technologies, seen, "WordPress", "frontend", "Detected from meta generator or wp-content assets");
+  }
+  if (generator.includes("drupal") || htmlLower.includes("drupalsettings") || htmlLower.includes("/sites/default/files/")) {
+    addDetectedTechnology(technologies, seen, "Drupal", "frontend", "Detected from Drupal page markers");
+  }
+  if (generator.includes("joomla")) {
+    addDetectedTechnology(technologies, seen, "Joomla", "frontend", "Detected from meta generator");
+  }
+  if (generator.includes("ghost")) {
+    addDetectedTechnology(technologies, seen, "Ghost", "frontend", "Detected from meta generator");
+  }
+  if (generator.includes("webflow") || allUrls.some((url) => url.includes("webflow"))) {
+    addDetectedTechnology(technologies, seen, "Webflow", "hosting", "Detected from Webflow assets or generator");
+  }
+  if (generator.includes("wix") || allUrls.some((url) => url.includes("wixstatic.com"))) {
+    addDetectedTechnology(technologies, seen, "Wix", "hosting", "Detected from Wix assets or generator");
+  }
+  if (allUrls.some((url) => url.includes("static1.squarespace.com")) || generator.includes("squarespace")) {
+    addDetectedTechnology(technologies, seen, "Squarespace", "hosting", "Detected from Squarespace assets or generator");
+  }
+  if (htmlLower.includes("/_next/") || htmlLower.includes("__next_data__")) {
+    addDetectedTechnology(technologies, seen, "Next.js", "frontend", "Detected from Next.js page assets");
+  }
+  if (htmlLower.includes("/_nuxt/") || htmlLower.includes("__nuxt")) {
+    addDetectedTechnology(technologies, seen, "Nuxt", "frontend", "Detected from Nuxt page assets");
+  }
+  if (allUrls.some((url) => url.includes("cdn.shopify.com")) || htmlLower.includes("shopify.theme")) {
+    addDetectedTechnology(technologies, seen, "Shopify", "hosting", "Detected from Shopify assets");
+  }
+  if (allUrls.some((url) => url.includes("code.jquery.com")) || htmlLower.includes("jquery")) {
+    addDetectedTechnology(technologies, seen, "jQuery", "frontend", "Detected from jQuery asset references");
+  }
+  if (allUrls.some((url) => url.includes("googletagmanager.com"))) {
+    addDetectedTechnology(technologies, seen, "Google Tag Manager", "network", "Detected from third-party script domains");
+  }
+  if (allUrls.some((url) => url.includes("google-analytics.com") || url.includes("gtag/js"))) {
+    addDetectedTechnology(technologies, seen, "Google Analytics", "network", "Detected from analytics asset references");
+  }
+  if (allUrls.some((url) => url.includes("app.usercentrics.eu"))) {
+    addDetectedTechnology(technologies, seen, "Usercentrics", "security", "Detected from consent-management script");
+  }
+  if (allUrls.some((url) => url.includes("consent.cookiebot.com"))) {
+    addDetectedTechnology(technologies, seen, "Cookiebot", "security", "Detected from consent-management script");
+  }
+  if (allUrls.some((url) => url.includes("js.hs-scripts.com"))) {
+    addDetectedTechnology(technologies, seen, "HubSpot", "network", "Detected from HubSpot script references");
+  }
+  if (allUrls.some((url) => url.includes("cloudfront.net"))) {
+    addDetectedTechnology(technologies, seen, "Amazon CloudFront", "network", "Detected from asset hosting domain");
+  }
+  if (finalUrl.hostname.endsWith(".pages.dev")) {
+    addDetectedTechnology(technologies, seen, "Cloudflare Pages", "hosting", "Derived from final hostname");
+  }
+
+  return technologies;
+}
+
+function mergeTechnologies(...groups) {
+  const merged = [];
+  const seen = new Set();
+
+  for (const group of groups) {
+    for (const technology of group || []) {
+      addDetectedTechnology(
+        merged,
+        seen,
+        technology.name,
+        technology.category,
+        technology.evidence,
+        technology.version,
+      );
+    }
+  }
+
+  return merged;
+}
+
 async function analyzeHtmlSecurity(finalUrl) {
   try {
     const response = await requestText(finalUrl);
@@ -942,6 +1113,8 @@ async function analyzeHtmlSecurity(finalUrl) {
       return {
         fetched: false,
         pageUrl: finalUrl.toString(),
+        pageTitle: null,
+        metaGenerator: null,
         forms: [],
         externalScriptDomains: [],
         externalStylesheetDomains: [],
@@ -949,6 +1122,8 @@ async function analyzeHtmlSecurity(finalUrl) {
         inlineScriptCount: 0,
         inlineStyleCount: 0,
         missingSriScriptUrls: [],
+        firstPartyPaths: [],
+        detectedTechnologies: [],
         issues: ["Primary response was not HTML, so page content inspection was skipped."],
         strengths: [],
       };
@@ -957,6 +1132,11 @@ async function analyzeHtmlSecurity(finalUrl) {
     const html = response.body;
     const issues = [];
     const strengths = [];
+    const pageTitle = getHtmlTitle(html);
+    const metaGenerator = getAttribute(
+      html.match(/<meta\b[^>]*name\s*=\s*["']generator["'][^>]*>/i)?.[0] || "",
+      "content",
+    );
 
     const formTags = [...html.matchAll(/<form\b[^>]*>([\s\S]*?)<\/form>/gi)];
     const forms = formTags.map(([fullTag, innerHtml]) => {
@@ -987,6 +1167,11 @@ async function analyzeHtmlSecurity(finalUrl) {
       .map((tag) => getAttribute(tag, "href"))
       .filter(Boolean)
       .map((href) => new URL(href, finalUrl).toString());
+    const anchorTags = [...html.matchAll(/<a\b[^>]*>/gi)].map((match) => match[0]);
+    const firstPartyPaths = rankDiscoveredPaths([
+      ...anchorTags.map((tag) => normalizeDiscoveredPath(getAttribute(tag, "href"), finalUrl)),
+      ...forms.map((form) => normalizeDiscoveredPath(form.action, finalUrl)),
+    ]);
     const insecureResourceUrls = unique(
       [...externalScriptUrls, ...externalStylesheetUrls].filter((url) => url.startsWith("http://")),
     );
@@ -1029,6 +1214,9 @@ async function analyzeHtmlSecurity(finalUrl) {
     if (missingSriScriptUrls.length) {
       issues.push("Some third-party scripts are missing Subresource Integrity attributes.");
     }
+    if (firstPartyPaths.length) {
+      strengths.push(`Discovered ${firstPartyPaths.length} same-origin navigation paths for low-noise follow-up scans.`);
+    }
     if (!issues.length) {
       strengths.push("No obvious passive HTML transport/content risks detected on the fetched page.");
     }
@@ -1036,6 +1224,8 @@ async function analyzeHtmlSecurity(finalUrl) {
     return {
       fetched: true,
       pageUrl: finalUrl.toString(),
+      pageTitle,
+      metaGenerator: metaGenerator || null,
       forms,
       externalScriptDomains,
       externalStylesheetDomains,
@@ -1043,6 +1233,14 @@ async function analyzeHtmlSecurity(finalUrl) {
       inlineScriptCount,
       inlineStyleCount,
       missingSriScriptUrls,
+      firstPartyPaths,
+      detectedTechnologies: detectHtmlTechnologies(
+        html,
+        finalUrl,
+        metaGenerator || null,
+        externalScriptUrls,
+        externalStylesheetUrls,
+      ),
       issues,
       strengths,
     };
@@ -1050,6 +1248,8 @@ async function analyzeHtmlSecurity(finalUrl) {
     return {
       fetched: false,
       pageUrl: finalUrl.toString(),
+      pageTitle: null,
+      metaGenerator: null,
       forms: [],
       externalScriptDomains: [],
       externalStylesheetDomains: [],
@@ -1057,9 +1257,141 @@ async function analyzeHtmlSecurity(finalUrl) {
       inlineScriptCount: 0,
       inlineStyleCount: 0,
       missingSriScriptUrls: [],
+      firstPartyPaths: [],
+      detectedTechnologies: [],
       issues: [error instanceof Error ? error.message : "HTML inspection failed."],
       strengths: [],
     };
+  }
+}
+
+function parseRobotsSitemaps(body) {
+  return unique(
+    body
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^sitemap:/i.test(line))
+      .map((line) => line.replace(/^sitemap:\s*/i, "").trim()),
+  );
+}
+
+function parseSitemapPaths(xml, finalUrl) {
+  return rankDiscoveredPaths(
+    [...xml.matchAll(/<loc>([\s\S]*?)<\/loc>/gi)].map((match) =>
+      normalizeDiscoveredPath(match[1].trim(), finalUrl),
+    ),
+  );
+}
+
+async function collectDiscoveryPaths(finalUrl, htmlSecurity) {
+  const discoverySources = [];
+  const discoveredPaths = [...(htmlSecurity.firstPartyPaths || [])];
+
+  if (htmlSecurity.firstPartyPaths?.length) {
+    discoverySources.push("page links");
+  }
+
+  const sitemapCandidates = [new URL("/sitemap.xml", finalUrl.origin).toString()];
+
+  try {
+    const robotsResponse = await requestText(new URL("/robots.txt", finalUrl.origin));
+    if (robotsResponse.statusCode >= 200 && robotsResponse.statusCode < 300 && robotsResponse.body.trim()) {
+      discoverySources.push("robots.txt");
+      sitemapCandidates.push(...parseRobotsSitemaps(robotsResponse.body));
+    }
+  } catch {
+    // Ignore robots fetch failures.
+  }
+
+  for (const sitemapCandidate of unique(sitemapCandidates).slice(0, 2)) {
+    try {
+      const sitemapUrl = new URL(sitemapCandidate, finalUrl);
+      const response = await requestText(sitemapUrl);
+      if (response.statusCode >= 200 && response.statusCode < 300 && response.body.includes("<loc>")) {
+        discoveredPaths.push(...parseSitemapPaths(response.body, finalUrl));
+        discoverySources.push(sitemapUrl.pathname === "/sitemap.xml" ? "sitemap.xml" : "robots.txt sitemap");
+        break;
+      }
+    } catch {
+      // Ignore sitemap fetch failures.
+    }
+  }
+
+  return {
+    paths: rankDiscoveredPaths(discoveredPaths),
+    sources: unique(discoverySources),
+  };
+}
+
+async function fetchPublicSignals(host) {
+  const apexHost = host.startsWith("www.") ? host.slice(4) : host;
+  const sourceUrl = `https://hstspreload.org/api/v2/status?domain=${encodeURIComponent(apexHost)}`;
+  const fallback = {
+    hstsPreload: {
+      status: "unknown",
+      summary: "Public HSTS preload status could not be determined.",
+      sourceUrl,
+    },
+    issues: [],
+    strengths: [],
+  };
+
+  try {
+    const response = await requestText(new URL(sourceUrl), { Accept: "application/json" });
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return fallback;
+    }
+
+    const payload = JSON.parse(response.body);
+    const statusText = String(payload.status || payload.result || "").toLowerCase();
+    const message = String(payload.message || payload.status || "").trim();
+    const errors = Array.isArray(payload.errors) ? payload.errors : [];
+    const errorText = errors
+      .map((entry) => (typeof entry === "string" ? entry : entry?.message || JSON.stringify(entry)))
+      .join(" ");
+
+    let status = "not_preloaded";
+    if (payload.preloaded === true || statusText.includes("preloaded")) {
+      status = "preloaded";
+    } else if (statusText.includes("pending")) {
+      status = "pending";
+    } else if (payload.preloadable === true || payload.eligible === true || statusText.includes("eligible")) {
+      status = "eligible";
+    } else if (!statusText && !errorText) {
+      status = "unknown";
+    }
+
+    const summary =
+      message && message.toLowerCase() !== "unknown"
+        ? message
+        : errorText ||
+          (status === "not_preloaded"
+            ? "The domain is not currently shown as preloaded in the public HSTS preload dataset."
+            : "HSTS preload status retrieved from the public preload dataset.");
+    const issues = [];
+    const strengths = [];
+
+    if (status === "preloaded") {
+      strengths.push("Domain appears in the public HSTS preload program.");
+    } else if (status === "pending") {
+      strengths.push("Domain appears to have an HSTS preload submission pending.");
+    } else if (status === "eligible") {
+      issues.push("Domain may be eligible for HSTS preload but is not currently shown as preloaded.");
+    } else if (status === "not_preloaded") {
+      issues.push("Domain is not shown as preloaded in the public HSTS preload dataset.");
+    }
+
+    return {
+      hstsPreload: {
+        status,
+        summary,
+        sourceUrl,
+      },
+      issues,
+      strengths,
+    };
+  } catch {
+    return fallback;
   }
 }
 
@@ -1562,13 +1894,29 @@ async function analyzeUrlCore(input, options = {}) {
   };
 }
 
-function buildCrawlCandidates(result) {
+function toCandidateLabel(pathname) {
+  if (pathname === "/") {
+    return "Homepage";
+  }
+
+  return pathname
+    .split("?")[0]
+    .split("/")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ")
+    .replace(/-/g, " ");
+}
+
+function buildCrawlCandidates(result, discoveryPaths = []) {
   const finalUrl = new URL(result.finalUrl);
   const userPath = new URL(result.normalizedUrl).pathname || "/";
   const seen = new Set();
 
   return [
     { label: userPath === "/" ? "Homepage" : "Requested page", path: userPath },
+    ...discoveryPaths.map((path) => ({ label: toCandidateLabel(path), path })),
     ...CRAWL_CANDIDATES,
   ]
     .map((candidate) => {
@@ -1587,7 +1935,7 @@ function buildCrawlCandidates(result) {
       seen.add(key);
       return true;
     })
-    .slice(0, 5);
+    .slice(0, 6);
 }
 
 function summarizePageAnalysis(label, path, pageResult, rootHost) {
@@ -1611,8 +1959,8 @@ function summarizePageAnalysis(label, path, pageResult, rootHost) {
   };
 }
 
-async function crawlRelatedPages(rootResult) {
-  const candidates = buildCrawlCandidates(rootResult);
+async function crawlRelatedPages(rootResult, discovery) {
+  const candidates = buildCrawlCandidates(rootResult, discovery.paths);
   const rootHost = new URL(rootResult.finalUrl).hostname;
   const pages = [];
 
@@ -1669,20 +2017,28 @@ async function crawlRelatedPages(rootResult) {
     strongestPage,
     weakestPage,
     inconsistentHeaders,
+    discoverySources: discovery.sources,
   };
 }
 
 async function analyzeUrl(input) {
   const result = await analyzeUrlCore(input, { includeCertificate: true });
+  const finalUrl = new URL(result.finalUrl);
+  const htmlSecurity = await analyzeHtmlSecurity(finalUrl);
+  const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
+  const publicSignals = await fetchPublicSignals(result.host);
+
   return {
     ...result,
-    crawl: await crawlRelatedPages(result),
-    securityTxt: await fetchSecurityTxt(new URL(result.finalUrl)),
+    technologies: mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies),
+    crawl: await crawlRelatedPages(result, discovery),
+    securityTxt: await fetchSecurityTxt(finalUrl),
     domainSecurity: await analyzeDomainSecurity(result.host),
-    htmlSecurity: await analyzeHtmlSecurity(new URL(result.finalUrl)),
-    exposure: await analyzeExposure(new URL(result.finalUrl)),
-    corsSecurity: await analyzeCorsSecurity(new URL(result.finalUrl), result.rawHeaders),
-    apiSurface: await analyzeApiSurface(new URL(result.finalUrl)),
+    htmlSecurity,
+    exposure: await analyzeExposure(finalUrl),
+    corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders),
+    apiSurface: await analyzeApiSurface(finalUrl),
+    publicSignals,
   };
 }
 

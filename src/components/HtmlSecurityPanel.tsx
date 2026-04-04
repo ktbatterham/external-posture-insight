@@ -17,7 +17,13 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Page title</p>
+            <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950">
+              {htmlSecurity.pageTitle || "Unavailable"}
+            </p>
+          </div>
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Forms</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.forms.length}</p>
@@ -35,6 +41,27 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
             <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.missingSriScriptUrls.length}</p>
           </div>
         </div>
+
+        {(htmlSecurity.metaGenerator || htmlSecurity.firstPartyPaths.length > 0) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Meta generator</p>
+              <p className="mt-2 text-sm font-medium text-slate-800">{htmlSecurity.metaGenerator || "Not declared"}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Discovered same-origin paths</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {htmlSecurity.firstPartyPaths.length ? (
+                  htmlSecurity.firstPartyPaths.map((path) => (
+                    <Badge key={path} variant="outline">{path}</Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-500">No same-origin page links were discovered passively.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {htmlSecurity.forms.length > 0 && (
           <div className="rounded-2xl bg-slate-50 p-4">
