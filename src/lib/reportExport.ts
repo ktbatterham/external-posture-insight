@@ -30,6 +30,12 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- Score: ${analysis.score}/100`,
     `- Status: ${analysis.statusCode}`,
     "",
+    "## Executive Readout",
+    "",
+    `- Overview: ${analysis.executiveSummary.overview}`,
+    `- Main risk: ${analysis.executiveSummary.mainRisk}`,
+    ...analysis.executiveSummary.takeaways.map((takeaway) => `- ${takeaway}`),
+    "",
     "## Summary",
     "",
     `- Critical findings: ${summary.critical}`,
@@ -88,6 +94,18 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
       ? analysis.technologies.map((tech) => `- ${tech.name} (${tech.category})${tech.evidence ? `: ${tech.evidence}` : ""}`)
       : ["- No stack signals recorded."]),
     "",
+    "## Third-Party Trust",
+    "",
+    `- Providers detected: ${analysis.thirdPartyTrust.totalProviders}`,
+    `- Higher-risk providers: ${analysis.thirdPartyTrust.highRiskProviders}`,
+    `- Summary: ${analysis.thirdPartyTrust.summary}`,
+    ...(analysis.thirdPartyTrust.providers.length
+      ? analysis.thirdPartyTrust.providers.map((provider) => `- ${provider.name} [${provider.category} | ${provider.risk} risk] ${provider.domain}`)
+      : ["- No third-party providers recorded."]),
+    ...(analysis.thirdPartyTrust.issues.length
+      ? analysis.thirdPartyTrust.issues.map((issue) => `- ${issue}`)
+      : ["- No third-party trust issues recorded."]),
+    "",
     "## AI Surface",
     "",
     `- Classification: ${aiSummary}`,
@@ -95,6 +113,8 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}`,
     `- Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}`,
     `- AI paths: ${analysis.aiSurface.discoveredPaths.length ? analysis.aiSurface.discoveredPaths.join(", ") : "None detected"}`,
+    ...(analysis.aiSurface.privacySignals.length ? analysis.aiSurface.privacySignals.map((signal) => `- ${signal}`) : ["- No explicit AI privacy guidance detected."]),
+    ...(analysis.aiSurface.governanceSignals.length ? analysis.aiSurface.governanceSignals.map((signal) => `- ${signal}`) : ["- No explicit AI governance language detected."]),
     ...(analysis.aiSurface.issues.length ? analysis.aiSurface.issues.map((issue) => `- ${issue}`) : ["- No AI-surface issues recorded."]),
     "",
     "## Low-Noise Exposure Checks",
@@ -179,6 +199,12 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <p>Status: ${analysis.statusCode}</p>
     </div>
     <div class="card">
+      <h2>Executive Readout</h2>
+      <p>${analysis.executiveSummary.overview}</p>
+      <p><strong>Main risk:</strong> ${analysis.executiveSummary.mainRisk}</p>
+      <ul>${analysis.executiveSummary.takeaways.map((takeaway) => `<li>${takeaway}</li>`).join("")}</ul>
+    </div>
+    <div class="card">
       <h2>Summary</h2>
       <p>Critical findings: ${summary.critical}</p>
       <p>Warning findings: ${summary.warning}</p>
@@ -212,12 +238,23 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <ul>${technologyItems}</ul>
     </div>
     <div class="card">
+      <h2>Third-Party Trust</h2>
+      <p>${analysis.thirdPartyTrust.summary}</p>
+      <p>Providers detected: ${analysis.thirdPartyTrust.totalProviders}</p>
+      <p>Higher-risk providers: ${analysis.thirdPartyTrust.highRiskProviders}</p>
+      <ul>${analysis.thirdPartyTrust.providers.length
+        ? analysis.thirdPartyTrust.providers.map((provider) => `<li><strong>${provider.name}</strong> [${provider.category} | ${provider.risk} risk] ${provider.domain}<br>${provider.evidence}</li>`).join("")
+        : "<li>No third-party providers recorded.</li>"}</ul>
+    </div>
+    <div class="card">
       <h2>AI Surface</h2>
       <p>Classification: ${aiSummary}</p>
       <p>AI detected: ${analysis.aiSurface.detected ? "Yes" : "No"}</p>
       <p>Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}</p>
       <p>Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}</p>
       <p>AI paths: ${analysis.aiSurface.discoveredPaths.length ? analysis.aiSurface.discoveredPaths.join(", ") : "None detected"}</p>
+      <p>AI privacy signals: ${analysis.aiSurface.privacySignals.length ? analysis.aiSurface.privacySignals.join(" ") : "None detected"}</p>
+      <p>AI governance signals: ${analysis.aiSurface.governanceSignals.length ? analysis.aiSurface.governanceSignals.join(" ") : "None detected"}</p>
     </div>
     <div class="card">
       <h2>Low-Noise Exposure Checks</h2>

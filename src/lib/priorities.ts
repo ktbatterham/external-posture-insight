@@ -71,6 +71,24 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     });
   }
 
+  if (analysis.thirdPartyTrust.highRiskProviders > 0) {
+    addAction({
+      title: "Review high-trust third-party providers",
+      detail: `The page loads ${analysis.thirdPartyTrust.highRiskProviders} higher-risk third-party integration${analysis.thirdPartyTrust.highRiskProviders === 1 ? "" : "s"} that expand data-flow and review scope.`,
+      severity: analysis.thirdPartyTrust.highRiskProviders >= 3 ? "critical" : "warning",
+      area: "Third Parties",
+    });
+  }
+
+  if (analysis.aiSurface.detected && analysis.aiSurface.issues.length > 0) {
+    addAction({
+      title: "Add clearer AI disclosure and privacy guidance",
+      detail: "Public AI or automation signals were detected, but the fetched page offers limited visible disclosure, privacy, or governance language.",
+      severity: "warning",
+      area: "AI",
+    });
+  }
+
   if (analysis.securityTxt.status !== "present") {
     addAction({
       title: "Publish a security.txt file",

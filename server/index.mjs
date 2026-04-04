@@ -294,6 +294,18 @@ function detectTechnologies(headers, finalUrl) {
   if (headerValue(headers, "x-vercel-id")) {
     addTechnology("Vercel", "hosting", "Detected from X-Vercel-Id header");
   }
+  if (headerValue(headers, "x-amz-cf-id")) {
+    addTechnology("Amazon CloudFront", "network", "Detected from CloudFront response headers");
+  }
+  if (headerValue(headers, "x-cache")?.toLowerCase().includes("fastly")) {
+    addTechnology("Fastly", "network", "Detected from X-Cache header");
+  }
+  if (headerValue(headers, "x-cdn")) {
+    addTechnology(headerValue(headers, "x-cdn"), "network", "Detected from X-CDN header");
+  }
+  if (headerValue(headers, "x-envoy-upstream-service-time")) {
+    addTechnology("Envoy", "network", "Detected from Envoy upstream timing header");
+  }
   if (headerValue(headers, "cf-ray") || cache) {
     addTechnology("Cloudflare", "network", "Detected from Cloudflare response headers");
   }
@@ -1126,6 +1138,27 @@ function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrl
   if (allUrls.some((url) => url.includes("js.hs-scripts.com"))) {
     addDetectedTechnology(technologies, seen, "HubSpot", "network", "Detected from HubSpot script references");
   }
+  if (allUrls.some((url) => url.includes("adobedtm.com") || url.includes("adobedc.net"))) {
+    addDetectedTechnology(technologies, seen, "Adobe Experience Cloud", "network", "Detected from Adobe tag or delivery assets");
+  }
+  if (allUrls.some((url) => url.includes("contentsquare") || url.includes("decibelinsight"))) {
+    addDetectedTechnology(technologies, seen, "Contentsquare / Decibel", "network", "Detected from session analytics assets");
+  }
+  if (allUrls.some((url) => url.includes("imperva") || url.includes("incapsula"))) {
+    addDetectedTechnology(technologies, seen, "Imperva", "security", "Detected from Imperva / Incapsula assets");
+  }
+  if (allUrls.some((url) => url.includes("onetrust"))) {
+    addDetectedTechnology(technologies, seen, "OneTrust", "security", "Detected from OneTrust consent assets");
+  }
+  if (allUrls.some((url) => url.includes("braintree"))) {
+    addDetectedTechnology(technologies, seen, "Braintree", "security", "Detected from payments-related assets");
+  }
+  if (allUrls.some((url) => url.includes("sentry.io"))) {
+    addDetectedTechnology(technologies, seen, "Sentry", "security", "Detected from client monitoring assets");
+  }
+  if (allUrls.some((url) => url.includes("googletagmanager.com"))) {
+    addDetectedTechnology(technologies, seen, "Tag Management", "network", "Detected from tag-manager assets");
+  }
   if (allUrls.some((url) => url.includes("cloudfront.net"))) {
     addDetectedTechnology(technologies, seen, "Amazon CloudFront", "network", "Detected from asset hosting domain");
   }
@@ -1242,12 +1275,26 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
 
   const aiPageSignals = firstPartyPaths.filter((path) => /\/(ai|assistant|copilot|chat|ask-ai|automation)(\/|$)/i.test(path));
   const disclosures = [];
+  const privacySignals = [];
+  const governanceSignals = [];
 
   if (/do not share sensitive|may be inaccurate|ai-generated|generative ai|assistant may/i.test(htmlLower)) {
     disclosures.push("The page appears to include AI usage or safety disclosure language.");
   }
   if (/privacy policy/i.test(htmlLower) && /ai/i.test(htmlLower)) {
     disclosures.push("AI-related language appears alongside privacy-policy content.");
+  }
+  if (/do not share personal|do not enter personal|do not submit sensitive|avoid sharing confidential/i.test(htmlLower)) {
+    privacySignals.push("The page appears to warn users not to enter sensitive or personal data.");
+  }
+  if (/data may be used to improve|used to train|retained for|stored to improve/i.test(htmlLower)) {
+    privacySignals.push("The page appears to disclose AI-related retention or model-improvement language.");
+  }
+  if (/human review|reviewed by humans|monitored for quality/i.test(htmlLower)) {
+    governanceSignals.push("The page appears to disclose human review or quality-monitoring language.");
+  }
+  if (/terms of use|acceptable use|responsible ai|ai principles/i.test(htmlLower) && /ai/i.test(htmlLower)) {
+    governanceSignals.push("The page appears to reference AI governance or acceptable-use language.");
   }
 
   const issues = [];
@@ -1270,6 +1317,15 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
   } else if (automationOnly && !disclosures.length) {
     issues.push("Support automation signals were detected, but no obvious disclosure language was found on the fetched page.");
   }
+  if (highConfidenceAiSignals && !privacySignals.length) {
+    issues.push("AI-related signals were detected, but no obvious data-handling or privacy guidance was found on the fetched page.");
+  }
+  if (privacySignals.length) {
+    strengths.push("AI-related privacy guidance appears to be visible on the fetched page.");
+  }
+  if (governanceSignals.length) {
+    strengths.push("AI governance or human-review language appears to be visible on the fetched page.");
+  }
   if (!assistantVisible && !vendors.length && !aiPageSignals.length) {
     strengths.push("No obvious public-facing AI assistant or automation surface was detected on the fetched page.");
   }
@@ -1281,8 +1337,164 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
     vendors,
     discoveredPaths: aiPageSignals,
     disclosures,
+    privacySignals,
+    governanceSignals,
     issues,
     strengths,
+  };
+}
+
+function classifyThirdPartyProvider(domain) {
+  const lower = domain.toLowerCase();
+  const providers = [
+    { pattern: /(google-analytics|googletagmanager|doubleclick|omtrdc|adobedtm|adobedc|analytics)/, name: "Analytics / Tagging", category: "analytics", risk: "medium", evidence: "Detected from third-party analytics or tag-management assets" },
+    { pattern: /(onetrust|cookiebot|usercentrics)/, name: "Consent Management", category: "consent", risk: "low", evidence: "Detected from consent-management assets" },
+    { pattern: /(intercom|drift|zendesk|zopim|hubspot|freshchat|crisp|sprinklr)/, name: "Support / Chat", category: "support", risk: "medium", evidence: "Detected from public support or chat tooling" },
+    { pattern: /(openai|anthropic|gemini|vertex|copilot|wizdom\.ai)/, name: "AI / Assistant Vendor", category: "ai", risk: "high", evidence: "Detected from AI-related scripts, assets, or public assistant tooling" },
+    { pattern: /(contentsquare|decibelinsight|hotjar|fullstory|medallia)/, name: "Session Replay / Experience Analytics", category: "session_replay", risk: "high", evidence: "Detected from session-replay or detailed experience-analytics assets" },
+    { pattern: /(braintree|paypal|cardinalcommerce|arcot|3dsecure|tsys|payment|payments)/, name: "Payments / Verification", category: "payments", risk: "medium", evidence: "Detected from payments or challenge-flow assets" },
+    { pattern: /(facebook|twitter|linkedin|tiktok|pinterest|reddit|youtube|snapchat|instagram)/, name: "Social / Advertising", category: "social", risk: "medium", evidence: "Detected from social, embedded media, or advertising assets" },
+    { pattern: /(ads|adservice|amazon-adsystem|smartadserver|pubmatic|gumgum|teads|casalemedia|openx|lijit|bidswitch)/, name: "Advertising", category: "ads", risk: "high", evidence: "Detected from advertising or programmatic asset domains" },
+    { pattern: /(cloudfront|fastly|akamai|cloudflare|jsdelivr|cdnjs)/, name: "CDN / Delivery", category: "cdn", risk: "low", evidence: "Detected from CDN or static-delivery domains" },
+    { pattern: /(imperva|incapsula|sucuri|sentry)/, name: "Security / Monitoring", category: "security", risk: "low", evidence: "Detected from security, edge-protection, or monitoring assets" },
+  ];
+
+  const match = providers.find((provider) => provider.pattern.test(lower));
+  if (match) {
+    return {
+      name: match.name,
+      category: match.category,
+      risk: match.risk,
+      evidence: match.evidence,
+    };
+  }
+  return {
+    name: domain,
+    category: "other",
+    risk: "medium",
+    evidence: "Detected from third-party assets loaded by the page",
+  };
+}
+
+function getSiteDomain(hostname) {
+  const lower = hostname.toLowerCase();
+  const parts = lower.split(".").filter(Boolean);
+  if (parts.length <= 2) {
+    return lower;
+  }
+
+  const compoundSuffixes = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "co.nz"]);
+  const suffix = parts.slice(-2).join(".");
+  if (compoundSuffixes.has(suffix) && parts.length >= 3) {
+    return parts.slice(-3).join(".");
+  }
+
+  return parts.slice(-2).join(".");
+}
+
+function analyzeThirdPartyTrust(finalUrl, htmlSecurity, aiSurface) {
+  const siteDomain = getSiteDomain(finalUrl.hostname);
+  const thirdPartyDomains = unique([
+    ...(htmlSecurity.externalScriptDomains || []),
+    ...(htmlSecurity.externalStylesheetDomains || []),
+  ]).filter((domain) => domain && getSiteDomain(domain) !== siteDomain);
+
+  const providers = thirdPartyDomains.map((domain) => {
+    const classification = classifyThirdPartyProvider(domain);
+    return {
+      domain,
+      ...classification,
+    };
+  });
+
+  const highRiskProviders = providers.filter((provider) => provider.risk === "high").length;
+  const issues = [];
+  const strengths = [];
+
+  if (highRiskProviders >= 3) {
+    issues.push("The page relies on several high-trust or high-observability third parties, which expands data exposure and review scope.");
+  } else if (highRiskProviders > 0) {
+    issues.push("The page includes high-trust third-party providers that deserve explicit review and ownership.");
+  }
+  if ((htmlSecurity.missingSriScriptUrls || []).length > 0) {
+    issues.push("Some third-party scripts are loaded without Subresource Integrity.");
+  }
+  if (providers.some((provider) => provider.category === "session_replay")) {
+    issues.push("Session replay or experience analytics tooling appears to be present.");
+  }
+  if (providers.some((provider) => provider.category === "ai") && !aiSurface.disclosures.length) {
+    issues.push("AI-related third-party tooling appears present without obvious on-page disclosure language.");
+  }
+
+  if (providers.some((provider) => provider.category === "consent")) {
+    strengths.push("A consent-management provider appears to be present.");
+  }
+  if (providers.length > 0 && highRiskProviders === 0) {
+    strengths.push("Third-party footprint appears present but mostly concentrated in lower-risk delivery, monitoring, or consent tooling.");
+  }
+  if (!providers.length) {
+    strengths.push("No obvious third-party script or stylesheet domains were detected on the fetched page.");
+  }
+
+  const summary = !providers.length
+    ? "Minimal visible third-party footprint on the fetched page."
+    : highRiskProviders > 0
+      ? "The page depends on several third-party providers that increase trust and data-flow complexity."
+      : "The page uses third-party providers, but the visible footprint is weighted more toward delivery and operational tooling.";
+
+  return {
+    totalProviders: providers.length,
+    highRiskProviders,
+    providers,
+    issues,
+    strengths,
+    summary,
+  };
+}
+
+function buildExecutiveSummary(result) {
+  const missingHeaderCount = result.headers.filter((header) => header.status === "missing").length;
+  const highRiskThirdParties = result.thirdPartyTrust.highRiskProviders;
+  const posture = result.score >= 80 ? "strong" : result.score >= 60 ? "mixed" : "weak";
+
+  let mainRisk = "Browser-layer hardening gaps are the main visible risk.";
+  if (highRiskThirdParties >= 3) {
+    mainRisk = "Third-party trust and data-flow sprawl are the main visible risk.";
+  } else if (result.aiSurface.detected && result.aiSurface.issues.length > 0) {
+    mainRisk = "Public AI or automation signals are visible without much supporting disclosure or privacy guidance.";
+  } else if (result.domainSecurity.issues.length > 0 || result.publicSignals.issues.length > 0) {
+    mainRisk = "Public trust and domain hygiene signals need attention alongside the web posture.";
+  }
+
+  const takeaways = [];
+  takeaways.push(
+    missingHeaderCount > 0
+      ? `${missingHeaderCount} browser-facing protections are missing or weak on the scanned response.`
+      : "Core browser-facing protections look consistently present on the scanned response.",
+  );
+  takeaways.push(
+    result.thirdPartyTrust.totalProviders > 0
+      ? `${result.thirdPartyTrust.totalProviders} third-party provider${result.thirdPartyTrust.totalProviders === 1 ? "" : "s"} were detected, including ${highRiskThirdParties} higher-risk integration${highRiskThirdParties === 1 ? "" : "s"}.`
+      : "No obvious third-party script or stylesheet providers were detected on the fetched page.",
+  );
+  takeaways.push(
+    result.aiSurface.detected
+      ? `${result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length} public AI or automation signal${(result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length) === 1 ? "" : "s"} were detected.`
+      : "No obvious public-facing AI or automation surface was detected.",
+  );
+
+  const overview =
+    posture === "strong"
+      ? "External posture looks broadly solid, with only a few areas that still deserve tuning."
+      : posture === "mixed"
+        ? "External posture looks operationally mature in places, but the report still shows several areas that need tightening."
+        : "External posture shows multiple weaknesses that make the site look less well hardened than a mature public-facing platform should.";
+
+  return {
+    overview,
+    mainRisk,
+    posture,
+    takeaways,
   };
 }
 
@@ -1345,6 +1557,8 @@ function analyzeHtmlSecurity(finalUrl, document) {
           vendors: [],
           discoveredPaths: [],
           disclosures: [],
+          privacySignals: [],
+          governanceSignals: [],
           issues: ["Primary response was not HTML, so AI surface inspection was skipped."],
           strengths: [],
         },
@@ -1491,6 +1705,8 @@ function analyzeHtmlSecurity(finalUrl, document) {
         vendors: [],
         discoveredPaths: [],
         disclosures: [],
+        privacySignals: [],
+        governanceSignals: [],
         issues: [error instanceof Error ? error.message : "AI surface inspection failed."],
         strengths: [],
       },
@@ -2302,8 +2518,9 @@ async function analyzeUrl(input) {
   const htmlSecurity = analyzeHtmlSecurity(finalUrl, htmlDocument);
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
   const publicSignals = await fetchPublicSignals(result.host);
+  const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
 
-  return {
+  const enrichedResult = {
     ...result,
     technologies: mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies),
     crawl: await crawlRelatedPages(result, discovery),
@@ -2311,10 +2528,16 @@ async function analyzeUrl(input) {
     domainSecurity: await analyzeDomainSecurity(result.host),
     htmlSecurity,
     aiSurface: htmlSecurity.aiSurface,
+    thirdPartyTrust,
     exposure: await analyzeExposure(finalUrl),
     corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders),
     apiSurface: await analyzeApiSurface(finalUrl, htmlDocument),
     publicSignals,
+  };
+
+  return {
+    ...enrichedResult,
+    executiveSummary: buildExecutiveSummary(enrichedResult),
   };
 }
 

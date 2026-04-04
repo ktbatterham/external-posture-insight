@@ -189,8 +189,34 @@ export interface AiSurfaceInfo {
   }>;
   discoveredPaths: string[];
   disclosures: string[];
+  privacySignals: string[];
+  governanceSignals: string[];
   issues: string[];
   strengths: string[];
+}
+
+export interface ThirdPartyProvider {
+  domain: string;
+  name: string;
+  category: "analytics" | "consent" | "support" | "ai" | "session_replay" | "payments" | "social" | "ads" | "cdn" | "security" | "other";
+  risk: "low" | "medium" | "high";
+  evidence: string;
+}
+
+export interface ThirdPartyTrustInfo {
+  totalProviders: number;
+  highRiskProviders: number;
+  providers: ThirdPartyProvider[];
+  issues: string[];
+  strengths: string[];
+  summary: string;
+}
+
+export interface ExecutiveSummaryInfo {
+  overview: string;
+  mainRisk: string;
+  posture: "strong" | "mixed" | "weak";
+  takeaways: string[];
 }
 
 export interface ExposureProbe {
@@ -271,6 +297,8 @@ export interface AnalysisResult {
   domainSecurity: DomainSecurityInfo;
   htmlSecurity: HtmlSecurityInfo;
   aiSurface: AiSurfaceInfo;
+  thirdPartyTrust: ThirdPartyTrustInfo;
+  executiveSummary: ExecutiveSummaryInfo;
   exposure: ExposureSummary;
   corsSecurity: CorsSecurityInfo;
   apiSurface: ApiSurfaceInfo;

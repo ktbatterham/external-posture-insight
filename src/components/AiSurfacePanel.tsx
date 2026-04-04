@@ -97,6 +97,39 @@ export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
           </div>
         )}
 
+        {(aiSurface.privacySignals.length > 0 || aiSurface.governanceSignals.length > 0) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Privacy signals</p>
+              <div className="mt-3 space-y-2">
+                {aiSurface.privacySignals.length > 0 ? (
+                  aiSurface.privacySignals.map((signal) => (
+                    <p key={signal} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+                      {signal}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">No AI-related privacy guidance was identified on the fetched page.</p>
+                )}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Governance signals</p>
+              <div className="mt-3 space-y-2">
+                {aiSurface.governanceSignals.length > 0 ? (
+                  aiSurface.governanceSignals.map((signal) => (
+                    <p key={signal} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+                      {signal}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">No visible AI governance or human-review language was identified.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           {aiSurface.strengths.map((strength) => (
             <div key={strength} className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">

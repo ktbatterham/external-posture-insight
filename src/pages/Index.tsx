@@ -8,6 +8,7 @@ import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
 import { CrawlPanel } from "@/components/CrawlPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { ExposurePanel } from "@/components/ExposurePanel";
+import { ExecutiveSummaryPanel } from "@/components/ExecutiveSummaryPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
@@ -22,6 +23,7 @@ import { RedirectChain } from "@/components/RedirectChain";
 import { SecurityGrade } from "@/components/SecurityGrade";
 import { SecurityTxtPanel } from "@/components/SecurityTxtPanel";
 import { TechnologyStack } from "@/components/TechnologyStack";
+import { ThirdPartyTrustPanel } from "@/components/ThirdPartyTrustPanel";
 import { UrlForm } from "@/components/UrlForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -526,7 +528,10 @@ const Index = () => {
               </div>
             </div>
 
-            <PostureSummaryPanel analysis={analysisData} />
+            <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+              <ExecutiveSummaryPanel summary={analysisData.executiveSummary} />
+              <PostureSummaryPanel analysis={analysisData} />
+            </div>
 
             <div className="grid gap-8 xl:grid-cols-2">
               <PriorityActionsPanel analysis={analysisData} />
@@ -546,7 +551,10 @@ const Index = () => {
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
 
-            <AiSurfacePanel aiSurface={analysisData.aiSurface} />
+            <div className="grid gap-8 xl:grid-cols-2">
+              <AiSurfacePanel aiSurface={analysisData.aiSurface} />
+              <ThirdPartyTrustPanel thirdPartyTrust={analysisData.thirdPartyTrust} />
+            </div>
 
             <ExposurePanel exposure={analysisData.exposure} />
 

@@ -1,7 +1,7 @@
 import { AnalysisResult } from "@/types/analysis";
 
 export interface AreaScore {
-  key: "edge" | "content" | "domain" | "exposure" | "api";
+  key: "edge" | "content" | "domain" | "exposure" | "api" | "trust" | "ai";
   label: string;
   score: number;
   status: "strong" | "watch" | "weak";
@@ -41,6 +41,14 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
   const apiPenalty =
     analysis.apiSurface.issues.length * 15 +
     analysis.apiSurface.probes.filter((probe) => probe.classification === "interesting").length * 4;
+
+  const trustPenalty =
+    analysis.thirdPartyTrust.highRiskProviders * 10 +
+    analysis.thirdPartyTrust.issues.length * 6;
+
+  const aiPenalty =
+    analysis.aiSurface.issues.length * 12 +
+    (analysis.aiSurface.detected && !analysis.aiSurface.disclosures.length ? 8 : 0);
 
   const areas: AreaScore[] = [
     {
@@ -93,6 +101,26 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
         `${analysis.apiSurface.probes.filter((probe) => probe.classification === "fallback").length} looked like frontend fallbacks`,
       ],
     },
+    {
+      key: "trust",
+      label: "Third-Party Trust",
+      score: clamp(100 - trustPenalty),
+      status: statusForScore(clamp(100 - trustPenalty)),
+      notes: [
+        `${analysis.thirdPartyTrust.totalProviders} providers detected`,
+        `${analysis.thirdPartyTrust.highRiskProviders} higher-risk providers`,
+      ],
+    },
+    {
+      key: "ai",
+      label: "AI & Automation",
+      score: clamp(100 - aiPenalty),
+      status: statusForScore(clamp(100 - aiPenalty)),
+      notes: [
+        analysis.aiSurface.detected ? "AI or automation signals detected" : "No visible AI surface detected",
+        `${analysis.aiSurface.issues.length} AI posture findings`,
+      ],
+    },
   ];
 
   return areas;
@@ -108,7 +136,9 @@ export const getUnifiedIssueSummary = (analysis: AnalysisResult) => {
       analysis.corsSecurity.issues.length +
       analysis.apiSurface.issues.length +
       analysis.securityTxt.issues.length +
-      analysis.publicSignals.issues.length,
+      analysis.publicSignals.issues.length +
+      analysis.thirdPartyTrust.issues.length +
+      analysis.aiSurface.issues.length,
     info:
       analysis.issues.filter((issue) => issue.severity === "info").length +
       analysis.exposure.probes.filter((probe) => probe.finding === "interesting").length,
