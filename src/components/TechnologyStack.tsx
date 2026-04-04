@@ -32,6 +32,12 @@ const categoryConfig = {
 
 const categoryOrder: Array<keyof typeof categoryConfig> = ["network", "hosting", "server", "frontend", "security"];
 
+const confidenceStyles = {
+  high: "bg-slate-200 text-slate-900",
+  medium: "bg-amber-100 text-amber-900",
+  low: "bg-sky-100 text-sky-900",
+} as const;
+
 export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
   if (!technologies.length) {
     return null;
@@ -68,9 +74,14 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="font-medium text-slate-900">{tech.name}</div>
-                      <Badge variant="secondary" className={config.color}>
-                        {tech.version ?? "Detected"}
-                      </Badge>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Badge variant="secondary" className={config.color}>
+                          {tech.version ?? tech.detection}
+                        </Badge>
+                        <Badge variant="secondary" className={confidenceStyles[tech.confidence]}>
+                          {tech.confidence} confidence
+                        </Badge>
+                      </div>
                     </div>
                     <p className="mt-2 text-xs text-slate-500">{tech.evidence}</p>
                   </div>

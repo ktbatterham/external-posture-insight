@@ -44,6 +44,8 @@ export interface TechnologyResult {
   category: "server" | "frontend" | "security" | "hosting" | "network";
   evidence: string;
   version: string | null;
+  confidence: IssueConfidence;
+  detection: "observed" | "inferred";
 }
 
 export interface CertificateResult {

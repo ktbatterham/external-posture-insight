@@ -246,83 +246,126 @@ function detectTechnologies(headers, finalUrl) {
   const technologies = [];
   const seen = new Set();
 
-  const addTechnology = (name, category, evidence, version) => {
+  const addTechnology = (name, category, evidence, version, confidence = "high", detection = "observed") => {
     const key = `${name}:${category}`;
     if (seen.has(key)) {
       return;
     }
     seen.add(key);
-    technologies.push({ name, category, evidence, version: version || null });
+    technologies.push({
+      name,
+      category,
+      evidence,
+      version: version || null,
+      confidence,
+      detection,
+    });
   };
 
   const server = headerValue(headers, "server");
   const poweredBy = headerValue(headers, "x-powered-by");
   const cache = headerValue(headers, "cf-cache-status");
+  const via = headerValue(headers, "via");
+
+  const classifyServerHeader = (value) => {
+    const lower = value.toLowerCase();
+    if (lower.includes("cloudflare")) {
+      return { name: "Cloudflare", category: "network", version: value };
+    }
+    if (lower.includes("sucuri")) {
+      return { name: "Sucuri", category: "network", version: value };
+    }
+    if (lower.includes("akamai")) {
+      return { name: "Akamai", category: "network", version: value };
+    }
+    if (lower.includes("fastly")) {
+      return { name: "Fastly", category: "network", version: value };
+    }
+    if (lower.includes("nginx")) {
+      return { name: "Nginx", category: "server", version: value };
+    }
+    if (lower.includes("apache")) {
+      return { name: "Apache", category: "server", version: value };
+    }
+    if (lower.includes("caddy")) {
+      return { name: "Caddy", category: "server", version: value };
+    }
+    if (/(gtm|gateway|proxy|edge|cache|router|traffic)/.test(lower)) {
+      return { name: value, category: "network", version: null };
+    }
+    return { name: value, category: "server", version: null };
+  };
+
+  const addViaSignals = (viaHeader) => {
+    const hops = viaHeader
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => part.replace(/^\d+(?:\.\d+)?\s+/i, "").trim());
+
+    for (const hop of hops) {
+      if (!hop) {
+        continue;
+      }
+      const lower = hop.toLowerCase();
+      if (/(bbc-gtm|gtm|gateway|proxy|edge|cache|belfrage|varnish)/.test(lower)) {
+        addTechnology(hop, "network", "Observed in Via response chain", null, "high", "observed");
+      }
+    }
+  };
 
   if (server) {
-    const serverLower = server.toLowerCase();
-    if (serverLower.includes("cloudflare")) {
-      addTechnology("Cloudflare", "network", "Detected from Server header", server);
-    } else if (serverLower.includes("sucuri")) {
-      addTechnology("Sucuri", "network", "Detected from Server header", server);
-    } else if (serverLower.includes("akamai")) {
-      addTechnology("Akamai", "network", "Detected from Server header", server);
-    } else if (serverLower.includes("fastly")) {
-      addTechnology("Fastly", "network", "Detected from Server header", server);
-    } else if (serverLower.includes("nginx")) {
-      addTechnology("Nginx", "server", "Detected from Server header", server);
-    } else if (serverLower.includes("apache")) {
-      addTechnology("Apache", "server", "Detected from Server header", server);
-    } else if (serverLower.includes("caddy")) {
-      addTechnology("Caddy", "server", "Detected from Server header", server);
-    } else {
-      addTechnology(server, "server", "Reported by Server header");
-    }
+    const classification = classifyServerHeader(server);
+    addTechnology(classification.name, classification.category, "Observed in Server header", classification.version, "high", "observed");
+  }
+
+  if (via) {
+    addViaSignals(via);
   }
 
   if (poweredBy) {
-    addTechnology(poweredBy, "frontend", "Detected from X-Powered-By header");
+    addTechnology(poweredBy, "frontend", "Observed in X-Powered-By header", null, "high", "observed");
     const poweredByLower = poweredBy.toLowerCase();
     if (poweredByLower.includes("express")) {
-      addTechnology("Express", "frontend", "Detected from X-Powered-By header");
+      addTechnology("Express", "frontend", "Observed in X-Powered-By header", null, "high", "observed");
     }
     if (poweredByLower.includes("next")) {
-      addTechnology("Next.js", "frontend", "Detected from X-Powered-By header");
+      addTechnology("Next.js", "frontend", "Observed in X-Powered-By header", null, "high", "observed");
     }
   }
 
   if (headerValue(headers, "x-vercel-id")) {
-    addTechnology("Vercel", "hosting", "Detected from X-Vercel-Id header");
+    addTechnology("Vercel", "hosting", "Observed in X-Vercel-Id header", null, "high", "observed");
   }
   if (headerValue(headers, "x-amz-cf-id")) {
-    addTechnology("Amazon CloudFront", "network", "Detected from CloudFront response headers");
+    addTechnology("Amazon CloudFront", "network", "Observed in CloudFront response headers", null, "high", "observed");
   }
   if (headerValue(headers, "x-cache")?.toLowerCase().includes("fastly")) {
-    addTechnology("Fastly", "network", "Detected from X-Cache header");
+    addTechnology("Fastly", "network", "Observed in X-Cache header", null, "high", "observed");
   }
   if (headerValue(headers, "x-cdn")) {
-    addTechnology(headerValue(headers, "x-cdn"), "network", "Detected from X-CDN header");
+    addTechnology(headerValue(headers, "x-cdn"), "network", "Observed in X-CDN header", null, "high", "observed");
   }
   if (headerValue(headers, "x-envoy-upstream-service-time")) {
-    addTechnology("Envoy", "network", "Detected from Envoy upstream timing header");
+    addTechnology("Envoy", "network", "Observed in Envoy upstream timing header", null, "high", "observed");
   }
   if (headerValue(headers, "cf-ray") || cache) {
-    addTechnology("Cloudflare", "network", "Detected from Cloudflare response headers");
+    addTechnology("Cloudflare", "network", "Observed in Cloudflare response headers", null, "high", "observed");
   }
   if (headerValue(headers, "x-sucuri-id") || headerValue(headers, "x-sucuri-cache")) {
-    addTechnology("Sucuri", "network", "Detected from Sucuri edge headers");
+    addTechnology("Sucuri", "network", "Observed in Sucuri edge headers", null, "high", "observed");
   }
   if (headerValue(headers, "x-akamai-transformed") || headerValue(headers, "akamai-cache-status")) {
-    addTechnology("Akamai", "network", "Detected from Akamai response headers");
+    addTechnology("Akamai", "network", "Observed in Akamai response headers", null, "high", "observed");
   }
   if (headerValue(headers, "x-served-by")?.toLowerCase().includes("cache-")) {
-    addTechnology("Fastly", "network", "Detected from X-Served-By cache headers");
+    addTechnology("Fastly", "network", "Observed in X-Served-By cache headers", null, "high", "observed");
   }
   if (headerValue(headers, "server-timing")?.toLowerCase().includes("cdn-cache")) {
-    addTechnology("CDN", "network", "Detected from Server-Timing header");
+    addTechnology("CDN", "network", "Observed in Server-Timing header", null, "medium", "observed");
   }
 
-  addTechnology(finalUrl.protocol === "https:" ? "HTTPS" : "HTTP", "security", "Derived from final URL");
+  addTechnology(finalUrl.protocol === "https:" ? "HTTPS" : "HTTP", "security", "Derived from final URL", null, "high", "observed");
   return technologies;
 }
 
@@ -1274,13 +1317,20 @@ function rankDiscoveredPaths(paths) {
     .slice(0, 10);
 }
 
-function addDetectedTechnology(target, seen, name, category, evidence, version) {
+function addDetectedTechnology(target, seen, name, category, evidence, version, confidence = "medium", detection = "inferred") {
   const key = `${name}:${category}`;
   if (seen.has(key)) {
     return;
   }
   seen.add(key);
-  target.push({ name, category, evidence, version: version || null });
+  target.push({
+    name,
+    category,
+    evidence,
+    version: version || null,
+    confidence,
+    detection,
+  });
 }
 
 function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrls, externalStylesheetUrls) {
@@ -1363,7 +1413,7 @@ function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrl
     addDetectedTechnology(technologies, seen, "Amazon CloudFront", "network", "Detected from asset hosting domain");
   }
   if (finalUrl.hostname.endsWith(".pages.dev")) {
-    addDetectedTechnology(technologies, seen, "Cloudflare Pages", "hosting", "Derived from final hostname");
+    addDetectedTechnology(technologies, seen, "Cloudflare Pages", "hosting", "Derived from final hostname", null, "low", "inferred");
   }
 
   return technologies;
@@ -1700,18 +1750,31 @@ function buildExecutiveSummary(result) {
 
 function mergeTechnologies(...groups) {
   const merged = [];
-  const seen = new Set();
+  const byKey = new Map();
+  const confidenceRank = { high: 3, medium: 2, low: 1 };
 
   for (const group of groups) {
     for (const technology of group || []) {
-      addDetectedTechnology(
-        merged,
-        seen,
-        technology.name,
-        technology.category,
-        technology.evidence,
-        technology.version,
-      );
+      const key = `${technology.name}:${technology.category}`;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, technology);
+        merged.push(technology);
+        continue;
+      }
+
+      const existingScore =
+        confidenceRank[existing.confidence] + (existing.detection === "observed" ? 10 : 0);
+      const nextScore =
+        confidenceRank[technology.confidence] + (technology.detection === "observed" ? 10 : 0);
+
+      if (nextScore > existingScore) {
+        const index = merged.indexOf(existing);
+        if (index >= 0) {
+          merged[index] = technology;
+        }
+        byKey.set(key, technology);
+      }
     }
   }
 

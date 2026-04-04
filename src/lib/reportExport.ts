@@ -10,7 +10,10 @@ const buildExposureLines = (analysis: AnalysisResult) =>
 
 const buildTechnologyLines = (analysis: AnalysisResult) =>
   analysis.technologies.length
-    ? analysis.technologies.map((tech) => `- ${tech.name} (${tech.category})${tech.evidence ? `: ${tech.evidence}` : ""}`)
+    ? analysis.technologies.map(
+        (tech) =>
+          `- ${tech.name} (${tech.category}, ${tech.detection}, ${tech.confidence} confidence)${tech.evidence ? `: ${tech.evidence}` : ""}`,
+      )
     : ["- No stack signals recorded."];
 
 const buildDiscoveryLines = (analysis: AnalysisResult) =>
@@ -164,7 +167,10 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     .join("");
   const technologyItems = analysis.technologies.length
     ? analysis.technologies
-        .map((tech) => `<li><strong>${tech.name}</strong> (${tech.category})<br>${tech.evidence}</li>`)
+        .map(
+          (tech) =>
+            `<li><strong>${tech.name}</strong> (${tech.category}, ${tech.detection}, ${tech.confidence} confidence)<br>${tech.evidence}</li>`,
+        )
         .join("")
     : "<li>No stack signals recorded.</li>";
   const discoveryItems = analysis.htmlSecurity.firstPartyPaths.length
