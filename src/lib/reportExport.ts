@@ -29,7 +29,10 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     "## Key Findings",
     "",
     ...(analysis.issues.length
-      ? analysis.issues.map((issue) => `- [${issue.severity}] ${issue.title}: ${issue.detail}`)
+      ? analysis.issues.map(
+          (issue) =>
+            `- [${issue.severity} | ${issue.confidence} confidence | ${issue.source}] ${issue.title}: ${issue.detail}`,
+        )
       : ["- No core findings recorded."]),
     "",
     "## Priority Actions",
@@ -88,7 +91,7 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     ? analysis.issues
         .map(
           (issue) =>
-            `<li><strong>[${issue.severity}] ${issue.title}</strong><br>${issue.detail}</li>`,
+            `<li><strong>[${issue.severity} | ${issue.confidence} confidence | ${issue.source}] ${issue.title}</strong><br>${issue.detail}</li>`,
         )
         .join("")
     : "<li>No core findings recorded.</li>";

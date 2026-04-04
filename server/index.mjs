@@ -318,6 +318,14 @@ function analyzeHeaders(headers, isHttps) {
   const results = [];
   const issues = [];
   const strengths = [];
+  const createIssue = (severity, area, title, detail, confidence = "high", source = "observed") => ({
+    severity,
+    area,
+    title,
+    detail,
+    confidence,
+    source,
+  });
 
   for (const definition of SECURITY_HEADERS) {
     const value = headerValue(headers, definition.key);
@@ -335,12 +343,16 @@ function analyzeHeaders(headers, isHttps) {
         status = "warning";
         severity = "warning";
         summary = "Present, but the policy is weaker than recommended.";
-        issues.push({
-          severity: "warning",
-          area: "transport",
-          title: "HSTS could be stronger",
-          detail: "Increase max-age and include subdomains for better HTTPS protection.",
-        });
+        issues.push(
+          createIssue(
+            "warning",
+            "transport",
+            "HSTS could be stronger",
+            "Increase max-age and include subdomains for better HTTPS protection.",
+            "medium",
+            "heuristic",
+          ),
+        );
       } else {
         strengths.push("Strong HSTS policy detected.");
       }
@@ -362,12 +374,16 @@ function analyzeHeaders(headers, isHttps) {
         status = "warning";
         severity = "warning";
         summary = "Present, but allows unsafe script execution in script policies.";
-        issues.push({
-          severity: "warning",
-          area: "headers",
-          title: "CSP contains risky allowances",
-          detail: "unsafe-inline or unsafe-eval in script policies weakens CSP protections against XSS.",
-        });
+        issues.push(
+          createIssue(
+            "warning",
+            "headers",
+            "CSP contains risky allowances",
+            "unsafe-inline or unsafe-eval in script policies weakens CSP protections against XSS.",
+            "high",
+            "observed",
+          ),
+        );
       } else {
         strengths.push("CSP is present without obvious unsafe script allowances.");
       }
@@ -396,12 +412,16 @@ function analyzeHeaders(headers, isHttps) {
     }
 
     if (!value) {
-      issues.push({
-        severity: definition.key === "permissions-policy" ? "info" : "warning",
-        area: "headers",
-        title: `${definition.label} is missing`,
-        detail: definition.recommendation,
-      });
+      issues.push(
+        createIssue(
+          definition.key === "permissions-policy" ? "info" : "warning",
+          "headers",
+          `${definition.label} is missing`,
+          definition.recommendation,
+          "high",
+          "observed",
+        ),
+      );
     }
 
     results.push({
@@ -414,12 +434,16 @@ function analyzeHeaders(headers, isHttps) {
   }
 
   if (!isHttps) {
-    issues.push({
-      severity: "critical",
-      area: "transport",
-      title: "Site is not using HTTPS",
-      detail: "Traffic can be intercepted or modified in transit over plain HTTP.",
-    });
+    issues.push(
+      createIssue(
+        "critical",
+        "transport",
+        "Site is not using HTTPS",
+        "Traffic can be intercepted or modified in transit over plain HTTP.",
+        "high",
+        "observed",
+      ),
+    );
   }
 
   return { headers: results, issues, strengths };
@@ -1835,6 +1859,8 @@ async function analyzeUrlCore(input, options = {}) {
       area: "cookies",
       title: `Cookie ${cookie.name} needs attention`,
       detail,
+      confidence: "high",
+      source: "observed",
     })),
   );
 
@@ -1846,6 +1872,8 @@ async function analyzeUrlCore(input, options = {}) {
             area: "transport",
             title: "Redirect chain detected",
             detail: `This scan followed ${requestData.redirects.length - 1} redirect${requestData.redirects.length > 2 ? "s" : ""} before reaching the final URL.`,
+            confidence: "high",
+            source: "observed",
           },
         ]
       : [];
@@ -1858,6 +1886,8 @@ async function analyzeUrlCore(input, options = {}) {
         area: "certificate",
         title: "TLS certificate needs attention",
         detail,
+        confidence: /expires/i.test(detail) ? "high" : "medium",
+        source: "observed",
       })),
     );
   }

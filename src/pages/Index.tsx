@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
 import { toast } from "sonner";
+import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
@@ -30,11 +31,20 @@ import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
 
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
 const HISTORY_KEY = "secure-header-insight:history";
+const MONITORED_TARGETS_KEY = "secure-header-insight:monitored-targets";
 
 interface RecentScan {
   url: string;
   grade: string;
   scannedAt: string;
+}
+
+interface MonitoredTarget {
+  url: string;
+  label: string;
+  cadence: "daily" | "weekly";
+  addedAt: string;
+  lastScannedAt: string | null;
 }
 
 const METRIC_CARD_CLASS =
@@ -57,6 +67,39 @@ const saveRecentScan = (scan: RecentScan) => {
   const next = [scan, ...loadRecentScans().filter((item) => item.url !== scan.url)].slice(0, 6);
   window.localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(next));
   return next;
+};
+
+const loadMonitoredTargets = (): MonitoredTarget[] => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(MONITORED_TARGETS_KEY);
+    return raw ? (JSON.parse(raw) as MonitoredTarget[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveMonitoredTargets = (targets: MonitoredTarget[]) => {
+  window.localStorage.setItem(MONITORED_TARGETS_KEY, JSON.stringify(targets));
+  return targets;
+};
+
+const cadenceMs: Record<MonitoredTarget["cadence"], number> = {
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+};
+
+const toMonitoredTargetView = (target: MonitoredTarget): MonitoredTargetView => {
+  const baseTime = target.lastScannedAt ? new Date(target.lastScannedAt).getTime() : new Date(target.addedAt).getTime();
+  const nextDueAt = new Date(baseTime + cadenceMs[target.cadence]).toISOString();
+  return {
+    ...target,
+    nextDueAt,
+    due: Date.now() >= new Date(nextDueAt).getTime(),
+  };
 };
 
 const loadHistory = (): Record<string, HistorySnapshot[]> => {
@@ -89,6 +132,8 @@ const snapshotFromAnalysis = (analysis: AnalysisResult): HistorySnapshot => ({
     severity: issue.severity,
     title: issue.title,
     detail: issue.detail,
+    confidence: issue.confidence,
+    source: issue.source,
   })),
 });
 
@@ -134,37 +179,127 @@ const Index = () => {
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyDiff, setHistoryDiff] = useState<HistoryDiff | null>(null);
+  const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>([]);
 
   useEffect(() => {
     setRecentScans(loadRecentScans());
+    setMonitoredTargets(loadMonitoredTargets());
   }, []);
+
+  const persistAnalysis = (payload: AnalysisResult, setAsCurrent = true) => {
+    startTransition(() => {
+      if (setAsCurrent) {
+        setAnalysisData(payload);
+      }
+      setRecentScans(
+        saveRecentScan({
+          url: payload.finalUrl,
+          grade: payload.grade,
+          scannedAt: payload.scannedAt,
+        }),
+      );
+      const nextHistory = saveHistorySnapshot(payload);
+      if (setAsCurrent) {
+        setHistory(nextHistory);
+        setHistoryDiff(buildHistoryDiff(nextHistory));
+      }
+      setMonitoredTargets((current) => {
+        const next = current.map((target) =>
+          target.url === payload.finalUrl || target.url === payload.normalizedUrl || target.label === payload.host
+            ? { ...target, url: payload.finalUrl, label: payload.host, lastScannedAt: payload.scannedAt }
+            : target,
+        );
+        saveMonitoredTargets(next);
+        return next;
+      });
+    });
+  };
+
+  const analyzeUrl = async (url: string, setAsCurrent = true) => {
+    const response = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Scan failed.");
+    }
+
+    persistAnalysis(payload, setAsCurrent);
+    return payload as AnalysisResult;
+  };
 
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Scan failed.");
-      }
-
-      startTransition(() => {
-        setAnalysisData(payload);
-        setRecentScans(
-          saveRecentScan({
-            url: payload.finalUrl,
-            grade: payload.grade,
-            scannedAt: payload.scannedAt,
-          }),
-        );
-        const nextHistory = saveHistorySnapshot(payload);
-        setHistory(nextHistory);
-        setHistoryDiff(buildHistoryDiff(nextHistory));
-      });
+      await analyzeUrl(url, true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveCurrentAsMonitored = (cadence: MonitoredTarget["cadence"]) => {
+    if (!analysisData) {
+      return;
+    }
+
+    setMonitoredTargets((current) => {
+      const next = [
+        {
+          url: analysisData.finalUrl,
+          label: analysisData.host,
+          cadence,
+          addedAt: new Date().toISOString(),
+          lastScannedAt: analysisData.scannedAt,
+        },
+        ...current.filter((target) => target.url !== analysisData.finalUrl),
+      ].slice(0, 12);
+      saveMonitoredTargets(next);
+      return next;
+    });
+
+    toast.success(`Saved ${analysisData.host} as a ${cadence} monitoring target.`);
+  };
+
+  const removeMonitoredTarget = (url: string) => {
+    setMonitoredTargets((current) => {
+      const next = current.filter((target) => target.url !== url);
+      saveMonitoredTargets(next);
+      return next;
+    });
+  };
+
+  const runTargetScan = async (url: string, setAsCurrent = true) => {
+    setIsLoading(true);
+    try {
+      const result = await analyzeUrl(url, setAsCurrent);
+      toast.success(`Scanned ${result.host}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to scan that monitored target.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const runDueScans = async () => {
+    const dueTargets = monitoredTargets.map(toMonitoredTargetView).filter((target) => target.due);
+    if (!dueTargets.length) {
+      toast.message("No monitoring targets are due right now.");
+      return;
+    }
+
+    setIsLoading(true);
+    let successCount = 0;
+
+    try {
+      for (const [index, target] of dueTargets.entries()) {
+        await analyzeUrl(target.url, index === dueTargets.length - 1);
+        successCount += 1;
+      }
+      toast.success(`Completed ${successCount} due monitoring scan${successCount === 1 ? "" : "s"}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "One of the due monitoring scans failed.");
     } finally {
       setIsLoading(false);
     }
@@ -278,6 +413,19 @@ const Index = () => {
             </div>
           </section>
         )}
+
+        <section className="mt-8">
+          <MonitoredTargetsPanel
+            targets={monitoredTargets.map(toMonitoredTargetView)}
+            currentUrl={analysisData?.finalUrl ?? null}
+            onAddDaily={() => saveCurrentAsMonitored("daily")}
+            onAddWeekly={() => saveCurrentAsMonitored("weekly")}
+            onRunDue={runDueScans}
+            onRunTarget={(url) => void runTargetScan(url, true)}
+            onRemove={removeMonitoredTarget}
+            busy={isLoading}
+          />
+        </section>
 
         {analysisData && (
           <section className="mt-8 space-y-8">

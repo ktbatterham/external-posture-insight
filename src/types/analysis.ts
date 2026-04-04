@@ -1,4 +1,6 @@
 export type Severity = "good" | "info" | "warning" | "critical";
+export type IssueConfidence = "high" | "medium" | "low";
+export type IssueSource = "observed" | "heuristic" | "inferred";
 
 export interface SecurityHeaderResult {
   key: string;
@@ -60,6 +62,8 @@ export interface ScanIssue {
   area: "transport" | "headers" | "certificate" | "cookies";
   title: string;
   detail: string;
+  confidence: IssueConfidence;
+  source: IssueSource;
 }
 
 export interface RemediationSnippet {
@@ -101,7 +105,7 @@ export interface HistorySnapshot {
   statusCode: number;
   responseTimeMs: number;
   headers: Pick<SecurityHeaderResult, "label" | "status" | "value">[];
-  issues: Pick<ScanIssue, "severity" | "title" | "detail">[];
+  issues: Pick<ScanIssue, "severity" | "title" | "detail" | "confidence" | "source">[];
 }
 
 export interface HistoryDiff {

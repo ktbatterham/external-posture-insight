@@ -1,4 +1,5 @@
 import { AlertTriangle, Info, ShieldCheck, ShieldX } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScanIssue } from "@/types/analysis";
 
@@ -22,7 +23,22 @@ const issueStyles = {
   },
 } as const;
 
+const confidenceStyles = {
+  high: "bg-slate-200 text-slate-800",
+  medium: "bg-amber-100 text-amber-900",
+  low: "bg-sky-100 text-sky-900",
+} as const;
+
 export const FindingsPanel = ({ issues, strengths }: FindingsPanelProps) => {
+  const rankedIssues = [...issues].sort((left, right) => {
+    const severityWeight = { critical: 0, warning: 1, info: 2 } as const;
+    const confidenceWeight = { high: 0, medium: 1, low: 2 } as const;
+    return (
+      severityWeight[left.severity] - severityWeight[right.severity] ||
+      confidenceWeight[left.confidence] - confidenceWeight[right.confidence]
+    );
+  });
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
@@ -39,15 +55,23 @@ export const FindingsPanel = ({ issues, strengths }: FindingsPanelProps) => {
           </div>
         ))}
 
-        {issues.length ? (
-          issues.slice(0, 6).map((issue) => (
+        {rankedIssues.length ? (
+          rankedIssues.slice(0, 6).map((issue) => (
             <div
               key={`${issue.area}-${issue.title}-${issue.detail}`}
               className={`flex gap-3 rounded-2xl border px-4 py-3 text-sm ${issueStyles[issue.severity].className}`}
             >
               <div className="mt-0.5 shrink-0">{issueStyles[issue.severity].icon}</div>
               <div>
-                <div className="font-medium">{issue.title}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium">{issue.title}</div>
+                  <Badge variant="secondary" className={confidenceStyles[issue.confidence]}>
+                    {issue.confidence} confidence
+                  </Badge>
+                  <Badge variant="outline" className="border-current/20 bg-transparent">
+                    {issue.source}
+                  </Badge>
+                </div>
                 <p className="mt-1 opacity-90">{issue.detail}</p>
               </div>
             </div>
