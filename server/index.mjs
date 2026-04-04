@@ -1786,6 +1786,12 @@ async function analyzeApiSurface(finalUrl) {
         classification = "restricted";
         detail = "Endpoint exists but requires authorization or is blocked.";
         strengths.push(`${probe.label} appears access-controlled.`);
+      } else if (response.statusCode === 404) {
+        classification = "absent";
+        detail = "Endpoint not found.";
+      } else if (response.statusCode >= 500) {
+        classification = "error";
+        detail = "Endpoint triggered a server-side error, so the path exists or is handled but did not respond cleanly.";
       } else if (response.statusCode >= 200 && response.statusCode < 300) {
         if ((contentType || "").includes("application/json")) {
           classification = "public";
@@ -1815,6 +1821,9 @@ async function analyzeApiSurface(finalUrl) {
       } else if (response.statusCode >= 300 && response.statusCode < 400) {
         classification = "interesting";
         detail = "Endpoint redirected.";
+      } else if (response.statusCode > 0) {
+        classification = "interesting";
+        detail = "Endpoint returned a non-success response that may still indicate application handling on this path.";
       }
 
       probes.push({

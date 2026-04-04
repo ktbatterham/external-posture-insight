@@ -225,7 +225,7 @@ export interface ApiSurfaceProbe {
   path: string;
   statusCode: number;
   finalUrl: string;
-  classification: "absent" | "public" | "restricted" | "interesting" | "fallback";
+  classification: "absent" | "public" | "restricted" | "interesting" | "fallback" | "error";
   contentType: string | null;
   detail: string;
 }
