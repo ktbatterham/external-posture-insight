@@ -88,6 +88,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       status: statusForScore(clamp(100 - apiPenalty)),
       notes: [
         `${analysis.apiSurface.probes.filter((probe) => probe.classification !== "absent").length} endpoints responded`,
+        `${analysis.apiSurface.probes.filter((probe) => probe.classification === "fallback").length} looked like frontend fallbacks`,
       ],
     },
   ];

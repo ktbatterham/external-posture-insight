@@ -687,7 +687,7 @@ function requestWithHeaders(targetUrl, method = "HEAD", extraHeaders = {}) {
   });
 }
 
-function requestText(targetUrl) {
+function requestText(targetUrl, extraHeaders = {}) {
   const isHttps = targetUrl.protocol === "https:";
   const transport = isHttps ? https : http;
 
@@ -701,6 +701,7 @@ function requestText(targetUrl) {
           "User-Agent": "SecureHeaderInsight/1.0",
           Accept: "text/plain,text/*;q=0.9,*/*;q=0.1",
           "Accept-Encoding": "identity",
+          ...extraHeaders,
         },
       },
       (response) => {
@@ -728,6 +729,66 @@ function requestText(targetUrl) {
     });
     request.end();
   });
+}
+
+function normalizeHtmlSignature(body) {
+  return body
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .slice(0, 280);
+}
+
+function extractHtmlTitle(body) {
+  const match = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match ? match[1].replace(/\s+/g, " ").trim().toLowerCase() : null;
+}
+
+function classifyHtmlApiFallback(probePath, finalUrl, resolvedUrl, body, homepageSignature, homepageTitle) {
+  const looksLikeHtml = /<html[\s>]|<!doctype html/i.test(body);
+  if (!looksLikeHtml) {
+    return false;
+  }
+
+  if (resolvedUrl.origin === finalUrl.origin && resolvedUrl.pathname === finalUrl.pathname) {
+    return true;
+  }
+
+  const probeSegments = probePath.split("/").filter(Boolean);
+  const resolvedSegments = resolvedUrl.pathname.split("/").filter(Boolean);
+  if (!resolvedSegments.length && probeSegments.length) {
+    return true;
+  }
+
+  const bodySignature = normalizeHtmlSignature(body);
+  const bodyTitle = extractHtmlTitle(body);
+  return Boolean(
+    homepageSignature &&
+      bodySignature &&
+      (bodySignature === homepageSignature ||
+        (homepageTitle && bodyTitle && homepageTitle === bodyTitle)),
+  );
+}
+
+function isAccessDeniedHtml(headers, body) {
+  const server = (headerValue(headers, "server") || "").toLowerCase();
+  const bodyText = body.toLowerCase();
+  const title = extractHtmlTitle(body) || "";
+
+  if (
+    server.includes("sucuri") ||
+    bodyText.includes("website security - access denied") ||
+    bodyText.includes("access denied") ||
+    bodyText.includes("request blocked") ||
+    title.includes("access denied")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
@@ -1159,19 +1220,35 @@ async function analyzeApiSurface(finalUrl) {
   const probes = [];
   const issues = [];
   const strengths = [];
+  let homepageSignature = "";
+  let homepageTitle = null;
+
+  try {
+    const homepageResponse = await requestText(finalUrl, {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    });
+    if (homepageResponse.statusCode >= 200 && homepageResponse.statusCode < 300) {
+      homepageSignature = normalizeHtmlSignature(homepageResponse.body);
+      homepageTitle = extractHtmlTitle(homepageResponse.body);
+    }
+  } catch {
+    // Ignore homepage body fetch failures and continue with probe-only heuristics.
+  }
 
   for (const probe of API_SURFACE_PROBES) {
     const targetUrl = new URL(probe.path, finalUrl.origin);
     try {
-      let response = await requestWithHeaders(targetUrl, "GET", {
+      let response = await requestText(targetUrl, {
         Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
       });
       let resolvedUrl = targetUrl;
 
       if ([301, 302, 303, 307, 308].includes(response.statusCode) && headerValue(response.headers, "location")) {
         const redirectData = await fetchWithRedirects(targetUrl, 2);
-        response = redirectData.response;
         resolvedUrl = redirectData.finalUrl;
+        response = await requestText(resolvedUrl, {
+          Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
+        });
       }
 
       const contentType = headerValue(response.headers, "content-type");
@@ -1187,6 +1264,23 @@ async function analyzeApiSurface(finalUrl) {
           classification = "public";
           detail = "Public JSON-style endpoint responded successfully.";
           issues.push(`${probe.label} appears publicly reachable at ${probe.path}.`);
+        } else if ((contentType || "").includes("text/html") && isAccessDeniedHtml(response.headers, response.body)) {
+          classification = "restricted";
+          detail = "Endpoint response appears to be a web application firewall or access-denied page.";
+          strengths.push(`${probe.label} appears blocked by edge protection.`);
+        } else if (
+          (contentType || "").includes("text/html") &&
+          classifyHtmlApiFallback(
+            probe.path,
+            finalUrl,
+            resolvedUrl,
+            response.body,
+            homepageSignature,
+            homepageTitle,
+          )
+        ) {
+          classification = "fallback";
+          detail = "Endpoint appears to return the site's standard HTML page rather than an API response.";
         } else {
           classification = "interesting";
           detail = "Endpoint responded successfully but does not clearly look like JSON.";
@@ -1220,6 +1314,10 @@ async function analyzeApiSurface(finalUrl) {
 
   if (!issues.length) {
     strengths.push("No obviously public API endpoints were detected in the limited probe set.");
+  }
+
+  if (probes.some((probe) => probe.classification === "fallback")) {
+    strengths.push("Some API-style paths appear to be frontend route fallbacks rather than exposed APIs.");
   }
 
   return {

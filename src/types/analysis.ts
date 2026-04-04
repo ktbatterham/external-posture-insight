@@ -200,7 +200,7 @@ export interface ApiSurfaceProbe {
   path: string;
   statusCode: number;
   finalUrl: string;
-  classification: "absent" | "public" | "restricted" | "interesting";
+  classification: "absent" | "public" | "restricted" | "interesting" | "fallback";
   contentType: string | null;
   detail: string;
 }
