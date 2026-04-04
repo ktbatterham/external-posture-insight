@@ -1122,6 +1122,9 @@ function collectPassiveLeakSignals(html, finalUrl, metaGenerator, externalScript
 function collectClientExposureSignals(html, finalUrl) {
   const signals = [];
   const htmlLower = html.toLowerCase();
+  const isLikelyApiAsset = (value) =>
+    /\/assets?\//i.test(value) ||
+    /\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot)(?:[?#]|$)/i.test(value);
 
   const rawEndpoints = summarizeEvidence([
     ...[...html.matchAll(/https?:\/\/[^"'`\s<>()]*(?:\/(?:api|graphql|trpc|socket\.io|rpc)[^"'`\s<>()]*)/gi)].map((match) => match[0]),
@@ -1133,7 +1136,7 @@ function collectClientExposureSignals(html, finalUrl) {
     } catch {
       return value;
     }
-  });
+  }).filter((value) => !isLikelyApiAsset(value));
 
   if (rawEndpoints.length) {
     signals.push({
@@ -1185,11 +1188,21 @@ function collectClientExposureSignals(html, finalUrl) {
   }
 
   const environmentMarkers = summarizeEvidence([
-    /staging/i.test(htmlLower) ? "staging" : null,
-    /\bdev(elopment)?\b/i.test(htmlLower) ? "development" : null,
-    /internal/i.test(htmlLower) ? "internal" : null,
-    /sandbox/i.test(htmlLower) ? "sandbox" : null,
-    /preview/i.test(htmlLower) ? "preview" : null,
+    /\b(?:environment|env|release)[^"'`\n]{0,32}staging|staging[^"'`\n]{0,32}(?:environment|env|release)/i.test(html)
+      ? "staging environment"
+      : null,
+    /\b(?:environment|env|release)[^"'`\n]{0,32}dev(?:elopment)?|dev(?:elopment)?[^"'`\n]{0,32}(?:environment|env|release)/i.test(html)
+      ? "development environment"
+      : null,
+    /\b(?:environment|env|release)[^"'`\n]{0,32}internal|internal[^"'`\n]{0,32}(?:environment|env|release)/i.test(html)
+      ? "internal environment"
+      : null,
+    /\b(?:environment|env|release)[^"'`\n]{0,32}sandbox|sandbox[^"'`\n]{0,32}(?:environment|env|release)/i.test(html)
+      ? "sandbox environment"
+      : null,
+    /\b(?:environment|env|release)[^"'`\n]{0,32}preview|preview[^"'`\n]{0,32}(?:environment|env|release)/i.test(html)
+      ? "preview environment"
+      : null,
   ]);
 
   if (environmentMarkers.length) {
