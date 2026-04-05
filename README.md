@@ -1,5 +1,8 @@
 # External Posture Insight
 
+[![npm version](https://img.shields.io/npm/v/%40ktbatterham%2Fexternal-posture-core)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+[![npm package](https://img.shields.io/badge/npm-package-red)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+
 External Posture Insight is a low-noise external posture analysis app for public web targets. It inspects a target URL through a local Node API, follows redirects, reads response headers, evaluates TLS certificate details, parses `Set-Cookie` flags, and produces a layered report in the browser.
 
 ## Published package
@@ -9,6 +12,12 @@ The reusable scanner core is now published on npm:
 - [`@ktbatterham/external-posture-core`](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
 
 This app consumes that core package locally from the workspace during development.
+
+## Release status
+
+- First reusable package release: `@ktbatterham/external-posture-core@0.1.0`
+- Latest npm tag: `latest`
+- Clean-install smoke test completed from a fresh npm project
 
 ## Features
 
