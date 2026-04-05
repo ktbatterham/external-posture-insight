@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>App</title>
+  </head>
+  <body>
+    <a href="/login">Sign in</a>
+    <form action="https://id.example.com/login" method="post">
+      <input type="email" />
+      <input type="password" />
+    </form>
+    <script>
+      window.__ENV = { apiBaseUrl: "https://example.com/api/", environment: "preview" };
+    </script>
+  </body>
+</html>

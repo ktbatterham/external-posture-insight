@@ -1,0 +1,23 @@
+{
+  "name": "@ktbatterham/external-posture-core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Low-noise external posture analysis core for web targets.",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "security",
+    "headers",
+    "tls",
+    "dns",
+    "owasp",
+    "posture",
+    "scanner"
+  ],
+  "license": "MIT"
+}

@@ -1,8 +1,11 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "external-posture-insight-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "vite",
@@ -10,6 +13,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "test:core": "node --test packages/core/test/*.test.mjs",
     "preview": "vite preview",
     "start": "node server/index.mjs"
   },
