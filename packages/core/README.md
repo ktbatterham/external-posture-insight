@@ -1,5 +1,8 @@
 # @ktbatterham/external-posture-core
 
+[![npm version](https://img.shields.io/npm/v/%40ktbatterham%2Fexternal-posture-core)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+[![npm package](https://img.shields.io/badge/npm-package-red)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+
 Low-noise external posture analysis for public web targets.
 
 This package is the reusable scanner engine extracted from the External Posture Insight app. It is designed for passive or near-passive posture assessment rather than active exploitation or noisy recon.
@@ -16,7 +19,11 @@ This package is the reusable scanner engine extracted from the External Posture 
 
 ## Current status
 
-This package is not published yet. The API is stabilizing and is currently used internally by the app.
+This package is published and consumable from npm:
+
+- [`@ktbatterham/external-posture-core`](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+
+It is also used by the External Posture Insight app from the local workspace during development.
 
 ## Release workflow
 
@@ -30,7 +37,7 @@ Recommended release flow:
 1. update the version in `packages/core/package.json`
 2. run `npm run test:core`
 3. run `npm run pack:core`
-4. create and push a tag like `core-v0.1.0`
+4. create and push a tag like `core-v0.1.1`
 5. let the publish workflow release the package
 
 See also:
