@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
-import { analyzeUrl, formatErrorMessage } from "../packages/core/src/index.mjs";
+import { analyzeUrl, formatErrorMessage } from "../packages/core/dist/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

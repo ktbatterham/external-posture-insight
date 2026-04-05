@@ -3,6 +3,36 @@ import https from "node:https";
 import dns from "node:dns/promises";
 import tls from "node:tls";
 import { URL } from "node:url";
+import type {
+  AnalysisResult,
+  AnalyzeTargetOptions,
+  AiSurfaceInfo,
+  CertificateResult,
+  CorsSecurityInfo,
+  DomainSecurityInfo,
+  ExecutiveSummaryInfo,
+  HtmlSecurityInfo,
+  IssueConfidence,
+  PublicSignalsInfo,
+  RemediationSnippet,
+  SecurityTxtInfo,
+  TechnologyResult,
+  ThirdPartyProvider,
+} from "./types";
+
+type ResponseHeaders = http.IncomingHttpHeaders;
+
+interface RequestHeadResult {
+  statusCode: number;
+  headers: ResponseHeaders;
+  elapsedMs: number;
+}
+
+interface RequestTextResult {
+  statusCode: number;
+  headers: ResponseHeaders;
+  body: string;
+}
 
 const SECURITY_HEADERS = [
   {
@@ -211,7 +241,7 @@ function parseSetCookie(setCookieHeaders) {
 
 function detectTechnologies(headers, finalUrl) {
   const technologies = [];
-  const seen = new Set();
+  const seen = new Set<string>();
 
   const addTechnology = (name, category, evidence, version, confidence = "high", detection = "observed") => {
     const key = `${name}:${category}`;
@@ -666,7 +696,7 @@ function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects
   return { score, grade };
 }
 
-function buildRemediation(headerResults) {
+function buildRemediation(headerResults): RemediationSnippet[] {
   const requiredHeaders = headerResults
     .filter((header) => header.status !== "present")
     .map((header) => ({
@@ -768,7 +798,7 @@ function buildRemediation(headerResults) {
   ];
 }
 
-function scanTls(targetUrl) {
+function scanTls(targetUrl: URL): Promise<CertificateResult> {
   if (targetUrl.protocol !== "https:") {
     return Promise.resolve({
       available: false,
@@ -848,11 +878,11 @@ function scanTls(targetUrl) {
   });
 }
 
-function requestOnce(targetUrl, method = "HEAD") {
+function requestOnce(targetUrl: URL, method = "HEAD"): Promise<RequestHeadResult> {
   return requestWithHeaders(targetUrl, method);
 }
 
-function requestWithHeaders(targetUrl, method = "HEAD", extraHeaders = {}) {
+function requestWithHeaders(targetUrl: URL, method = "HEAD", extraHeaders = {}): Promise<RequestHeadResult> {
   const isHttps = targetUrl.protocol === "https:";
   const transport = isHttps ? https : http;
   const startedAt = Date.now();
@@ -888,7 +918,7 @@ function requestWithHeaders(targetUrl, method = "HEAD", extraHeaders = {}) {
   });
 }
 
-function requestText(targetUrl, extraHeaders = {}) {
+function requestText(targetUrl: URL, extraHeaders = {}): Promise<RequestTextResult> {
   const isHttps = targetUrl.protocol === "https:";
   const transport = isHttps ? https : http;
 
@@ -953,8 +983,8 @@ function extractHtmlTitle(body) {
   return title ? title.toLowerCase() : null;
 }
 
-function summarizeEvidence(values, limit = 3) {
-  return unique(values.filter(Boolean)).slice(0, limit);
+function summarizeEvidence<T>(values: Array<T | null | undefined | false>, limit = 3): T[] {
+  return unique(values).slice(0, limit);
 }
 
 function extractRedactedMatch(pattern, html, transform = (value) => value) {
@@ -1241,15 +1271,16 @@ async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
   };
 }
 
-function parseSecurityTxt(raw, url) {
+function parseSecurityTxt(raw: string, url: URL): SecurityTxtInfo {
   const fields = {
-    contact: [],
-    policy: [],
-    acknowledgments: [],
-    encryption: [],
-    hiring: [],
-    preferredLanguages: [],
-    canonical: [],
+    contact: [] as string[],
+    policy: [] as string[],
+    acknowledgments: [] as string[],
+    encryption: [] as string[],
+    hiring: [] as string[],
+    preferredLanguages: [] as string[],
+    canonical: [] as string[],
+    expires: undefined as string | undefined,
   };
   const issues = [];
 
@@ -1300,7 +1331,7 @@ function parseSecurityTxt(raw, url) {
   };
 }
 
-async function fetchSecurityTxt(finalUrl) {
+async function fetchSecurityTxt(finalUrl: URL): Promise<SecurityTxtInfo> {
   const candidates = [
     new URL("/.well-known/security.txt", finalUrl.origin),
     new URL("/security.txt", finalUrl.origin),
@@ -1338,8 +1369,8 @@ function getAttribute(tag, attribute) {
   return match ? match[1] : null;
 }
 
-function unique(values) {
-  return [...new Set(values.filter(Boolean))];
+function unique<T>(values: Array<T | null | undefined | false>): T[] {
+  return [...new Set(values.filter((value): value is T => Boolean(value)))];
 }
 
 function isLikelyPagePath(pathname) {
@@ -1361,7 +1392,7 @@ function scorePagePath(pathname) {
   }, pathname.split("/").filter(Boolean).length <= 2 ? 5 : 0);
 }
 
-function normalizeDiscoveredPath(value, finalUrl) {
+function normalizeDiscoveredPath(value, finalUrl: URL): string | null {
   if (!value || /^(mailto|tel|javascript):/i.test(value)) {
     return null;
   }
@@ -1379,13 +1410,22 @@ function normalizeDiscoveredPath(value, finalUrl) {
   }
 }
 
-function rankDiscoveredPaths(paths) {
+function rankDiscoveredPaths(paths: Array<string | null | undefined | false>): string[] {
   return unique(paths)
     .sort((left, right) => scorePagePath(right) - scorePagePath(left))
     .slice(0, 10);
 }
 
-function addDetectedTechnology(target, seen, name, category, evidence, version, confidence = "medium", detection = "inferred") {
+function addDetectedTechnology(
+  target: TechnologyResult[],
+  seen: Set<string>,
+  name: string,
+  category: TechnologyResult["category"],
+  evidence: string,
+  version?: string | null,
+  confidence: IssueConfidence = "medium",
+  detection: TechnologyResult["detection"] = "inferred",
+) {
   const key = `${name}:${category}`;
   if (seen.has(key)) {
     return;
@@ -1403,7 +1443,7 @@ function addDetectedTechnology(target, seen, name, category, evidence, version, 
 
 function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrls, externalStylesheetUrls) {
   const technologies = [];
-  const seen = new Set();
+  const seen = new Set<string>();
   const htmlLower = html.toLowerCase();
   const allUrls = [...externalScriptUrls, ...externalStylesheetUrls].map((url) => url.toLowerCase());
   const generator = metaGenerator?.toLowerCase() || "";
@@ -1490,7 +1530,7 @@ function detectHtmlTechnologies(html, finalUrl, metaGenerator, externalScriptUrl
 function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
   const htmlLower = html.toLowerCase();
   const vendors = [];
-  const seen = new Set();
+  const seen = new Set<string>();
   const addVendor = (name, evidence, category, confidence) => {
     const key = `${name}:${category}`;
     if (seen.has(key)) {
@@ -1662,9 +1702,15 @@ function analyzeAiSurface(html, finalUrl, externalScriptUrls, firstPartyPaths) {
   };
 }
 
-function classifyThirdPartyProvider(domain) {
+function classifyThirdPartyProvider(domain: string): Omit<ThirdPartyProvider, "domain"> {
   const lower = domain.toLowerCase();
-  const providers = [
+  const providers: Array<{
+    pattern: RegExp;
+    name: string;
+    category: ThirdPartyProvider["category"];
+    risk: ThirdPartyProvider["risk"];
+    evidence: string;
+  }> = [
     { pattern: /(google-analytics|googletagmanager|doubleclick|omtrdc|adobedtm|adobedc|analytics)/, name: "Analytics / Tagging", category: "analytics", risk: "medium", evidence: "Detected from third-party analytics or tag-management assets" },
     { pattern: /(onetrust|cookiebot|usercentrics)/, name: "Consent Management", category: "consent", risk: "low", evidence: "Detected from consent-management assets" },
     { pattern: /(intercom|drift|zendesk|zopim|hubspot|freshchat|crisp|sprinklr)/, name: "Support / Chat", category: "support", risk: "medium", evidence: "Detected from public support or chat tooling" },
@@ -1710,7 +1756,7 @@ function getSiteDomain(hostname) {
   return parts.slice(-2).join(".");
 }
 
-function analyzeThirdPartyTrust(finalUrl, htmlSecurity, aiSurface) {
+function analyzeThirdPartyTrust(finalUrl, htmlSecurity, aiSurface: AiSurfaceInfo) {
   const siteDomain = getSiteDomain(finalUrl.hostname);
   const thirdPartyDomains = unique([
     ...(htmlSecurity.externalScriptDomains || []),
@@ -1770,7 +1816,7 @@ function analyzeThirdPartyTrust(finalUrl, htmlSecurity, aiSurface) {
   };
 }
 
-function buildExecutiveSummary(result) {
+function buildExecutiveSummary(result): ExecutiveSummaryInfo {
   const missingHeaderCount = result.headers.filter((header) => header.status === "missing").length;
   const highRiskThirdParties = result.thirdPartyTrust.highRiskProviders;
   const posture = result.score >= 80 ? "strong" : result.score >= 60 ? "mixed" : "weak";
@@ -1816,8 +1862,8 @@ function buildExecutiveSummary(result) {
   };
 }
 
-function mergeTechnologies(...groups) {
-  const merged = [];
+function mergeTechnologies(...groups: Array<TechnologyResult[] | null | undefined>) {
+  const merged: TechnologyResult[] = [];
   const byKey = new Map();
   const confidenceRank = { high: 3, medium: 2, low: 1 };
 
@@ -1864,7 +1910,7 @@ async function fetchHtmlDocument(finalUrl) {
   };
 }
 
-function analyzeHtmlSecurity(finalUrl, document) {
+function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle: string | null } | null): HtmlSecurityInfo {
   try {
     if (!document) {
       return {
@@ -2077,13 +2123,13 @@ function analyzeHtmlSecurity(finalUrl, document) {
   }
 }
 
-export function analyzeHtmlDocument(input, html) {
+export function analyzeHtmlDocument(input: string | URL, html: string): HtmlSecurityInfo {
   const finalUrl = typeof input === "string" ? new URL(input) : input;
   const pageTitle = extractHtmlTitle(html);
   return analyzeHtmlSecurity(finalUrl, { html, pageTitle });
 }
 
-function parseRobotsSitemaps(body) {
+function parseRobotsSitemaps(body: string): string[] {
   return unique(
     body
       .split(/\r?\n/)
@@ -2093,7 +2139,7 @@ function parseRobotsSitemaps(body) {
   );
 }
 
-function parseSitemapPaths(xml, finalUrl) {
+function parseSitemapPaths(xml: string, finalUrl: URL): string[] {
   return rankDiscoveredPaths(
     [...xml.matchAll(/<loc>([\s\S]*?)<\/loc>/gi)].map((match) =>
       normalizeDiscoveredPath(match[1].trim(), finalUrl),
@@ -2141,10 +2187,10 @@ async function collectDiscoveryPaths(finalUrl, htmlSecurity) {
   };
 }
 
-async function fetchPublicSignals(host) {
+async function fetchPublicSignals(host: string): Promise<PublicSignalsInfo> {
   const apexHost = host.startsWith("www.") ? host.slice(4) : host;
   const sourceUrl = `https://hstspreload.org/api/v2/status?domain=${encodeURIComponent(apexHost)}`;
-  const fallback = {
+  const fallback: PublicSignalsInfo = {
     hstsPreload: {
       status: "unknown",
       summary: "Public HSTS preload status could not be determined.",
@@ -2168,7 +2214,7 @@ async function fetchPublicSignals(host) {
       .map((entry) => (typeof entry === "string" ? entry : entry?.message || JSON.stringify(entry)))
       .join(" ");
 
-    let status = "not_preloaded";
+    let status: PublicSignalsInfo["hstsPreload"]["status"] = "not_preloaded";
     if (payload.preloaded === true || statusText.includes("preloaded")) {
       status = "preloaded";
     } else if (statusText.includes("pending")) {
@@ -2323,8 +2369,8 @@ function parseCsvHeader(value) {
     : [];
 }
 
-async function analyzeCorsSecurity(finalUrl, responseHeaders) {
-  let optionsResponse = { statusCode: 0, headers: {} };
+async function analyzeCorsSecurity(finalUrl: URL, responseHeaders: ResponseHeaders): Promise<CorsSecurityInfo> {
+  let optionsResponse: RequestHeadResult = { statusCode: 0, headers: {}, elapsedMs: 0 };
   try {
     optionsResponse = await requestWithHeaders(finalUrl, "OPTIONS", {
       Origin: "https://security-posture-insight.local",
@@ -2500,7 +2546,7 @@ async function analyzeApiSurface(finalUrl, homepageContext = null) {
   };
 }
 
-async function safeResolve(operation) {
+async function safeResolve<T>(operation: () => Promise<T>): Promise<T | null> {
   try {
     return await operation();
   } catch {
@@ -2530,7 +2576,7 @@ async function fetchMtaStsPolicy(host) {
   };
 }
 
-async function analyzeDomainSecurity(host) {
+async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> {
   const apexHost = host.startsWith("www.") ? host.slice(4) : host;
   const candidateHosts = [...new Set([host, apexHost])];
 
@@ -2634,10 +2680,10 @@ async function analyzeDomainSecurity(host) {
   };
 }
 
-async function analyzeUrlCore(input, options = {}) {
+async function analyzeUrlCore(input: string | URL, options: AnalyzeTargetOptions = {}) {
   const { includeCertificate = true } = options;
   let normalizedUrl = input instanceof URL ? input : normalizeUrl(input);
-  let requestData;
+  let requestData: Awaited<ReturnType<typeof fetchWithRedirects>>;
 
   try {
     requestData = await fetchWithRedirects(normalizedUrl);
@@ -2805,7 +2851,7 @@ function toCandidateLabel(pathname) {
 function buildCrawlCandidates(result, discoveryPaths = []) {
   const finalUrl = new URL(result.finalUrl);
   const userPath = new URL(result.normalizedUrl).pathname || "/";
-  const seen = new Set();
+  const seen = new Set<string>();
 
   return [
     { label: userPath === "/" ? "Homepage" : "Requested page", path: userPath },
@@ -2914,7 +2960,7 @@ async function crawlRelatedPages(rootResult, discovery) {
   };
 }
 
-export async function analyzeUrl(input) {
+export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   const result = await analyzeUrlCore(input, { includeCertificate: true });
   const finalUrl = new URL(result.finalUrl);
   let htmlDocument = null;
@@ -2951,3 +2997,4 @@ export async function analyzeUrl(input) {
 
 export const analyzeTarget = analyzeUrl;
 export { formatErrorMessage };
+export type { AnalysisResult, AnalyzeTargetOptions, HtmlSecurityInfo } from "./types";

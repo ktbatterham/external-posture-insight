@@ -7,15 +7,16 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev": "npm run build:core && concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "vite",
-    "dev:server": "node server/index.mjs",
-    "build": "vite build",
+    "dev:server": "npm run build:core && node server/index.mjs",
+    "build:core": "tsc -p packages/core/tsconfig.json",
+    "build": "npm run build:core && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "test:core": "node --test packages/core/test/*.test.mjs",
+    "test:core": "npm run build:core && node --test packages/core/test/*.test.mjs",
     "preview": "vite preview",
-    "start": "node server/index.mjs"
+    "start": "npm run build:core && node server/index.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

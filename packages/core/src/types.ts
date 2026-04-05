@@ -207,6 +207,7 @@ export interface HtmlSecurityInfo {
   passiveLeakSignals: PassiveLeakSignal[];
   clientExposureSignals: ClientExposureSignal[];
   detectedTechnologies: TechnologyResult[];
+  aiSurface: AiSurfaceInfo;
   issues: string[];
   strengths: string[];
 }
