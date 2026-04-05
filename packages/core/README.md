@@ -18,6 +18,21 @@ This package is the reusable scanner engine extracted from the External Posture 
 
 This package is not published yet. The API is stabilizing and is currently used internally by the app.
 
+## Release workflow
+
+- local package check: `npm run pack:core`
+- CI verification: `.github/workflows/core-package-checks.yml`
+- publish workflow: `.github/workflows/publish-core-package.yml`
+- publish requires an `NPM_TOKEN` repository secret
+
+Recommended release flow:
+
+1. update the version in `packages/core/package.json`
+2. run `npm run test:core`
+3. run `npm run pack:core`
+4. create and push a tag like `core-v0.1.0`
+5. let the publish workflow release the package
+
 ## Public API
 
 ### `analyzeTarget(url)`
