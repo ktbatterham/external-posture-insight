@@ -3,10 +3,22 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Low-noise external posture analysis core for web targets.",
+  "types": "./src/index.d.ts",
   "main": "./src/index.mjs",
   "exports": {
-    ".": "./src/index.mjs"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
+    },
+    "./types": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
+    }
   },
+  "files": [
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "test": "node --test test/*.test.mjs"
   },

@@ -2947,4 +2947,5 @@ export async function analyzeUrl(input) {
   };
 }
 
+export const analyzeTarget = analyzeUrl;
 export { formatErrorMessage };
