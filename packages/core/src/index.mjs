@@ -1,3 +1,4 @@
+import http from "node:http";
 import https from "node:https";
 import dns from "node:dns/promises";
 import tls from "node:tls";
@@ -2290,13 +2291,14 @@ async function analyzeExposure(finalUrl) {
         detail,
       });
     } catch (error) {
+      const detail = formatErrorMessage(error) || "Probe failed unexpectedly.";
       probes.push({
         label: probe.label,
         path: probe.path,
         statusCode: 0,
         finalUrl: probeUrl.toString(),
         finding: "error",
-        detail: error instanceof Error ? error.message : "Probe failed.",
+        detail,
       });
     }
   }
