@@ -31,7 +31,9 @@
   },
   "files": [
     "dist",
+    "CHANGELOG.md",
     "README.md",
+    "RELEASING.md",
     "LICENSE"
   ],
   "scripts": {

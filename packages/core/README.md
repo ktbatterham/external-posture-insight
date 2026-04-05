@@ -33,6 +33,11 @@ Recommended release flow:
 4. create and push a tag like `core-v0.1.0`
 5. let the publish workflow release the package
 
+See also:
+
+- `packages/core/CHANGELOG.md`
+- `packages/core/RELEASING.md`
+
 ## Public API
 
 ### `analyzeTarget(url)`
