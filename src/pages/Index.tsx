@@ -255,6 +255,7 @@ const Index = () => {
     return new URLSearchParams(window.location.search).get("view") === "report";
   });
   const autoScanRanRef = useRef(false);
+  const analyzeUrlRef = useRef<(url: string, setAsCurrent?: boolean) => Promise<AnalysisResult>>();
 
   const persistAnalysis = (payload: AnalysisResult, setAsCurrent = true) => {
     startTransition(() => {
@@ -295,6 +296,8 @@ const Index = () => {
     return payload as AnalysisResult;
   };
 
+  analyzeUrlRef.current = analyzeUrl;
+
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
 
@@ -322,7 +325,7 @@ const Index = () => {
     void (async () => {
       setIsLoading(true);
       try {
-        await analyzeUrl(target, true);
+        await analyzeUrlRef.current?.(target, true);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
       } finally {
@@ -437,18 +440,47 @@ const Index = () => {
 
   const exportPdf = () => {
     if (!analysisData) return;
-    const reportWindow = window.open("", "_blank", "noopener,noreferrer");
-    if (!reportWindow) {
-      toast.error("Could not open a print window for PDF export.");
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        iframe.remove();
+      }, 1000);
+    };
+
+    iframe.onload = () => {
+      const frameWindow = iframe.contentWindow;
+      if (!frameWindow) {
+        toast.error("Could not prepare the PDF export.");
+        cleanup();
+        return;
+      }
+
+      frameWindow.focus();
+      window.setTimeout(() => {
+        frameWindow.print();
+        cleanup();
+      }, 250);
+    };
+
+    document.body.appendChild(iframe);
+    const frameDocument = iframe.contentDocument;
+    if (!frameDocument) {
+      toast.error("Could not prepare the PDF export.");
+      cleanup();
       return;
     }
 
-    reportWindow.document.write(buildHtmlReport(analysisData));
-    reportWindow.document.close();
-    reportWindow.focus();
-    reportWindow.onload = () => {
-      reportWindow.print();
-    };
+    frameDocument.open();
+    frameDocument.write(buildHtmlReport(analysisData));
+    frameDocument.close();
   };
 
   const monitoredViews = monitoredTargets.map(toMonitoredTargetView);

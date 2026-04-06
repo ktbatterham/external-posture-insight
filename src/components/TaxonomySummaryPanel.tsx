@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnalysisResult } from "@/types/analysis";
 import { getDominantThemes } from "@/lib/reportInsights";
@@ -28,12 +27,32 @@ export const TaxonomySummaryPanel = ({ analysis }: TaxonomySummaryPanelProps) =>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">OWASP themes</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 space-y-3">
               {themes.owasp.length ? (
                 themes.owasp.map((item) => (
-                  <Badge key={item.label} variant="outline">
-                    {item.label} · {item.count}
-                  </Badge>
+                  <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {item.count}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">{item.summary}</p>
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Why it matters</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{item.whyItMatters}</p>
+                    <div className="mt-3">
+                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Driving findings</p>
+                      {item.examples.length ? (
+                        <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                          {item.examples.map((example) => (
+                            <li key={example}>{example}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-500">No example findings recorded.</p>
+                      )}
+                    </div>
+                  </div>
                 ))
               ) : (
                 <span className="text-sm text-slate-500">No OWASP-tagged findings yet.</span>
@@ -42,12 +61,32 @@ export const TaxonomySummaryPanel = ({ analysis }: TaxonomySummaryPanelProps) =>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">MITRE relevance</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 space-y-3">
               {themes.mitre.length ? (
                 themes.mitre.map((item) => (
-                  <Badge key={item.label} variant="outline">
-                    {item.label} · {item.count}
-                  </Badge>
+                  <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {item.count}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">{item.summary}</p>
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Why it matters</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{item.whyItMatters}</p>
+                    <div className="mt-3">
+                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Driving findings</p>
+                      {item.examples.length ? (
+                        <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                          {item.examples.map((example) => (
+                            <li key={example}>{example}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-500">No example findings recorded.</p>
+                      )}
+                    </div>
+                  </div>
                 ))
               ) : (
                 <span className="text-sm text-slate-500">No MITRE-relevant mappings yet.</span>

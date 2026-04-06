@@ -5,6 +5,12 @@ export interface InsightBucket<T extends string> {
   count: number;
 }
 
+export interface ThemeDetail<T extends string> extends InsightBucket<T> {
+  summary: string;
+  whyItMatters: string;
+  examples: string[];
+}
+
 export interface DisclosurePosture {
   summary: string;
   strengths: string[];
@@ -36,15 +42,109 @@ const countByLabel = <T extends string>(labels: T[]) => {
     .map(([label, count]) => ({ label, count }));
 };
 
+const OWASP_EXPLAINERS: Record<
+  OwaspCategory,
+  {
+    summary: string;
+    whyItMatters: string;
+  }
+> = {
+  "A01 Broken Access Control": {
+    summary: "The visible surface suggests some publicly reachable or overexposed routes and resources deserve boundary review.",
+    whyItMatters: "Even passive exposure clues can point to routes or assets that should be more tightly constrained before deeper testing starts.",
+  },
+  "A02 Cryptographic Failures": {
+    summary: "Transport and trust controls are showing weakness through TLS, HTTPS, certificate, or secure-cookie posture.",
+    whyItMatters: "Weak transport controls can expose sessions, weaken browser trust, and make downstream application protections less meaningful.",
+  },
+  "A03 Injection": {
+    summary: "Browser-side content controls are permissive enough that injection resistance may be weaker than it should be.",
+    whyItMatters: "Loose CSP or inline execution patterns increase the blast radius if any script-injection issue exists elsewhere in the stack.",
+  },
+  "A05 Security Misconfiguration": {
+    summary: "Most visible issues are hardening or configuration gaps rather than evidence of an application-specific exploit path.",
+    whyItMatters: "This is often the fastest class of weakness to improve and usually gives the biggest posture lift for the least engineering effort.",
+  },
+  "A07 Identification and Authentication Failures": {
+    summary: "Session, cookie, and authentication-adjacent behavior is more exposed or weaker than ideal.",
+    whyItMatters: "Authentication posture shapes how much confidence you can place in session integrity and user-boundary controls.",
+  },
+};
+
+const MITRE_EXPLAINERS: Record<
+  MitreRelevance,
+  {
+    summary: string;
+    whyItMatters: string;
+  }
+> = {
+  Reconnaissance: {
+    summary: "The site exposes information that makes external mapping and fingerprinting easier.",
+    whyItMatters: "Attackers usually start by learning the shape of the surface; reducing public clues lowers that early advantage.",
+  },
+  "Initial Access": {
+    summary: "Some findings could make the external surface easier to approach or abuse as a first foothold.",
+    whyItMatters: "These are the signals most likely to matter before authentication or deeper exploitation even begins.",
+  },
+  "Credential Access": {
+    summary: "The visible surface includes session, password, or cookie clues that relate to how credentials could be exposed or mishandled.",
+    whyItMatters: "Anything that weakens session or credential handling tends to have outsized operational impact.",
+  },
+  Collection: {
+    summary: "Some browser or page behaviors could increase unintended data leakage or collection opportunities.",
+    whyItMatters: "These issues often matter for privacy, telemetry, and post-auth data handling even when they are not headline security bugs.",
+  },
+  "Defense Evasion": {
+    summary: "Certain controls are weak or absent in ways that could make abusive behavior harder to contain or detect at the browser boundary.",
+    whyItMatters: "Easier evasion means other controls may need to work harder to compensate for weaker client-facing safeguards.",
+  },
+};
+
 export const getOwaspSummary = (analysis: AnalysisResult): InsightBucket<OwaspCategory>[] =>
   countByLabel(analysis.issues.flatMap((issue) => issue.owasp)) as InsightBucket<OwaspCategory>[];
 
 export const getMitreSummary = (analysis: AnalysisResult): InsightBucket<MitreRelevance>[] =>
   countByLabel(analysis.issues.flatMap((issue) => issue.mitre)) as InsightBucket<MitreRelevance>[];
 
+const buildThemeDetails = <T extends string>(
+  buckets: InsightBucket<T>[],
+  analysis: AnalysisResult,
+  explainers: Record<string, { summary: string; whyItMatters: string }>,
+  matcher: (label: T) => (issue: AnalysisResult["issues"][number]) => boolean,
+): ThemeDetail<T>[] =>
+  buckets.map((bucket) => {
+    const explainer = explainers[bucket.label] || {
+      summary: "This theme was inferred from the current finding set.",
+      whyItMatters: "It helps group related issues into a more operational posture readout.",
+    };
+    const examples = analysis.issues
+      .filter(matcher(bucket.label))
+      .slice(0, 3)
+      .map((issue) => issue.title);
+
+    return {
+      ...bucket,
+      summary: explainer.summary,
+      whyItMatters: explainer.whyItMatters,
+      examples,
+    };
+  });
+
 export const getDominantThemes = (analysis: AnalysisResult) => {
-  const owasp = getOwaspSummary(analysis).slice(0, 3);
-  const mitre = getMitreSummary(analysis).slice(0, 3);
+  const owaspBuckets = getOwaspSummary(analysis).slice(0, 3);
+  const mitreBuckets = getMitreSummary(analysis).slice(0, 3);
+  const owasp = buildThemeDetails(
+    owaspBuckets,
+    analysis,
+    OWASP_EXPLAINERS,
+    (label) => (issue) => issue.owasp.includes(label),
+  );
+  const mitre = buildThemeDetails(
+    mitreBuckets,
+    analysis,
+    MITRE_EXPLAINERS,
+    (label) => (issue) => issue.mitre.includes(label),
+  );
   const dominantOwasp = owasp[0]?.label || "A05 Security Misconfiguration";
 
   const summary =
