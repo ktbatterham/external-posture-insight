@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { Activity, Clock3, Download, Link2, Presentation, Server } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
@@ -307,17 +307,6 @@ const Index = () => {
     }
   };
 
-  const runAutoScan = useEffectEvent(async (target: string) => {
-    setIsLoading(true);
-    try {
-      await analyzeUrl(target, true);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
-    } finally {
-      setIsLoading(false);
-    }
-  });
-
   useEffect(() => {
     if (typeof window === "undefined" || autoScanRanRef.current) {
       return;
@@ -330,8 +319,17 @@ const Index = () => {
     }
 
     autoScanRanRef.current = true;
-    void runAutoScan(target);
-  }, [runAutoScan]);
+    void (async () => {
+      setIsLoading(true);
+      try {
+        await analyzeUrl(target, true);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to scan that site.");
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
 
   const saveCurrentAsMonitored = (cadence: MonitoredTarget["cadence"]) => {
     if (!analysisData) {
