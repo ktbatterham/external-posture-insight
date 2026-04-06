@@ -7,6 +7,7 @@ import { ClientExposurePanel } from "@/components/ClientExposurePanel";
 import { CookieAnalysis } from "@/components/CookieAnalysis";
 import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
 import { CrawlPanel } from "@/components/CrawlPanel";
+import { CtDiscoveryPanel } from "@/components/CtDiscoveryPanel";
 import { DataCollectionPanel } from "@/components/DataCollectionPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { DisclosureTrustPanel } from "@/components/DisclosureTrustPanel";
@@ -17,6 +18,7 @@ import { HeadersTable } from "@/components/HeadersTable";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { HomeDashboardPanel } from "@/components/HomeDashboardPanel";
 import { HtmlSecurityPanel } from "@/components/HtmlSecurityPanel";
+import { IdentityProviderPanel } from "@/components/IdentityProviderPanel";
 import { MonitoringPanel } from "@/components/MonitoringPanel";
 import { PostureSummaryPanel } from "@/components/PostureSummaryPanel";
 import { PriorityActionsPanel } from "@/components/PriorityActionsPanel";
@@ -435,6 +437,22 @@ const Index = () => {
     );
   };
 
+  const exportPdf = () => {
+    if (!analysisData) return;
+    const reportWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!reportWindow) {
+      toast.error("Could not open a print window for PDF export.");
+      return;
+    }
+
+    reportWindow.document.write(buildHtmlReport(analysisData));
+    reportWindow.document.close();
+    reportWindow.focus();
+    reportWindow.onload = () => {
+      reportWindow.print();
+    };
+  };
+
   const monitoredViews = monitoredTargets.map(toMonitoredTargetView);
   const reportShareUrl =
     typeof window !== "undefined" && analysisData
@@ -586,6 +604,9 @@ const Index = () => {
                   summary={analysisData.summary}
                 />
                 <div className="flex flex-wrap gap-3">
+                  <Button variant="outline" className="rounded-2xl" onClick={exportPdf}>
+                    Export PDF
+                  </Button>
                   <Button variant="outline" className="rounded-2xl" onClick={exportMarkdown}>
                     Export Markdown
                   </Button>
@@ -720,6 +741,11 @@ const Index = () => {
               <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
               <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
               <DisclosureTrustPanel analysis={analysisData} />
+            </div>
+
+            <div className="grid gap-8 xl:grid-cols-2">
+              <IdentityProviderPanel identityProvider={analysisData.identityProvider} />
+              <CtDiscoveryPanel ctDiscovery={analysisData.ctDiscovery} />
             </div>
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />

@@ -37,6 +37,11 @@ const buildThirdPartyLines = (analysis: AnalysisResult) =>
       )
     : ["- No third-party providers recorded."];
 
+const buildCtLines = (analysis: AnalysisResult) =>
+  analysis.ctDiscovery.subdomains.length
+    ? analysis.ctDiscovery.subdomains.map((host) => `- ${host}`)
+    : ["- No CT-discovered subdomains recorded."];
+
 export const buildMarkdownReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
@@ -107,6 +112,24 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     `- DMARC: ${analysis.domainSecurity.dmarc ?? "Not found"}`,
     `- MX count: ${analysis.domainSecurity.mxRecords.length}`,
     `- CAA count: ${analysis.domainSecurity.caaRecords.length}`,
+    "",
+    "## Identity Provider & OAuth Surface",
+    "",
+    `- Detected: ${analysis.identityProvider.detected ? "Yes" : "No"}`,
+    `- Provider: ${analysis.identityProvider.provider ?? "Not identified"}`,
+    `- OIDC config: ${analysis.identityProvider.openIdConfigurationUrl ?? "Not observed"}`,
+    `- Redirect origins: ${analysis.identityProvider.redirectOrigins.length ? analysis.identityProvider.redirectOrigins.join(", ") : "None recorded"}`,
+    `- Login paths: ${analysis.identityProvider.loginPaths.length ? analysis.identityProvider.loginPaths.join(", ") : "None recorded"}`,
+    ...(analysis.identityProvider.redirectUriSignals.length
+      ? analysis.identityProvider.redirectUriSignals.map((signal) => `- Review redirect URI signal: ${signal}`)
+      : ["- No public redirect_uri-style parameters were recorded."]),
+    "",
+    "## Certificate Transparency",
+    "",
+    `- Queried domain: ${analysis.ctDiscovery.queriedDomain}`,
+    `- Subdomains discovered: ${analysis.ctDiscovery.subdomains.length}`,
+    `- Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}`,
+    ...buildCtLines(analysis),
     "",
     "## Public Trust Signals",
     "",
@@ -225,6 +248,9 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const passiveLeakItems = buildPassiveLeakLines(analysis)
     .map((line) => `<li>${line.slice(2)}</li>`)
     .join("");
+  const ctItems = buildCtLines(analysis)
+    .map((line) => `<li>${line.slice(2)}</li>`)
+    .join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -281,6 +307,31 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     <div class="card">
       <h2>Priority Actions</h2>
       <ul>${priorityItems}</ul>
+    </div>
+    <div class="card">
+      <h2>Domain &amp; Email Security</h2>
+      <p>SPF: ${analysis.domainSecurity.spf ?? "Not found"}</p>
+      <p>DMARC: ${analysis.domainSecurity.dmarc ?? "Not found"}</p>
+      <p>MX count: ${analysis.domainSecurity.mxRecords.length}</p>
+      <p>CAA count: ${analysis.domainSecurity.caaRecords.length}</p>
+    </div>
+    <div class="card">
+      <h2>Identity Provider &amp; OAuth Surface</h2>
+      <p>Detected: ${analysis.identityProvider.detected ? "Yes" : "No"}</p>
+      <p>Provider: ${analysis.identityProvider.provider ?? "Not identified"}</p>
+      <p>OIDC config: ${analysis.identityProvider.openIdConfigurationUrl ?? "Not observed"}</p>
+      <p>Redirect origins: ${analysis.identityProvider.redirectOrigins.length ? analysis.identityProvider.redirectOrigins.join(", ") : "None recorded"}</p>
+      <p>Login paths: ${analysis.identityProvider.loginPaths.length ? analysis.identityProvider.loginPaths.join(", ") : "None recorded"}</p>
+      <ul>${analysis.identityProvider.redirectUriSignals.length
+        ? analysis.identityProvider.redirectUriSignals.map((signal) => `<li>Review redirect URI signal: ${signal}</li>`).join("")
+        : "<li>No public redirect_uri-style parameters were recorded.</li>"}</ul>
+    </div>
+    <div class="card">
+      <h2>Certificate Transparency</h2>
+      <p>Queried domain: ${analysis.ctDiscovery.queriedDomain}</p>
+      <p>Subdomains discovered: ${analysis.ctDiscovery.subdomains.length}</p>
+      <p>Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}</p>
+      <ul>${ctItems}</ul>
     </div>
     <div class="card">
       <h2>Public Trust Signals</h2>

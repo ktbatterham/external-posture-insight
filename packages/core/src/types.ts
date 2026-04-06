@@ -168,6 +168,30 @@ export interface DomainSecurityInfo {
   strengths: string[];
 }
 
+export interface IdentityProviderInfo {
+  detected: boolean;
+  provider: string | null;
+  redirectOrigins: string[];
+  loginPaths: string[];
+  openIdConfigurationUrl: string | null;
+  issuer: string | null;
+  authorizationEndpoint: string | null;
+  tokenEndpoint: string | null;
+  endSessionEndpoint: string | null;
+  redirectUriSignals: string[];
+  issues: string[];
+  strengths: string[];
+}
+
+export interface CtDiscoveryInfo {
+  queriedDomain: string;
+  sourceUrl: string;
+  subdomains: string[];
+  wildcardEntries: string[];
+  issues: string[];
+  strengths: string[];
+}
+
 export interface HtmlFormInfo {
   action: string | null;
   method: string;
@@ -341,6 +365,8 @@ export interface AnalysisResult {
   crawl: CrawlSummary;
   securityTxt: SecurityTxtInfo;
   domainSecurity: DomainSecurityInfo;
+  identityProvider: IdentityProviderInfo;
+  ctDiscovery: CtDiscoveryInfo;
   htmlSecurity: HtmlSecurityInfo;
   aiSurface: AiSurfaceInfo;
   thirdPartyTrust: ThirdPartyTrustInfo;

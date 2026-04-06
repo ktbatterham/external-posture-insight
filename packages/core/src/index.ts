@@ -1,17 +1,21 @@
 import http from "node:http";
 import https from "node:https";
 import dns from "node:dns/promises";
+import net from "node:net";
 import tls from "node:tls";
 import { URL } from "node:url";
+import * as cheerio from "cheerio";
 import type {
   AnalysisResult,
   AnalyzeTargetOptions,
   AiSurfaceInfo,
   CertificateResult,
+  CtDiscoveryInfo,
   CorsSecurityInfo,
   DomainSecurityInfo,
   ExecutiveSummaryInfo,
   HtmlSecurityInfo,
+  IdentityProviderInfo,
   IssueConfidence,
   PublicSignalsInfo,
   RemediationSnippet,
@@ -21,6 +25,25 @@ import type {
 } from "./types";
 
 type ResponseHeaders = http.IncomingHttpHeaders;
+
+const SCANNER_USER_AGENT = "ExternalPostureInsight/1.0";
+const REQUEST_TIMEOUT_MS = 12_000;
+const TLS_HANDSHAKE_TIMEOUT_MS = 10_000;
+const TEXT_BODY_LIMIT = 256_000;
+const HTML_SIGNATURE_LIMIT = 280;
+const DISCOVERY_PATH_LIMIT = 10;
+const SUMMARY_EVIDENCE_LIMIT = 3;
+const CLIENT_EXPOSURE_EVIDENCE_LIMIT = 6;
+const REDIRECT_LIMIT = 5;
+const CT_SUBDOMAIN_LIMIT = 20;
+const CT_WILDCARD_LIMIT = 5;
+
+// Deliberately disabled only for observational scanning so invalid or expired
+// certificates can still be described. This must never be reused for
+// authenticated or stateful application traffic.
+const OBSERVATIONAL_TLS_OPTIONS = {
+  rejectUnauthorized: false,
+};
 
 interface RequestHeadResult {
   statusCode: number;
@@ -511,10 +534,6 @@ function buildRawHeaders(headers) {
   );
 }
 
-function uniqueStrings(values) {
-  return [...new Set(values.filter(Boolean))];
-}
-
 function classifyIssueTaxonomy(issue) {
   const text = `${issue.area} ${issue.title} ${issue.detail}`.toLowerCase();
   const owasp = [];
@@ -601,8 +620,8 @@ function classifyIssueTaxonomy(issue) {
 
   return {
     ...issue,
-    owasp: uniqueStrings(owasp),
-    mitre: uniqueStrings(mitre),
+    owasp: unique(owasp),
+    mitre: unique(mitre),
   };
 }
 
@@ -822,8 +841,8 @@ function scanTls(targetUrl: URL): Promise<CertificateResult> {
       host: targetUrl.hostname,
       port: Number(targetUrl.port || 443),
       servername: targetUrl.hostname,
-      rejectUnauthorized: false,
-      timeout: 10000,
+      ...OBSERVATIONAL_TLS_OPTIONS,
+      timeout: TLS_HANDSHAKE_TIMEOUT_MS,
     });
 
     socket.once("secureConnect", () => {
@@ -892,9 +911,9 @@ function requestWithHeaders(targetUrl: URL, method = "HEAD", extraHeaders = {}):
       targetUrl,
       {
         method,
-        rejectUnauthorized: false,
+        ...OBSERVATIONAL_TLS_OPTIONS,
         headers: {
-          "User-Agent": "SecureHeaderInsight/1.0",
+          "User-Agent": SCANNER_USER_AGENT,
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Encoding": "identity",
           ...extraHeaders,
@@ -911,7 +930,7 @@ function requestWithHeaders(targetUrl: URL, method = "HEAD", extraHeaders = {}):
     );
 
     request.on("error", reject);
-    request.setTimeout(12000, () => {
+    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
       request.destroy(new Error("Request timed out."));
     });
     request.end();
@@ -927,9 +946,9 @@ function requestText(targetUrl: URL, extraHeaders = {}): Promise<RequestTextResu
       targetUrl,
       {
         method: "GET",
-        rejectUnauthorized: false,
+        ...OBSERVATIONAL_TLS_OPTIONS,
         headers: {
-          "User-Agent": "SecureHeaderInsight/1.0",
+          "User-Agent": SCANNER_USER_AGENT,
           Accept: "text/plain,text/*;q=0.9,*/*;q=0.1",
           "Accept-Encoding": "identity",
           ...extraHeaders,
@@ -940,8 +959,8 @@ function requestText(targetUrl: URL, extraHeaders = {}): Promise<RequestTextResu
         response.setEncoding("utf8");
         response.on("data", (chunk) => {
           body += chunk;
-          if (body.length > 64_000) {
-            body = body.slice(0, 64_000);
+          if (body.length > TEXT_BODY_LIMIT) {
+            body = body.slice(0, TEXT_BODY_LIMIT);
           }
         });
         response.on("end", () => {
@@ -955,11 +974,78 @@ function requestText(targetUrl: URL, extraHeaders = {}): Promise<RequestTextResu
     );
 
     request.on("error", reject);
-    request.setTimeout(12000, () => {
+    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
       request.destroy(new Error("Request timed out."));
     });
     request.end();
   });
+}
+
+function isPrivateIpv4(value: string) {
+  const [first, second] = value.split(".").map((part) => Number(part));
+  if ([first, second].some((part) => Number.isNaN(part))) {
+    return false;
+  }
+
+  return (
+    first === 10 ||
+    first === 127 ||
+    first === 0 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 198 && (second === 18 || second === 19))
+  );
+}
+
+function isPrivateIpv6(value: string) {
+  const normalized = value.toLowerCase();
+  return (
+    normalized === "::1" ||
+    normalized === "::" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:")
+  );
+}
+
+function isLocalHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local") ||
+    normalized.endsWith(".internal")
+  );
+}
+
+function isPrivateAddress(value: string) {
+  const ipVersion = net.isIP(value);
+  if (ipVersion === 4) {
+    return isPrivateIpv4(value);
+  }
+  if (ipVersion === 6) {
+    return isPrivateIpv6(value);
+  }
+  return false;
+}
+
+async function assertPublicRedirectTarget(targetUrl: URL) {
+  if (isLocalHostname(targetUrl.hostname) || isPrivateAddress(targetUrl.hostname)) {
+    throw new Error(`Redirect target ${targetUrl.hostname} is not public and was blocked.`);
+  }
+
+  try {
+    const lookups = await dns.lookup(targetUrl.hostname, { all: true });
+    if (lookups.length && lookups.every((entry) => isPrivateAddress(entry.address))) {
+      throw new Error(`Redirect target ${targetUrl.hostname} resolved only to private or loopback addresses and was blocked.`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("was blocked")) {
+      throw error;
+    }
+  }
 }
 
 function normalizeHtmlSignature(body) {
@@ -970,7 +1056,7 @@ function normalizeHtmlSignature(body) {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase()
-    .slice(0, 280);
+    .slice(0, HTML_SIGNATURE_LIMIT);
 }
 
 function getHtmlTitle(body) {
@@ -983,7 +1069,7 @@ function extractHtmlTitle(body) {
   return title ? title.toLowerCase() : null;
 }
 
-function summarizeEvidence<T>(values: Array<T | null | undefined | false>, limit = 3): T[] {
+function summarizeEvidence<T>(values: Array<T | null | undefined | false>, limit = SUMMARY_EVIDENCE_LIMIT): T[] {
   return unique(values).slice(0, limit);
 }
 
@@ -1094,7 +1180,7 @@ function collectClientExposureSignals(html, finalUrl) {
     ...[...html.matchAll(/https?:\/\/[^"'`\s<>()]*(?:\/(?:api|graphql|trpc|socket\.io|rpc)[^"'`\s<>()]*)/gi)].map((match) => match[0]),
     ...[...html.matchAll(/["'`](\/(?:api|graphql|trpc|socket\.io|_next\/data)[^"'`<>\s]*)["'`]/gi)].map((match) => match[1]),
     ...[...html.matchAll(/["'`](\/[a-z0-9/_-]*(?:graphql|api|trpc)[^"'`<>\s]*)["'`]/gi)].map((match) => match[1]),
-  ], 6).map((value) => {
+  ], CLIENT_EXPOSURE_EVIDENCE_LIMIT).map((value) => {
     try {
       return new URL(value, finalUrl).toString();
     } catch {
@@ -1229,7 +1315,7 @@ function isAccessDeniedHtml(headers, body) {
   return false;
 }
 
-async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
+async function fetchWithRedirects(initialUrl, redirectLimit = REDIRECT_LIMIT) {
   const redirects = [];
   let currentUrl = initialUrl;
   let response = await requestOnce(currentUrl, "HEAD");
@@ -1251,6 +1337,7 @@ async function fetchWithRedirects(initialUrl, redirectLimit = 5) {
       secure: currentUrl.protocol === "https:",
     });
     currentUrl = new URL(location, currentUrl);
+    await assertPublicRedirectTarget(currentUrl);
     response = await requestOnce(currentUrl, "HEAD");
     if (response.statusCode === 405 || response.statusCode === 403) {
       response = await requestOnce(currentUrl, "GET");
@@ -1364,11 +1451,6 @@ async function fetchSecurityTxt(finalUrl: URL): Promise<SecurityTxtInfo> {
   };
 }
 
-function getAttribute(tag, attribute) {
-  const match = tag.match(new RegExp(`${attribute}\\s*=\\s*["']([^"']+)["']`, "i"));
-  return match ? match[1] : null;
-}
-
 function unique<T>(values: Array<T | null | undefined | false>): T[] {
   return [...new Set(values.filter((value): value is T => Boolean(value)))];
 }
@@ -1413,7 +1495,7 @@ function normalizeDiscoveredPath(value, finalUrl: URL): string | null {
 function rankDiscoveredPaths(paths: Array<string | null | undefined | false>): string[] {
   return unique(paths)
     .sort((left, right) => scorePagePath(right) - scorePagePath(left))
-    .slice(0, 10);
+    .slice(0, DISCOVERY_PATH_LIMIT);
 }
 
 function addDetectedTechnology(
@@ -1949,44 +2031,39 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
     const html = document.html;
     const issues = [];
     const strengths = [];
-    const pageTitle = document.pageTitle;
-    const metaGenerator = getAttribute(
-      html.match(/<meta\b[^>]*name\s*=\s*["']generator["'][^>]*>/i)?.[0] || "",
-      "content",
-    );
+    const $ = cheerio.load(html);
+    const pageTitle = document.pageTitle || $("title").first().text().trim() || null;
+    const metaGenerator = $('meta[name="generator"]').attr("content") || null;
 
-    const formTags = [...html.matchAll(/<form\b[^>]*>([\s\S]*?)<\/form>/gi)];
-    const forms = formTags.map(([fullTag, innerHtml]) => {
-      const openTagMatch = fullTag.match(/<form\b[^>]*>/i);
-      const openTag = openTagMatch ? openTagMatch[0] : fullTag;
-      const action = getAttribute(openTag, "action");
-      const method = (getAttribute(openTag, "method") || "GET").toUpperCase();
-      const hasPasswordField = /<input\b[^>]*type\s*=\s*["']password["']/i.test(innerHtml);
-      const resolvedAction = action ? new URL(action, finalUrl).toString() : finalUrl.toString();
-      const insecureSubmission = resolvedAction.startsWith("http://");
+    const forms = $("form")
+      .toArray()
+      .map((form) => {
+        const element = $(form);
+        const action = element.attr("action") || null;
+        const method = (element.attr("method") || "GET").toUpperCase();
+        const resolvedAction = action ? new URL(action, finalUrl).toString() : finalUrl.toString();
+        return {
+          action,
+          method,
+          insecureSubmission: resolvedAction.startsWith("http://"),
+          hasPasswordField: element.find('input[type="password"]').length > 0,
+        };
+      });
 
-      return {
-        action,
-        method,
-        insecureSubmission,
-        hasPasswordField,
-      };
-    });
-
-    const scriptTags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
-    const linkTags = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
-    const externalScriptUrls = scriptTags
-      .map((tag) => getAttribute(tag, "src"))
+    const scriptElements = $("script").toArray();
+    const externalScriptUrls = scriptElements
+      .map((script) => $(script).attr("src"))
       .filter(Boolean)
-      .map((src) => new URL(src, finalUrl).toString());
-    const externalStylesheetUrls = linkTags
-      .filter((tag) => /\brel\s*=\s*["'][^"']*stylesheet/i.test(tag))
-      .map((tag) => getAttribute(tag, "href"))
+      .map((src) => new URL(src as string, finalUrl).toString());
+    const externalStylesheetUrls = $('link[rel~="stylesheet"]')
+      .toArray()
+      .map((link) => $(link).attr("href"))
       .filter(Boolean)
-      .map((href) => new URL(href, finalUrl).toString());
-    const anchorTags = [...html.matchAll(/<a\b[^>]*>/gi)].map((match) => match[0]);
+      .map((href) => new URL(href as string, finalUrl).toString());
     const firstPartyPaths = rankDiscoveredPaths([
-      ...anchorTags.map((tag) => normalizeDiscoveredPath(getAttribute(tag, "href"), finalUrl)),
+      ...$("a[href]")
+        .toArray()
+        .map((anchor) => normalizeDiscoveredPath($(anchor).attr("href"), finalUrl)),
       ...forms.map((form) => normalizeDiscoveredPath(form.action, finalUrl)),
     ]);
     const insecureResourceUrls = unique(
@@ -2002,16 +2079,22 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
         .map((url) => new URL(url).hostname)
         .filter((hostname) => hostname !== finalUrl.hostname),
     );
-    const inlineScriptCount = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/gi)].length;
-    const inlineStyleCount = [...html.matchAll(/<style\b[^>]*>[\s\S]*?<\/style>/gi)].length;
-    const missingSriScriptUrls = scriptTags
-      .filter((tag) => getAttribute(tag, "src"))
-      .filter((tag) => {
-        const src = getAttribute(tag, "src");
-        const resolved = src ? new URL(src, finalUrl) : null;
-        return resolved && resolved.hostname !== finalUrl.hostname && !getAttribute(tag, "integrity");
+    const inlineScriptCount = scriptElements.filter((script) => !$(script).attr("src")).length;
+    const inlineStyleCount = $("style").length;
+    const missingSriScriptUrls = scriptElements
+      .map((script) => {
+        const element = $(script);
+        const src = element.attr("src");
+        if (!src) {
+          return null;
+        }
+        const resolved = new URL(src, finalUrl);
+        if (resolved.hostname === finalUrl.hostname || element.attr("integrity")) {
+          return null;
+        }
+        return resolved.toString();
       })
-      .map((tag) => new URL(getAttribute(tag, "src"), finalUrl).toString());
+      .filter(Boolean);
     const passiveLeakSignals = collectPassiveLeakSignals(
       html,
       finalUrl,
@@ -2680,6 +2763,242 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
   };
 }
 
+function toDiscoveryDomain(host: string) {
+  const normalized = host.replace(/\.$/, "").toLowerCase();
+  const labels = normalized.split(".").filter(Boolean);
+  if (labels.length <= 2) {
+    return normalized;
+  }
+
+  const secondLevelLabels = new Set(["co", "com", "org", "net", "gov", "ac", "edu"]);
+  const last = labels[labels.length - 1];
+  const secondLast = labels[labels.length - 2];
+  if (last.length === 2 && secondLevelLabels.has(secondLast)) {
+    return labels.slice(-3).join(".");
+  }
+
+  return labels.slice(-2).join(".");
+}
+
+async function requestJson(targetUrl: URL, extraHeaders = {}) {
+  const response = await requestText(targetUrl, {
+    Accept: "application/json,text/plain;q=0.9,*/*;q=0.1",
+    ...extraHeaders,
+  });
+  return {
+    ...response,
+    json: response.body ? JSON.parse(response.body) : null,
+  };
+}
+
+async function fetchCtDiscovery(host: string): Promise<CtDiscoveryInfo> {
+  const queriedDomain = toDiscoveryDomain(host);
+  const sourceUrl = `https://crt.sh/?q=%25.${queriedDomain}&output=json`;
+
+  try {
+    const response = await requestJson(new URL(sourceUrl));
+    const rows = Array.isArray(response.json) ? response.json : [];
+    const rawNames = rows.flatMap((entry) =>
+      String(entry?.name_value || "")
+        .split(/\r?\n/)
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const wildcardEntries = unique(
+      rawNames
+        .filter((value) => value.startsWith("*."))
+        .map((value) => value.slice(2))
+        .filter((value) => value === queriedDomain || value.endsWith(`.${queriedDomain}`)),
+    ).slice(0, CT_WILDCARD_LIMIT);
+    const subdomains = unique(
+      rawNames.filter((value) => !value.startsWith("*.") && value !== queriedDomain && value.endsWith(`.${queriedDomain}`)),
+    ).slice(0, CT_SUBDOMAIN_LIMIT);
+
+    return {
+      queriedDomain,
+      sourceUrl,
+      subdomains,
+      wildcardEntries,
+      issues: subdomains.length
+        ? []
+        : ["Certificate transparency search did not return any distinct subdomains for this domain."],
+      strengths: subdomains.length
+        ? [`Certificate transparency surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} without touching the target.`]
+        : [],
+    };
+  } catch (error) {
+    return {
+      queriedDomain,
+      sourceUrl,
+      subdomains: [],
+      wildcardEntries: [],
+      issues: [error instanceof Error ? `Certificate transparency lookup failed: ${error.message}` : "Certificate transparency lookup failed."],
+      strengths: [],
+    };
+  }
+}
+
+const IDENTITY_PROVIDER_PATTERNS = [
+  { provider: "Microsoft Entra ID", pattern: /(^|\.)login\.microsoftonline\.com$/i },
+  { provider: "Okta", pattern: /(^|\.)okta(?:-emea)?\.com$/i },
+  { provider: "Auth0", pattern: /(^|\.)auth0\.com$/i },
+  { provider: "Ping Identity", pattern: /(^|\.)ping(?:one|identity)\.com$/i },
+  { provider: "OneLogin", pattern: /(^|\.)onelogin\.com$/i },
+  { provider: "Amazon Cognito", pattern: /amazoncognito\.com$/i },
+  { provider: "Google Identity", pattern: /(^|\.)accounts\.google\.com$/i },
+  { provider: "Keycloak", pattern: /keycloak/i },
+];
+
+function detectIdentityProviderName(candidates: string[]) {
+  for (const candidate of candidates) {
+    for (const entry of IDENTITY_PROVIDER_PATTERNS) {
+      if (entry.pattern.test(candidate)) {
+        return entry.provider;
+      }
+    }
+  }
+  return null;
+}
+
+function collectRedirectUriSignals(html: string, finalUrl: URL) {
+  const signals = [];
+  const matches = [
+    ...html.matchAll(/(?:redirect_uri|post_logout_redirect_uri)=([^"'`\s<>()&]+)/gi),
+  ];
+
+  for (const match of matches) {
+    try {
+      const decoded = decodeURIComponent(match[1]);
+      const redirectUrl = new URL(decoded, finalUrl);
+      if (redirectUrl.protocol === "http:" || redirectUrl.hostname === "localhost" || redirectUrl.hostname.endsWith(".localhost")) {
+        signals.push(redirectUrl.toString());
+      } else if (redirectUrl.origin !== finalUrl.origin) {
+        signals.push(redirectUrl.toString());
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return unique(signals).slice(0, SUMMARY_EVIDENCE_LIMIT);
+}
+
+function deriveOpenIdCandidates(finalUrl: URL, redirects: AnalysisResult["redirects"], htmlSecurity: HtmlSecurityInfo) {
+  const candidates = [new URL("/.well-known/openid-configuration", finalUrl.origin).toString()];
+  if (/login\.microsoftonline\.com$/i.test(finalUrl.hostname)) {
+    candidates.push(new URL("/common/v2.0/.well-known/openid-configuration", finalUrl.origin).toString());
+  }
+  const loginPaths = [
+    ...redirects.map((hop) => hop.location).filter(Boolean),
+    ...htmlSecurity.firstPartyPaths.filter((path) => /login|signin|oauth|authorize|sso|auth/i.test(path)),
+  ];
+
+  for (const value of loginPaths) {
+    try {
+      const resolved = new URL(value, finalUrl);
+      const pathname = resolved.pathname;
+      if (/\/oauth2\/[^/]+\/v1\/authorize/i.test(pathname)) {
+        const issuerPath = pathname.replace(/\/v1\/authorize.*$/i, "");
+        candidates.push(new URL(`${issuerPath}/.well-known/openid-configuration`, resolved.origin).toString());
+      } else if (/\/authorize/i.test(pathname)) {
+        const issuerPath = pathname.replace(/\/authorize.*$/i, "");
+        candidates.push(new URL(`${issuerPath}/.well-known/openid-configuration`, resolved.origin).toString());
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return unique(candidates);
+}
+
+async function analyzeIdentityProvider(
+  finalUrl: URL,
+  redirects: AnalysisResult["redirects"],
+  htmlSecurity: HtmlSecurityInfo,
+  html: string | null,
+): Promise<IdentityProviderInfo> {
+  const redirectOrigins = unique(
+    redirects
+      .map((hop) => hop.location)
+      .filter(Boolean)
+      .map((location) => {
+        try {
+          return new URL(location as string, finalUrl).origin;
+        } catch {
+          return null;
+        }
+      }),
+  );
+  const redirectHosts = redirectOrigins.map((origin) => new URL(origin).hostname);
+  const loginPaths = unique(
+    htmlSecurity.firstPartyPaths.filter((path) => /login|signin|oauth|authorize|sso|auth/i.test(path)),
+  ).slice(0, DISCOVERY_PATH_LIMIT);
+  const provider = detectIdentityProviderName([
+    finalUrl.hostname,
+    ...redirectHosts,
+    ...htmlSecurity.externalScriptDomains,
+    ...htmlSecurity.externalStylesheetDomains,
+    ...htmlSecurity.aiSurface.discoveredPaths,
+  ]);
+  const redirectUriSignals = html ? collectRedirectUriSignals(html, finalUrl) : [];
+
+  let openIdConfigurationUrl: string | null = null;
+  let issuer: string | null = null;
+  let authorizationEndpoint: string | null = null;
+  let tokenEndpoint: string | null = null;
+  let endSessionEndpoint: string | null = null;
+  const strengths: string[] = [];
+  const issues: string[] = [];
+
+  for (const candidate of deriveOpenIdCandidates(finalUrl, redirects, htmlSecurity)) {
+    try {
+      const response = await requestJson(new URL(candidate));
+      if (response.statusCode >= 200 && response.statusCode < 300 && response.json) {
+        openIdConfigurationUrl = candidate;
+        issuer = response.json.issuer || null;
+        authorizationEndpoint = response.json.authorization_endpoint || null;
+        tokenEndpoint = response.json.token_endpoint || null;
+        endSessionEndpoint = response.json.end_session_endpoint || response.json.revocation_endpoint || null;
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (provider) {
+    strengths.push(`Identity provider signals point to ${provider}.`);
+  }
+  if (openIdConfigurationUrl) {
+    strengths.push("An OpenID Connect configuration endpoint is publicly exposed.");
+  }
+  if (redirectOrigins.some((origin) => origin !== finalUrl.origin)) {
+    strengths.push("Authentication redirects point to a dedicated identity origin.");
+  }
+  if (redirectUriSignals.length) {
+    issues.push("Public markup exposed OAuth redirect_uri-style parameters worth review.");
+  }
+  if (!provider && !openIdConfigurationUrl && !loginPaths.length && !redirectOrigins.length) {
+    strengths.push("No obvious public IdP or OAuth surface was detected from passive signals.");
+  }
+
+  return {
+    detected: Boolean(provider || openIdConfigurationUrl || redirectOrigins.length || loginPaths.length),
+    provider,
+    redirectOrigins,
+    loginPaths,
+    openIdConfigurationUrl,
+    issuer,
+    authorizationEndpoint,
+    tokenEndpoint,
+    endSessionEndpoint,
+    redirectUriSignals,
+    issues,
+    strengths,
+  };
+}
+
 async function analyzeUrlCore(input: string | URL, options: AnalyzeTargetOptions = {}) {
   const { includeCertificate = true } = options;
   let normalizedUrl = input instanceof URL ? input : normalizeUrl(input);
@@ -2973,6 +3292,10 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
   const publicSignals = await fetchPublicSignals(result.host);
   const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
+  const [identityProvider, ctDiscovery] = await Promise.all([
+    analyzeIdentityProvider(finalUrl, result.redirects, htmlSecurity, htmlDocument?.html || null),
+    fetchCtDiscovery(result.host),
+  ]);
 
   const enrichedResult = {
     ...result,
@@ -2980,6 +3303,8 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     crawl: await crawlRelatedPages(result, discovery),
     securityTxt: await fetchSecurityTxt(finalUrl),
     domainSecurity: await analyzeDomainSecurity(result.host),
+    identityProvider,
+    ctDiscovery,
     htmlSecurity,
     aiSurface: htmlSecurity.aiSurface,
     thirdPartyTrust,
