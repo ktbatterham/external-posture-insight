@@ -42,6 +42,31 @@ const buildCtLines = (analysis: AnalysisResult) =>
     ? analysis.ctDiscovery.subdomains.map((host) => `- ${host}`)
     : ["- No CT-discovered subdomains recorded."];
 
+const buildThemeMarkdownLines = (
+  labelPrefix: "OWASP" | "MITRE",
+  themes: Array<{ label: string; count: number; summary: string; whyItMatters: string; examples: string[] }>,
+) =>
+  themes.length
+    ? themes.flatMap((item) => [
+        `- ${labelPrefix}: ${item.label} (${item.count})`,
+        `  Summary: ${item.summary}`,
+        `  Why it matters: ${item.whyItMatters}`,
+        ...(item.examples.length ? [`  Driving findings: ${item.examples.join("; ")}`] : []),
+      ])
+    : [`- No ${labelPrefix}-aligned themes recorded.`];
+
+const buildThemeHtmlItems = (
+  themes: Array<{ label: string; count: number; summary: string; whyItMatters: string; examples: string[] }>,
+) =>
+  themes.length
+    ? themes
+        .map(
+          (item) =>
+            `<li><strong>${item.label}</strong> (${item.count})<br>${item.summary}<br><em>Why it matters:</em> ${item.whyItMatters}${item.examples.length ? `<br><em>Driving findings:</em> ${item.examples.join("; ")}` : ""}</li>`,
+        )
+        .join("")
+    : "<li>No taxonomy themes recorded.</li>";
+
 export const buildMarkdownReport = (analysis: AnalysisResult) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
@@ -76,8 +101,8 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     "## Risk Themes",
     "",
     `- Summary: ${taxonomy.summary}`,
-    ...(taxonomy.owasp.length ? taxonomy.owasp.map((item) => `- OWASP: ${item.label} (${item.count})`) : ["- No OWASP themes recorded."]),
-    ...(taxonomy.mitre.length ? taxonomy.mitre.map((item) => `- MITRE: ${item.label} (${item.count})`) : ["- No MITRE themes recorded."]),
+    ...buildThemeMarkdownLines("OWASP", taxonomy.owasp),
+    ...buildThemeMarkdownLines("MITRE", taxonomy.mitre),
     "",
     "## Category Scores",
     "",
@@ -251,6 +276,8 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
   const ctItems = buildCtLines(analysis)
     .map((line) => `<li>${line.slice(2)}</li>`)
     .join("");
+  const owaspThemeItems = buildThemeHtmlItems(taxonomy.owasp);
+  const mitreThemeItems = buildThemeHtmlItems(taxonomy.mitre);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -290,10 +317,10 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     <div class="card">
       <h2>Risk Themes</h2>
       <p>${taxonomy.summary}</p>
-      <ul>
-        ${taxonomy.owasp.length ? taxonomy.owasp.map((item) => `<li>OWASP: ${item.label} (${item.count})</li>`).join("") : "<li>No OWASP themes recorded.</li>"}
-        ${taxonomy.mitre.length ? taxonomy.mitre.map((item) => `<li>MITRE: ${item.label} (${item.count})</li>`).join("") : "<li>No MITRE themes recorded.</li>"}
-      </ul>
+      <p><strong>OWASP themes</strong></p>
+      <ul>${owaspThemeItems}</ul>
+      <p><strong>MITRE relevance</strong></p>
+      <ul>${mitreThemeItems}</ul>
     </div>
     <div class="card">
       <h2>Category Scores</h2>
