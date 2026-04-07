@@ -24,12 +24,12 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
         <p className="mt-2 text-lg font-semibold text-slate-950">{identityProvider.provider ?? "No obvious provider"}</p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Redirect origins</p>
-        <p className="mt-2 text-lg font-semibold text-slate-950">{identityProvider.redirectOrigins.length}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Protocol</p>
+        <p className="mt-2 text-lg font-semibold text-slate-950">{identityProvider.protocol ? identityProvider.protocol.toUpperCase() : "Not inferred"}</p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Login paths</p>
-        <p className="mt-2 text-lg font-semibold text-slate-950">{identityProvider.loginPaths.length}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Redirect origins</p>
+        <p className="mt-2 text-lg font-semibold text-slate-950">{identityProvider.redirectOrigins.length}</p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">OIDC config</p>
@@ -47,6 +47,8 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
           <p><span className="font-semibold text-slate-900">Authorization:</span> {identityProvider.authorizationEndpoint ?? "Not discovered"}</p>
           <p><span className="font-semibold text-slate-900">Token:</span> {identityProvider.tokenEndpoint ?? "Not discovered"}</p>
           <p><span className="font-semibold text-slate-900">End session:</span> {identityProvider.endSessionEndpoint ?? "Not discovered"}</p>
+          <p><span className="font-semibold text-slate-900">Tenant brand:</span> {identityProvider.tenantBrand ?? "Not discovered"}</p>
+          <p><span className="font-semibold text-slate-900">Tenant region:</span> {identityProvider.tenantRegion ?? "Not discovered"}</p>
         </div>
       </div>
 
@@ -63,12 +65,42 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               </ul>
             </div>
           )}
+          {identityProvider.authHostCandidates.length > 0 && (
+            <div className="mb-3">
+              <p className="font-semibold text-slate-900">Auth-like hosts</p>
+              <ul className="mt-2 space-y-1">
+                {identityProvider.authHostCandidates.map((host) => (
+                  <li key={host}>{host}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {identityProvider.loginPaths.length > 0 && (
             <div className="mb-3">
               <p className="font-semibold text-slate-900">Login-like paths</p>
               <ul className="mt-2 space-y-1">
                 {identityProvider.loginPaths.map((path) => (
                   <li key={path}>{path}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {identityProvider.wellKnownEndpoints.length > 0 && (
+            <div className="mb-3">
+              <p className="font-semibold text-slate-900">Well-known endpoints</p>
+              <ul className="mt-2 space-y-1 break-all">
+                {identityProvider.wellKnownEndpoints.map((endpoint) => (
+                  <li key={endpoint}>{endpoint}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {identityProvider.tenantSignals.length > 0 && (
+            <div>
+              <p className="font-semibold text-slate-900">Tenant clues</p>
+              <ul className="mt-2 space-y-1">
+                {identityProvider.tenantSignals.map((signal) => (
+                  <li key={signal}>{signal}</li>
                 ))}
               </ul>
             </div>
@@ -84,6 +116,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
             </div>
           )}
           {identityProvider.redirectOrigins.length === 0 &&
+            identityProvider.authHostCandidates.length === 0 &&
             identityProvider.loginPaths.length === 0 &&
             identityProvider.redirectUriSignals.length === 0 && <p>No passive IdP or OAuth discovery artifacts were recorded.</p>}
         </div>

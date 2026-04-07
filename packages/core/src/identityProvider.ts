@@ -1,5 +1,5 @@
 import { URL } from "node:url";
-import type { HtmlSecurityInfo, IdentityProviderInfo, RedirectHop } from "./types.js";
+import type { CtDiscoveryInfo, HtmlSecurityInfo, IdentityProviderInfo, RedirectHop } from "./types.js";
 
 interface JsonResponse<T = unknown> {
   statusCode: number;
@@ -10,6 +10,7 @@ type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => 
 
 const DISCOVERY_PATH_LIMIT = 10;
 const SUMMARY_EVIDENCE_LIMIT = 3;
+const AUTH_HOST_LIMIT = 5;
 
 const unique = <T>(values: Array<T | null | undefined | false>): T[] =>
   [...new Set(values.filter((value): value is T => Boolean(value)))];
@@ -32,6 +33,29 @@ const detectIdentityProviderName = (candidates: string[]) => {
         return entry.provider;
       }
     }
+  }
+  return null;
+};
+
+const inferProtocol = ({
+  openIdConfigurationUrl,
+  authorizationEndpoint,
+  tokenEndpoint,
+  redirectOrigins,
+}: {
+  openIdConfigurationUrl: string | null;
+  authorizationEndpoint: string | null;
+  tokenEndpoint: string | null;
+  redirectOrigins: string[];
+}): IdentityProviderInfo["protocol"] => {
+  if (openIdConfigurationUrl || authorizationEndpoint || tokenEndpoint) {
+    return "oidc";
+  }
+  if (redirectOrigins.some((origin) => /saml|adfs/i.test(origin))) {
+    return "saml";
+  }
+  if (redirectOrigins.length) {
+    return "oauth";
   }
   return null;
 };
@@ -60,10 +84,20 @@ const collectRedirectUriSignals = (html: string, finalUrl: URL) => {
   return unique(signals).slice(0, SUMMARY_EVIDENCE_LIMIT);
 };
 
-const deriveOpenIdCandidates = (finalUrl: URL, redirects: RedirectHop[], htmlSecurity: HtmlSecurityInfo) => {
+const deriveOpenIdCandidates = (
+  finalUrl: URL,
+  redirects: RedirectHop[],
+  htmlSecurity: HtmlSecurityInfo,
+  authHostCandidates: string[],
+) => {
   const candidates = [new URL("/.well-known/openid-configuration", finalUrl.origin).toString()];
   if (/login\.microsoftonline\.com$/i.test(finalUrl.hostname)) {
     candidates.push(new URL("/common/v2.0/.well-known/openid-configuration", finalUrl.origin).toString());
+  }
+  for (const host of authHostCandidates) {
+    if (host !== finalUrl.hostname) {
+      candidates.push(new URL("/.well-known/openid-configuration", `https://${host}`).toString());
+    }
   }
 
   const loginPaths = [
@@ -92,12 +126,73 @@ const deriveOpenIdCandidates = (finalUrl: URL, redirects: RedirectHop[], htmlSec
   return unique(candidates);
 };
 
+const deriveAuthHostCandidates = (
+  finalUrl: URL,
+  redirects: RedirectHop[],
+  htmlSecurity: HtmlSecurityInfo,
+  ctDiscovery?: CtDiscoveryInfo,
+) =>
+  unique([
+    finalUrl.hostname,
+    ...redirects
+      .map((hop) => hop.location)
+      .filter((location): location is string => Boolean(location))
+      .map((location) => {
+        try {
+          return new URL(location, finalUrl).hostname;
+        } catch {
+          return null;
+        }
+      }),
+    ...htmlSecurity.externalScriptDomains.filter(
+      (hostname) =>
+        /auth|login|okta|auth0|onelogin|microsoftonline|ping|cognito/i.test(hostname) ||
+        /(^|\.)accounts\.google\.com$/i.test(hostname),
+    ),
+    ...htmlSecurity.firstPartyPaths
+      .filter((path) => /login|signin|oauth|authorize|sso|auth/i.test(path))
+      .map((path) => {
+        try {
+          return new URL(path, finalUrl).hostname;
+        } catch {
+          return null;
+        }
+      }),
+    ...(ctDiscovery?.prioritizedHosts || [])
+      .filter((entry) => entry.category === "auth" || entry.priority === "high")
+      .map((entry) => entry.host),
+  ]).slice(0, AUTH_HOST_LIMIT);
+
+const extractTenantSignals = (provider: string | null, issuer: string | null, metadata: Record<string, string | undefined> | null) => {
+  if (provider !== "Microsoft Entra ID") {
+    return {
+      tenantBrand: null,
+      tenantRegion: null,
+      tenantSignals: [] as string[],
+    };
+  }
+
+  const signals = unique([
+    issuer && /\/[0-9a-f-]{36}\//i.test(issuer) ? "Issuer exposes a tenant-specific GUID." : null,
+    metadata?.tenant_region_scope ? `Tenant region scope: ${metadata.tenant_region_scope}` : null,
+    metadata?.cloud_instance_name ? `Cloud instance: ${metadata.cloud_instance_name}` : null,
+    metadata?.tenant_region_sub_scope ? `Tenant region sub-scope: ${metadata.tenant_region_sub_scope}` : null,
+  ]);
+
+  return {
+    tenantBrand: metadata?.cloud_instance_name || "Microsoft Entra ID",
+    tenantRegion: metadata?.tenant_region_scope || metadata?.tenant_region_sub_scope || null,
+    tenantSignals: signals,
+  };
+};
+
 export const analyzeIdentityProvider = async (
   finalUrl: URL,
   redirects: RedirectHop[],
   htmlSecurity: HtmlSecurityInfo,
   html: string | null,
   requestJson: RequestJsonFn,
+  ctDiscovery?: CtDiscoveryInfo,
 ): Promise<IdentityProviderInfo> => {
   const redirectOrigins = unique(
     redirects
@@ -115,9 +210,11 @@ export const analyzeIdentityProvider = async (
   const loginPaths = unique(
     htmlSecurity.firstPartyPaths.filter((path) => /login|signin|oauth|authorize|sso|auth/i.test(path)),
   ).slice(0, DISCOVERY_PATH_LIMIT);
+  const authHostCandidates = deriveAuthHostCandidates(finalUrl, redirects, htmlSecurity, ctDiscovery);
   const provider = detectIdentityProviderName([
     finalUrl.hostname,
     ...redirectHosts,
+    ...authHostCandidates,
     ...htmlSecurity.externalScriptDomains,
     ...htmlSecurity.externalStylesheetDomains,
     ...htmlSecurity.aiSurface.discoveredPaths,
@@ -129,15 +226,19 @@ export const analyzeIdentityProvider = async (
   let authorizationEndpoint: string | null = null;
   let tokenEndpoint: string | null = null;
   let endSessionEndpoint: string | null = null;
+  let metadataSnapshot: Record<string, string | undefined> | null = null;
   const strengths: string[] = [];
   const issues: string[] = [];
+  const wellKnownEndpoints: string[] = [];
 
-  for (const candidate of deriveOpenIdCandidates(finalUrl, redirects, htmlSecurity)) {
+  for (const candidate of deriveOpenIdCandidates(finalUrl, redirects, htmlSecurity, authHostCandidates)) {
     try {
       const response = await requestJson(new URL(candidate));
       if (response.statusCode >= 200 && response.statusCode < 300 && response.json) {
         const metadata = response.json as Record<string, string | undefined>;
+        metadataSnapshot = metadata;
         openIdConfigurationUrl = candidate;
+        wellKnownEndpoints.push(candidate);
         issuer = metadata.issuer || null;
         authorizationEndpoint = metadata.authorization_endpoint || null;
         tokenEndpoint = metadata.token_endpoint || null;
@@ -149,14 +250,34 @@ export const analyzeIdentityProvider = async (
     }
   }
 
+  const protocol = inferProtocol({
+    openIdConfigurationUrl,
+    authorizationEndpoint,
+    tokenEndpoint,
+    redirectOrigins,
+  });
+  const { tenantBrand, tenantRegion, tenantSignals } = extractTenantSignals(provider, issuer, metadataSnapshot);
+
   if (provider) {
     strengths.push(`Identity provider signals point to ${provider}.`);
   }
   if (openIdConfigurationUrl) {
     strengths.push("An OpenID Connect configuration endpoint is publicly exposed.");
   }
+  if (protocol) {
+    strengths.push(`Passive evidence suggests a ${protocol.toUpperCase()}-style identity flow.`);
+  }
   if (redirectOrigins.some((origin) => origin !== finalUrl.origin)) {
     strengths.push("Authentication redirects point to a dedicated identity origin.");
+  }
+  if (loginPaths.length) {
+    strengths.push(`Passive discovery surfaced ${loginPaths.length} login-like path${loginPaths.length === 1 ? "" : "s"} on the scanned origin.`);
+  }
+  if (authHostCandidates.some((hostname) => hostname !== finalUrl.hostname)) {
+    strengths.push("Separate auth-like hosts were passively observed alongside the main application origin.");
+  }
+  if (tenantSignals.length) {
+    strengths.push("Passive tenant-level Entra metadata was visible.");
   }
   if (redirectUriSignals.length) {
     issues.push("Public markup exposed OAuth redirect_uri-style parameters worth review.");
@@ -168,14 +289,20 @@ export const analyzeIdentityProvider = async (
   return {
     detected: Boolean(provider || openIdConfigurationUrl || redirectOrigins.length || loginPaths.length),
     provider,
+    protocol,
     redirectOrigins,
+    authHostCandidates,
     loginPaths,
     openIdConfigurationUrl,
+    wellKnownEndpoints,
     issuer,
     authorizationEndpoint,
     tokenEndpoint,
     endSessionEndpoint,
     redirectUriSignals,
+    tenantBrand,
+    tenantRegion,
+    tenantSignals,
     issues,
     strengths,
   };

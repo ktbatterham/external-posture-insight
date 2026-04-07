@@ -1,9 +1,10 @@
-import type { CtDiscoveryInfo } from "./types.js";
+import type { CtDiscoveryInfo, CtDiscoveredHost, CtHostObservation } from "./types.js";
 
 const CT_SUBDOMAIN_LIMIT = 20;
 const CT_WILDCARD_LIMIT = 5;
 const CT_LOOKUP_TIMEOUT_MS = 1_500;
 const CT_CACHE_TTL_MS = 15 * 60 * 1000;
+const CT_SAMPLE_LIMIT = 4;
 
 interface CtCacheEntry {
   expiresAt: number;
@@ -15,7 +16,14 @@ interface JsonResponse<T = unknown> {
   json: T | null;
 }
 
+interface TextResponse {
+  statusCode: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: string;
+}
+
 type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => Promise<JsonResponse>;
+type RequestTextFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => Promise<TextResponse>;
 
 const ctCache = new Map<string, CtCacheEntry>();
 
@@ -56,7 +64,241 @@ const toDiscoveryDomain = (host: string) => {
   return labels.slice(-2).join(".");
 };
 
-export const fetchCtDiscovery = async (host: string, requestJson: RequestJsonFn): Promise<CtDiscoveryInfo> => {
+const headerValue = (headers: Record<string, string | string[] | undefined>, name: string) => {
+  const value = headers[name];
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+  return value ?? null;
+};
+
+const IDENTITY_PROVIDER_PATTERNS = [
+  { provider: "Microsoft Entra ID", pattern: /(^|\.)login\.microsoftonline\.com$/i },
+  { provider: "Okta", pattern: /(^|\.)okta(?:-emea)?\.com$/i },
+  { provider: "Auth0", pattern: /(^|\.)auth0\.com$/i },
+  { provider: "Ping Identity", pattern: /(^|\.)ping(?:one|identity)\.com$/i },
+  { provider: "OneLogin", pattern: /(^|\.)onelogin\.com$/i },
+  { provider: "Amazon Cognito", pattern: /amazoncognito\.com$/i },
+  { provider: "Google Identity", pattern: /(^|\.)accounts\.google\.com$/i },
+  { provider: "Keycloak", pattern: /keycloak/i },
+];
+
+const WAF_PATTERNS = [
+  { name: "Cloudflare", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(headerValue(headers, "cf-ray") || /cloudflare/i.test(headerValue(headers, "server") || "") || /attention required|cloudflare/i.test(body)) },
+  { name: "Akamai", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(headerValue(headers, "x-akamai-transformed") || headerValue(headers, "akamai-cache-status") || /akamai/i.test(headerValue(headers, "server") || "") || /reference #\d+\.[a-z0-9.]+\.akamai/i.test(body)) },
+  { name: "Imperva", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(/imperva|incapsula/i.test(headerValue(headers, "server") || "") || headerValue(headers, "x-iinfo") || /incapsula incident id|imperva/i.test(body)) },
+  { name: "Sucuri", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(headerValue(headers, "x-sucuri-id") || headerValue(headers, "x-sucuri-cache") || /sucuri/i.test(headerValue(headers, "server") || "") || /sucuri website firewall/i.test(body)) },
+  { name: "Fastly", test: (headers: Record<string, string | string[] | undefined>) => Boolean((headerValue(headers, "x-served-by") || "").toLowerCase().includes("cache-") || (headerValue(headers, "x-cache") || "").toLowerCase().includes("fastly")) },
+  { name: "AWS WAF / CloudFront", test: (headers: Record<string, string | string[] | undefined>) => Boolean(headerValue(headers, "x-amz-cf-id") || /cloudfront/i.test(headerValue(headers, "server") || "")) },
+];
+
+const categorizeHost = (host: string): CtDiscoveredHost["category"] => {
+  if (/^(?:auth|login|sso|signin|id|identity|oauth|accounts?)\./i.test(host) || /(?:^|\.)(?:auth|login|sso|signin|id|identity|oauth|accounts?)(?:[.-]|$)/i.test(host)) {
+    return "auth";
+  }
+  if (/(^|\.)(?:api|graphql|rpc|gateway)(?:[.-]|$)/i.test(host)) {
+    return "api";
+  }
+  if (/(^|\.)(?:admin|manage|console|portal)(?:[.-]|$)/i.test(host)) {
+    return "admin";
+  }
+  if (/(^|\.)(?:app|www2?|dashboard|client|members?)(?:[.-]|$)/i.test(host)) {
+    return "app";
+  }
+  if (/(^|\.)(?:cdn|assets?|static|media|img|images?)(?:[.-]|$)/i.test(host)) {
+    return "static";
+  }
+  if (/(^|\.)(?:edge|cache|waf|shield)(?:[.-]|$)/i.test(host)) {
+    return "cdn";
+  }
+  return "other";
+};
+
+const priorityForCategory = (category: CtDiscoveredHost["category"]): CtDiscoveredHost["priority"] => {
+  if (category === "auth" || category === "admin" || category === "api") {
+    return "high";
+  }
+  if (category === "app" || category === "cdn") {
+    return "medium";
+  }
+  return "low";
+};
+
+const evidenceForCategory = (category: CtDiscoveredHost["category"]) => {
+  switch (category) {
+    case "auth":
+      return "Hostname suggests identity or SSO surface.";
+    case "api":
+      return "Hostname suggests a public API or gateway surface.";
+    case "admin":
+      return "Hostname suggests administration or management surface.";
+    case "app":
+      return "Hostname suggests an application or customer-facing surface.";
+    case "cdn":
+      return "Hostname suggests edge delivery or protection infrastructure.";
+    case "static":
+      return "Hostname suggests static asset delivery.";
+    default:
+      return "Hostname was surfaced by CT logs without a stronger passive category match.";
+  }
+};
+
+const rankHosts = (hosts: string[]): CtDiscoveredHost[] =>
+  hosts
+    .map((host) => {
+      const category = categorizeHost(host);
+      return {
+        host,
+        category,
+        priority: priorityForCategory(category),
+        evidence: evidenceForCategory(category),
+      };
+    })
+    .sort((left, right) => {
+      const priorityWeight = { high: 0, medium: 1, low: 2 };
+      const categoryWeight = { auth: 0, admin: 1, api: 2, app: 3, cdn: 4, static: 5, other: 6 };
+      return (
+        priorityWeight[left.priority] - priorityWeight[right.priority] ||
+        categoryWeight[left.category] - categoryWeight[right.category] ||
+        left.host.localeCompare(right.host)
+      );
+    });
+
+const detectIdentityProvider = (values: string[]) => {
+  for (const value of values) {
+    for (const entry of IDENTITY_PROVIDER_PATTERNS) {
+      if (entry.pattern.test(value)) {
+        return entry.provider;
+      }
+    }
+  }
+  return null;
+};
+
+const detectEdgeProvider = (headers: Record<string, string | string[] | undefined>, body: string) => {
+  for (const entry of WAF_PATTERNS) {
+    if (entry.test(headers, body)) {
+      return entry.name;
+    }
+  }
+  const server = headerValue(headers, "server");
+  if (server && /(proxy|gateway|edge|gtm|belfrage|varnish)/i.test(server)) {
+    return server;
+  }
+  return null;
+};
+
+const classifyResponseKind = (statusCode: number, headers: Record<string, string | string[] | undefined>, body: string): CtHostObservation["responseKind"] => {
+  if ([301, 302, 303, 307, 308].includes(statusCode)) {
+    return "redirect";
+  }
+  const contentType = (headerValue(headers, "content-type") || "").toLowerCase();
+  if (contentType.includes("text/html") || /<html[\s>]|<!doctype html/i.test(body)) {
+    return "html";
+  }
+  if (contentType.includes("application/json") || /^\s*[{[]/.test(body)) {
+    return "json";
+  }
+  if (contentType) {
+    return "other";
+  }
+  return "unknown";
+};
+
+const summarizeObservationNote = (
+  statusCode: number,
+  responseKind: CtHostObservation["responseKind"],
+  location: string | null,
+  identityProvider: string | null,
+  edgeProvider: string | null,
+) => {
+  if (location && identityProvider) {
+    return `Redirects toward ${identityProvider} identity infrastructure.`;
+  }
+  if (location) {
+    return `Responded with a redirect to ${location}.`;
+  }
+  if (identityProvider) {
+    return `Returned content with ${identityProvider} identity signals.`;
+  }
+  if (edgeProvider) {
+    return `Returned through ${edgeProvider}.`;
+  }
+  if (statusCode >= 200 && statusCode < 300) {
+    return `Responded normally with ${responseKind} content.`;
+  }
+  if (statusCode === 401 || statusCode === 403) {
+    return "Host exists but is access controlled.";
+  }
+  if (statusCode === 404) {
+    return "Host resolved but did not expose a default page.";
+  }
+  return `Observed HTTP ${statusCode}.`;
+};
+
+const observeSampledHosts = async (
+  prioritizedHosts: CtDiscoveredHost[],
+  requestText: RequestTextFn,
+): Promise<CtHostObservation[]> => {
+  const samples = prioritizedHosts.slice(0, CT_SAMPLE_LIMIT);
+  const observations = await Promise.all(
+    samples.map(async (hostInfo) => {
+      const target = new URL(`https://${hostInfo.host}/`);
+
+      try {
+        const response = await withTimeout(
+          requestText(target),
+          CT_LOOKUP_TIMEOUT_MS,
+          "CT sample request timed out.",
+        );
+        const location = headerValue(response.headers, "location");
+        const redirectTarget = location ? new URL(location, target).hostname : null;
+        const identityProvider = detectIdentityProvider([
+          hostInfo.host,
+          redirectTarget,
+          response.body,
+          location,
+        ].filter((value): value is string => Boolean(value)));
+        const edgeProvider = detectEdgeProvider(response.headers, response.body);
+        const responseKind = classifyResponseKind(response.statusCode, response.headers, response.body);
+
+        return {
+          host: hostInfo.host,
+          category: hostInfo.category,
+          priority: hostInfo.priority,
+          reachable: true,
+          finalUrl: target.toString(),
+          statusCode: response.statusCode,
+          responseKind,
+          identityProvider,
+          edgeProvider,
+          note: summarizeObservationNote(response.statusCode, responseKind, location, identityProvider, edgeProvider),
+        } satisfies CtHostObservation;
+      } catch (error) {
+        return {
+          host: hostInfo.host,
+          category: hostInfo.category,
+          priority: hostInfo.priority,
+          reachable: false,
+          finalUrl: target.toString(),
+          statusCode: 0,
+          responseKind: "unknown",
+          identityProvider: null,
+          edgeProvider: null,
+          note: error instanceof Error ? error.message : "CT sample request failed.",
+        } satisfies CtHostObservation;
+      }
+    }),
+  );
+
+  return observations;
+};
+
+export const fetchCtDiscovery = async (
+  host: string,
+  requestJson: RequestJsonFn,
+  requestText: RequestTextFn,
+): Promise<CtDiscoveryInfo> => {
   const queriedDomain = toDiscoveryDomain(host);
   const cached = ctCache.get(queriedDomain);
   if (cached && cached.expiresAt > Date.now()) {
@@ -89,17 +331,41 @@ export const fetchCtDiscovery = async (host: string, requestJson: RequestJsonFn)
       rawNames.filter((value) => !value.startsWith("*.") && value !== queriedDomain && value.endsWith(`.${queriedDomain}`)),
     ).slice(0, CT_SUBDOMAIN_LIMIT);
 
+    const prioritizedHosts = rankHosts(subdomains);
+    const sampledHosts = await observeSampledHosts(prioritizedHosts, requestText);
+    const authCount = prioritizedHosts.filter((entry) => entry.category === "auth").length;
+    const edgeHits = sampledHosts.filter((entry) => entry.edgeProvider).length;
+    const coverageSummary = subdomains.length
+      ? `CT logs surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} for ${queriedDomain}; ${prioritizedHosts.filter((entry) => entry.priority === "high").length} look high-priority and ${sampledHosts.length} were lightly sampled.`
+      : `CT logs did not surface distinct subdomains for ${queriedDomain}.`;
+
     const value: CtDiscoveryInfo = {
       queriedDomain,
       sourceUrl,
       subdomains,
       wildcardEntries,
-      issues: subdomains.length
-        ? []
-        : ["Certificate transparency search did not return any distinct subdomains for this domain."],
-      strengths: subdomains.length
-        ? [`Certificate transparency surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} without touching the target.`]
-        : [],
+      prioritizedHosts,
+      sampledHosts,
+      coverageSummary,
+      issues: [
+        ...(subdomains.length
+          ? []
+          : ["Certificate transparency search did not return any distinct subdomains for this domain."]),
+        ...(authCount
+          ? [`CT logs surfaced ${authCount} auth- or login-like host${authCount === 1 ? "" : "s"} worth reviewing.`]
+          : []),
+      ],
+      strengths: [
+        ...(subdomains.length
+          ? [`Certificate transparency surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} without touching the target.`]
+          : []),
+        ...(sampledHosts.length
+          ? [`Best-effort coverage sampled ${sampledHosts.length} discovered host${sampledHosts.length === 1 ? "" : "s"} to estimate exposed footprint.`]
+          : []),
+        ...(edgeHits
+          ? [`${edgeHits} sampled host${edgeHits === 1 ? "" : "s"} showed edge or protection-provider signals.`]
+          : []),
+      ],
     };
 
     ctCache.set(queriedDomain, {
@@ -114,6 +380,9 @@ export const fetchCtDiscovery = async (host: string, requestJson: RequestJsonFn)
       sourceUrl,
       subdomains: [],
       wildcardEntries: [],
+      prioritizedHosts: [],
+      sampledHosts: [],
+      coverageSummary: `CT discovery could not be completed for ${queriedDomain}.`,
       issues: [error instanceof Error ? `Certificate transparency lookup failed: ${error.message}` : "Certificate transparency lookup failed."],
       strengths: [],
     };

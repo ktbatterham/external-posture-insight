@@ -20,6 +20,7 @@ import {
   analyzeExposure,
   fetchPublicSignals,
 } from "./surfaceEnrichment.js";
+import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type {
   AnalysisResult,
   AnalyzeTargetOptions,
@@ -2225,7 +2226,7 @@ async function crawlRelatedPages(rootResult, discovery) {
 export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   const result = await analyzeUrlCore(input, { includeCertificate: true });
   const finalUrl = new URL(result.finalUrl);
-  const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson);
+  const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson, requestText);
   let htmlDocument = null;
   try {
     htmlDocument = await fetchHtmlDocument(finalUrl);
@@ -2236,14 +2237,21 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
   const publicSignals = await fetchPublicSignals(result.host, { requestText });
   const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
+  const ctDiscovery = await ctDiscoveryPromise;
   const identityProvider = await analyzeIdentityProvider(
     finalUrl,
     result.redirects,
     htmlSecurity,
     htmlDocument?.html || null,
     requestJson,
+    ctDiscovery,
   );
-  const ctDiscovery = await ctDiscoveryPromise;
+  const wafFingerprint = analyzeWafFingerprint(
+    finalUrl,
+    result.rawHeaders,
+    htmlDocument?.html || null,
+    result.redirects,
+  );
 
   const enrichedResult = {
     ...result,
@@ -2256,6 +2264,7 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     htmlSecurity,
     aiSurface: htmlSecurity.aiSurface,
     thirdPartyTrust,
+    wafFingerprint,
     exposure: await analyzeExposure(finalUrl, {
       exposureProbes: EXPOSURE_PROBES,
       requestOnce,

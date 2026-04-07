@@ -18,6 +18,8 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => (
       </div>
     </div>
 
+    <p className="mt-4 text-sm leading-6 text-slate-600">{ctDiscovery.coverageSummary}</p>
+
     <div className="mt-6 grid gap-4 md:grid-cols-3">
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Queried domain</p>
@@ -61,6 +63,56 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => (
           <p className="mt-3 text-sm text-slate-600">No wildcard certificate entries were surfaced.</p>
         )}
         <p className="mt-4 text-xs text-slate-500">Source: {ctDiscovery.sourceUrl}</p>
+      </div>
+    </div>
+
+    <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Prioritized hosts</h3>
+        {ctDiscovery.prioritizedHosts.length > 0 ? (
+          <ul className="mt-3 space-y-3 text-sm text-slate-700">
+            {ctDiscovery.prioritizedHosts.slice(0, 8).map((host) => (
+              <li key={host.host} className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-900">{host.host}</span>
+                  <span className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                    {host.priority} {host.category}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{host.evidence}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">No high-signal host categories were derived from CT results.</p>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Sampled coverage</h3>
+        {ctDiscovery.sampledHosts.length > 0 ? (
+          <ul className="mt-3 space-y-3 text-sm text-slate-700">
+            {ctDiscovery.sampledHosts.map((host) => (
+              <li key={host.host} className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-slate-900">{host.host}</span>
+                  <span className="text-xs uppercase tracking-[0.12em] text-slate-500">
+                    {host.reachable ? `${host.statusCode} ${host.responseKind}` : "unreachable"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{host.note}</p>
+                {(host.identityProvider || host.edgeProvider) && (
+                  <p className="mt-2 text-xs text-slate-600">
+                    {host.identityProvider ? `IdP: ${host.identityProvider}` : "IdP: none"}
+                    {host.edgeProvider ? ` | Edge: ${host.edgeProvider}` : ""}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">No best-effort CT host sampling was recorded.</p>
+        )}
       </div>
     </div>
 

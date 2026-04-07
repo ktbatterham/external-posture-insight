@@ -33,6 +33,7 @@ import { TechnologyStack } from "@/components/TechnologyStack";
 import { TaxonomySummaryPanel } from "@/components/TaxonomySummaryPanel";
 import { ThirdPartyTrustPanel } from "@/components/ThirdPartyTrustPanel";
 import { UrlForm } from "@/components/UrlForm";
+import { WafFingerprintPanel } from "@/components/WafFingerprintPanel";
 import { AuthSurfacePanel } from "@/components/AuthSurfacePanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -773,9 +774,10 @@ const Index = () => {
               <DisclosureTrustPanel analysis={analysisData} />
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-2">
+            <div className="grid gap-8 xl:grid-cols-3">
               <IdentityProviderPanel identityProvider={analysisData.identityProvider} />
               <CtDiscoveryPanel ctDiscovery={analysisData.ctDiscovery} />
+              <WafFingerprintPanel wafFingerprint={analysisData.wafFingerprint} />
             </div>
 
             <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />

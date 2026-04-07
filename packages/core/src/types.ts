@@ -171,16 +171,42 @@ export interface DomainSecurityInfo {
 export interface IdentityProviderInfo {
   detected: boolean;
   provider: string | null;
+  protocol: "oidc" | "oauth" | "saml" | "mixed" | "unknown" | null;
   redirectOrigins: string[];
+  authHostCandidates: string[];
   loginPaths: string[];
   openIdConfigurationUrl: string | null;
+  wellKnownEndpoints: string[];
   issuer: string | null;
   authorizationEndpoint: string | null;
   tokenEndpoint: string | null;
   endSessionEndpoint: string | null;
   redirectUriSignals: string[];
+  tenantBrand: string | null;
+  tenantRegion: string | null;
+  tenantSignals: string[];
   issues: string[];
   strengths: string[];
+}
+
+export interface CtDiscoveredHost {
+  host: string;
+  category: "auth" | "app" | "api" | "admin" | "cdn" | "static" | "other";
+  priority: "high" | "medium" | "low";
+  evidence: string;
+}
+
+export interface CtHostObservation {
+  host: string;
+  category: CtDiscoveredHost["category"];
+  priority: CtDiscoveredHost["priority"];
+  reachable: boolean;
+  finalUrl: string | null;
+  statusCode: number;
+  responseKind: "html" | "json" | "redirect" | "other" | "unknown";
+  identityProvider: string | null;
+  edgeProvider: string | null;
+  note: string;
 }
 
 export interface CtDiscoveryInfo {
@@ -188,8 +214,27 @@ export interface CtDiscoveryInfo {
   sourceUrl: string;
   subdomains: string[];
   wildcardEntries: string[];
+  prioritizedHosts: CtDiscoveredHost[];
+  sampledHosts: CtHostObservation[];
+  coverageSummary: string;
   issues: string[];
   strengths: string[];
+}
+
+export interface WafFingerprint {
+  name: string;
+  confidence: IssueConfidence;
+  detection: "observed" | "inferred";
+  evidence: string;
+}
+
+export interface WafFingerprintInfo {
+  detected: boolean;
+  providers: WafFingerprint[];
+  edgeSignals: string[];
+  issues: string[];
+  strengths: string[];
+  summary: string;
 }
 
 export interface HtmlFormInfo {
@@ -375,6 +420,7 @@ export interface AnalysisResult {
   corsSecurity: CorsSecurityInfo;
   apiSurface: ApiSurfaceInfo;
   publicSignals: PublicSignalsInfo;
+  wafFingerprint: WafFingerprintInfo;
 }
 
 export interface AnalyzeTargetOptions {

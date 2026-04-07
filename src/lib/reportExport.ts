@@ -42,6 +42,21 @@ const buildCtLines = (analysis: AnalysisResult) =>
     ? analysis.ctDiscovery.subdomains.map((host) => `- ${host}`)
     : ["- No CT-discovered subdomains recorded."];
 
+const buildCtSampleLines = (analysis: AnalysisResult) =>
+  analysis.ctDiscovery.sampledHosts.length
+    ? analysis.ctDiscovery.sampledHosts.map(
+        (host) =>
+          `- ${host.host} [${host.priority} ${host.category}] ${host.reachable ? `${host.statusCode} ${host.responseKind}` : "unreachable"}: ${host.note}`,
+      )
+    : ["- No CT sampled hosts recorded."];
+
+const buildWafLines = (analysis: AnalysisResult) =>
+  analysis.wafFingerprint.providers.length
+    ? analysis.wafFingerprint.providers.map(
+        (provider) => `- ${provider.name} (${provider.detection}, ${provider.confidence} confidence): ${provider.evidence}`,
+      )
+    : ["- No branded WAF or edge provider was conclusively identified."];
+
 const buildThemeMarkdownLines = (
   labelPrefix: "OWASP" | "MITRE",
   themes: Array<{ label: string; count: number; summary: string; whyItMatters: string; examples: string[] }>,
@@ -142,9 +157,12 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     "",
     `- Detected: ${analysis.identityProvider.detected ? "Yes" : "No"}`,
     `- Provider: ${analysis.identityProvider.provider ?? "Not identified"}`,
+    `- Protocol: ${analysis.identityProvider.protocol ?? "Not inferred"}`,
     `- OIDC config: ${analysis.identityProvider.openIdConfigurationUrl ?? "Not observed"}`,
     `- Redirect origins: ${analysis.identityProvider.redirectOrigins.length ? analysis.identityProvider.redirectOrigins.join(", ") : "None recorded"}`,
+    `- Auth-like hosts: ${analysis.identityProvider.authHostCandidates.length ? analysis.identityProvider.authHostCandidates.join(", ") : "None recorded"}`,
     `- Login paths: ${analysis.identityProvider.loginPaths.length ? analysis.identityProvider.loginPaths.join(", ") : "None recorded"}`,
+    `- Tenant clues: ${analysis.identityProvider.tenantSignals.length ? analysis.identityProvider.tenantSignals.join(", ") : "None recorded"}`,
     ...(analysis.identityProvider.redirectUriSignals.length
       ? analysis.identityProvider.redirectUriSignals.map((signal) => `- Review redirect URI signal: ${signal}`)
       : ["- No public redirect_uri-style parameters were recorded."]),
@@ -152,9 +170,19 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     "## Certificate Transparency",
     "",
     `- Queried domain: ${analysis.ctDiscovery.queriedDomain}`,
+    `- Coverage summary: ${analysis.ctDiscovery.coverageSummary}`,
     `- Subdomains discovered: ${analysis.ctDiscovery.subdomains.length}`,
     `- Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}`,
     ...buildCtLines(analysis),
+    ...buildCtSampleLines(analysis),
+    "",
+    "## WAF & Edge Fingerprint",
+    "",
+    `- Summary: ${analysis.wafFingerprint.summary}`,
+    ...buildWafLines(analysis),
+    ...(analysis.wafFingerprint.edgeSignals.length
+      ? analysis.wafFingerprint.edgeSignals.map((signal) => `- Edge evidence: ${signal}`)
+      : ["- No extra edge evidence recorded."]),
     "",
     "## Public Trust Signals",
     "",
@@ -346,9 +374,12 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
       <h2>Identity Provider &amp; OAuth Surface</h2>
       <p>Detected: ${analysis.identityProvider.detected ? "Yes" : "No"}</p>
       <p>Provider: ${analysis.identityProvider.provider ?? "Not identified"}</p>
+      <p>Protocol: ${analysis.identityProvider.protocol ?? "Not inferred"}</p>
       <p>OIDC config: ${analysis.identityProvider.openIdConfigurationUrl ?? "Not observed"}</p>
       <p>Redirect origins: ${analysis.identityProvider.redirectOrigins.length ? analysis.identityProvider.redirectOrigins.join(", ") : "None recorded"}</p>
+      <p>Auth-like hosts: ${analysis.identityProvider.authHostCandidates.length ? analysis.identityProvider.authHostCandidates.join(", ") : "None recorded"}</p>
       <p>Login paths: ${analysis.identityProvider.loginPaths.length ? analysis.identityProvider.loginPaths.join(", ") : "None recorded"}</p>
+      <p>Tenant clues: ${analysis.identityProvider.tenantSignals.length ? analysis.identityProvider.tenantSignals.join(", ") : "None recorded"}</p>
       <ul>${analysis.identityProvider.redirectUriSignals.length
         ? analysis.identityProvider.redirectUriSignals.map((signal) => `<li>Review redirect URI signal: ${signal}</li>`).join("")
         : "<li>No public redirect_uri-style parameters were recorded.</li>"}</ul>
@@ -356,9 +387,19 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     <div class="card">
       <h2>Certificate Transparency</h2>
       <p>Queried domain: ${analysis.ctDiscovery.queriedDomain}</p>
+      <p>${analysis.ctDiscovery.coverageSummary}</p>
       <p>Subdomains discovered: ${analysis.ctDiscovery.subdomains.length}</p>
       <p>Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}</p>
       <ul>${ctItems}</ul>
+      <ul>${buildCtSampleLines(analysis).map((line) => `<li>${line.slice(2)}</li>`).join("")}</ul>
+    </div>
+    <div class="card">
+      <h2>WAF &amp; Edge Fingerprint</h2>
+      <p>${analysis.wafFingerprint.summary}</p>
+      <ul>${buildWafLines(analysis).map((line) => `<li>${line.slice(2)}</li>`).join("")}</ul>
+      <ul>${analysis.wafFingerprint.edgeSignals.length
+        ? analysis.wafFingerprint.edgeSignals.map((signal) => `<li>${signal}</li>`).join("")
+        : "<li>No extra edge evidence recorded.</li>"}</ul>
     </div>
     <div class="card">
       <h2>Public Trust Signals</h2>
