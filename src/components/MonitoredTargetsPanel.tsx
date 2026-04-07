@@ -36,10 +36,15 @@ export const MonitoredTargetsPanel = ({
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <BellDot className="h-5 w-5" />
-          Monitoring Targets
-        </CardTitle>
+        <div className="space-y-2">
+          <CardTitle className="flex items-center gap-2">
+            <BellDot className="h-5 w-5" />
+            Monitoring Targets
+          </CardTitle>
+          <p className="max-w-2xl text-sm text-slate-500">
+            Monitoring runs in this browser only. Saved targets and history persist locally, but due scans do not run in the background after you close the tab.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="rounded-2xl" disabled={!currentUrl || busy} onClick={onAddDaily}>
             Monitor Daily

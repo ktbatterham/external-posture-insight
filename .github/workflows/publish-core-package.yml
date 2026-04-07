@@ -32,6 +32,6 @@ jobs:
           npm run test:core
 
       - name: Publish core package
-        run: npm publish ./packages/core --access public
+        run: npm publish ./packages/core --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
