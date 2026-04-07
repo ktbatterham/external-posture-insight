@@ -9,6 +9,7 @@
     "src/types.ts",
     "src/ctDiscovery.ts",
     "src/identityProvider.ts",
-    "src/htmlInsights.ts"
+    "src/htmlInsights.ts",
+    "src/surfaceEnrichment.ts"
   ]
 }

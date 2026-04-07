@@ -14,6 +14,12 @@ import {
   mergeTechnologies,
 } from "./htmlInsights.js";
 import { analyzeIdentityProvider } from "./identityProvider.js";
+import {
+  analyzeApiSurface,
+  analyzeCorsSecurity,
+  analyzeExposure,
+  fetchPublicSignals,
+} from "./surfaceEnrichment.js";
 import type {
   AnalysisResult,
   AnalyzeTargetOptions,
@@ -1791,365 +1797,6 @@ async function collectDiscoveryPaths(finalUrl, htmlSecurity) {
   };
 }
 
-async function fetchPublicSignals(host: string): Promise<PublicSignalsInfo> {
-  const apexHost = host.startsWith("www.") ? host.slice(4) : host;
-  const sourceUrl = `https://hstspreload.org/api/v2/status?domain=${encodeURIComponent(apexHost)}`;
-  const fallback: PublicSignalsInfo = {
-    hstsPreload: {
-      status: "unknown",
-      summary: "Public HSTS preload status could not be determined.",
-      sourceUrl,
-    },
-    issues: [],
-    strengths: [],
-  };
-
-  try {
-    const response = await requestText(new URL(sourceUrl), { Accept: "application/json" });
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      return fallback;
-    }
-
-    const payload = JSON.parse(response.body);
-    const statusText = String(payload.status || payload.result || "").toLowerCase();
-    const message = String(payload.message || payload.status || "").trim();
-    const errors = Array.isArray(payload.errors) ? payload.errors : [];
-    const errorText = errors
-      .map((entry) => (typeof entry === "string" ? entry : entry?.message || JSON.stringify(entry)))
-      .join(" ");
-
-    let status: PublicSignalsInfo["hstsPreload"]["status"] = "not_preloaded";
-    if (payload.preloaded === true || statusText.includes("preloaded")) {
-      status = "preloaded";
-    } else if (statusText.includes("pending")) {
-      status = "pending";
-    } else if (payload.preloadable === true || payload.eligible === true || statusText.includes("eligible")) {
-      status = "eligible";
-    } else if (!statusText && !errorText) {
-      status = "unknown";
-    }
-
-    const summary =
-      message && message.toLowerCase() !== "unknown"
-        ? message
-        : errorText ||
-          (status === "not_preloaded"
-            ? "The domain is not currently shown as preloaded in the public HSTS preload dataset."
-            : "HSTS preload status retrieved from the public preload dataset.");
-    const issues = [];
-    const strengths = [];
-
-    if (status === "preloaded") {
-      strengths.push("Domain appears in the public HSTS preload program.");
-    } else if (status === "pending") {
-      strengths.push("Domain appears to have an HSTS preload submission pending.");
-    } else if (status === "eligible") {
-      issues.push("Domain may be eligible for HSTS preload but is not currently shown as preloaded.");
-    } else if (status === "not_preloaded") {
-      issues.push("Domain is not shown as preloaded in the public HSTS preload dataset.");
-    }
-
-    return {
-      hstsPreload: {
-        status,
-        summary,
-        sourceUrl,
-      },
-      issues,
-      strengths,
-    };
-  } catch {
-    return fallback;
-  }
-}
-
-async function analyzeExposure(finalUrl) {
-  const probes = [];
-  const issues = [];
-  const strengths = [];
-
-  for (const probe of EXPOSURE_PROBES) {
-    const probeUrl = new URL(probe.path, finalUrl.origin);
-    try {
-      let response;
-      let resolvedUrl = probeUrl;
-
-      if (probe.path === "/robots.txt" || probe.path === "/sitemap.xml") {
-        const redirectData = await fetchWithRedirects(probeUrl, 3);
-        response = redirectData.response;
-        resolvedUrl = redirectData.finalUrl;
-      } else {
-        response = await requestOnce(probeUrl, "HEAD");
-        if (response.statusCode === 405) {
-          response = await requestOnce(probeUrl, "GET");
-        } else if (response.statusCode === 401 || response.statusCode === 403) {
-          response = await requestText(probeUrl);
-        }
-      }
-
-      let finding = "safe";
-      let detail = "Not exposed.";
-
-      if (probe.path === "/robots.txt" || probe.path === "/sitemap.xml") {
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          finding = "interesting";
-          detail =
-            resolvedUrl.toString() === probeUrl.toString()
-              ? "Public discovery file is available."
-              : `Public discovery file is available after redirect to ${resolvedUrl.toString()}.`;
-          strengths.push(`${probe.label} is published.`);
-        } else if (response.statusCode === 401 || response.statusCode === 403) {
-          finding = "interesting";
-          detail = "Discovery file exists but is access-controlled.";
-        } else if (response.statusCode >= 500) {
-          finding = "error";
-          detail = "Discovery file path triggered a server-side error, so availability could not be determined cleanly.";
-        } else {
-          detail = "Discovery file not found.";
-        }
-      } else if (response.statusCode >= 200 && response.statusCode < 300) {
-        finding = "exposed";
-        detail = "Sensitive path returned a successful response.";
-        issues.push(`${probe.label} may be exposed at ${probe.path}.`);
-      } else if (response.statusCode === 401 || response.statusCode === 403) {
-        const contentType = headerValue(response.headers, "content-type") || "";
-        const blockedByGenericRules =
-          typeof response.body === "string" &&
-          contentType.includes("text/html") &&
-          isAccessDeniedHtml(response.headers, response.body);
-
-        if (blockedByGenericRules) {
-          finding = "blocked";
-          detail = "Probe was blocked by generic server or edge protection rules. This does not confirm the sensitive file exists.";
-          strengths.push(`${probe.label} probe was blocked by generic protection.`);
-        } else {
-          finding = "interesting";
-          detail = "Sensitive path may exist but is access-controlled.";
-          strengths.push(`${probe.label} appears access-controlled.`);
-        }
-      } else if (response.statusCode >= 500) {
-        finding = "error";
-        detail = "Sensitive path triggered a server-side error, so the path may exist or be handled unexpectedly.";
-      }
-
-      probes.push({
-        label: probe.label,
-        path: probe.path,
-        statusCode: response.statusCode,
-        finalUrl: resolvedUrl.toString(),
-        finding,
-        detail,
-      });
-    } catch (error) {
-      const detail = formatErrorMessage(error) || "Probe failed unexpectedly.";
-      probes.push({
-        label: probe.label,
-        path: probe.path,
-        statusCode: 0,
-        finalUrl: probeUrl.toString(),
-        finding: "error",
-        detail,
-      });
-    }
-  }
-
-  if (!issues.length) {
-    strengths.push("No obvious high-signal sensitive files were openly exposed in the limited probe set.");
-  }
-
-  return {
-    probes,
-    issues,
-    strengths,
-  };
-}
-
-function parseCsvHeader(value) {
-  return value
-    ? value
-        .split(",")
-        .map((part) => part.trim())
-        .filter(Boolean)
-    : [];
-}
-
-async function analyzeCorsSecurity(finalUrl: URL, responseHeaders: ResponseHeaders): Promise<CorsSecurityInfo> {
-  let optionsResponse: RequestHeadResult = { statusCode: 0, headers: {}, elapsedMs: 0 };
-  try {
-    optionsResponse = await requestWithHeaders(finalUrl, "OPTIONS", {
-      Origin: "https://security-posture-insight.local",
-      "Access-Control-Request-Method": "POST",
-      "Access-Control-Request-Headers": "content-type,authorization",
-    });
-  } catch {
-    // Keep the default empty response if OPTIONS is blocked or errors out.
-  }
-
-  const mergedHeaders = {
-    ...responseHeaders,
-    ...optionsResponse.headers,
-  };
-  const allowedOrigin = headerValue(mergedHeaders, "access-control-allow-origin");
-  const allowCredentials = headerValue(mergedHeaders, "access-control-allow-credentials");
-  const allowMethods = parseCsvHeader(headerValue(mergedHeaders, "access-control-allow-methods"));
-  const allowHeaders = parseCsvHeader(headerValue(mergedHeaders, "access-control-allow-headers"));
-  const allowPrivateNetwork = headerValue(mergedHeaders, "access-control-allow-private-network");
-  const vary = headerValue(mergedHeaders, "vary");
-  const issues = [];
-  const strengths = [];
-
-  if (allowedOrigin === "*") {
-    if (allowCredentials?.toLowerCase() === "true") {
-      issues.push("CORS allows any origin while also allowing credentials.");
-    } else {
-      issues.push("CORS allows any origin.");
-    }
-  } else if (allowedOrigin) {
-    strengths.push(`CORS is scoped to ${allowedOrigin}.`);
-  }
-
-  if (allowMethods.includes("PUT") || allowMethods.includes("DELETE") || allowMethods.includes("PATCH")) {
-    issues.push(`Preflight allows elevated methods: ${allowMethods.join(", ")}.`);
-  }
-  if (allowHeaders.includes("*")) {
-    issues.push("CORS allows any request header.");
-  }
-  if (allowPrivateNetwork?.toLowerCase() === "true") {
-    issues.push("CORS allows private network access.");
-  }
-  if (allowedOrigin && allowedOrigin !== "*" && !(vary || "").toLowerCase().includes("origin")) {
-    issues.push("CORS varies by origin but the response does not advertise Vary: Origin.");
-  }
-  if (!allowedOrigin) {
-    strengths.push("No permissive CORS policy detected on the scanned page.");
-  }
-
-  return {
-    allowedOrigin,
-    allowCredentials,
-    allowMethods,
-    allowHeaders,
-    allowPrivateNetwork,
-    vary,
-    optionsStatus: optionsResponse.statusCode,
-    issues,
-    strengths,
-  };
-}
-
-async function analyzeApiSurface(finalUrl, homepageContext = null) {
-  const probes = [];
-  const issues = [];
-  const strengths = [];
-  const homepageSignature = homepageContext?.signature || "";
-  const homepageTitle = homepageContext?.pageTitle || null;
-
-  for (const probe of API_SURFACE_PROBES) {
-    const targetUrl = new URL(probe.path, finalUrl.origin);
-    try {
-      let response = await requestText(targetUrl, {
-        Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
-      });
-      let resolvedUrl = targetUrl;
-
-      if ([301, 302, 303, 307, 308].includes(response.statusCode) && headerValue(response.headers, "location")) {
-        const redirectData = await fetchWithRedirects(targetUrl, 2);
-        resolvedUrl = redirectData.finalUrl;
-        response = await requestText(resolvedUrl, {
-          Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
-        });
-      }
-
-      const contentType = headerValue(response.headers, "content-type");
-      let classification = "absent";
-      let detail = "Endpoint not found.";
-
-      if (response.statusCode === 401 || response.statusCode === 403) {
-        classification = "restricted";
-        detail = "Endpoint exists but requires authorization or is blocked.";
-        strengths.push(`${probe.label} appears access-controlled.`);
-      } else if (response.statusCode === 405) {
-        classification = "interesting";
-        detail = "Endpoint appears to exist, but it does not allow the request method used by this probe.";
-      } else if (response.statusCode === 429) {
-        classification = "restricted";
-        detail = "Endpoint appears rate-limited, so availability could not be assessed cleanly.";
-      } else if (response.statusCode === 404) {
-        classification = "absent";
-        detail = "Endpoint not found.";
-      } else if (response.statusCode >= 500) {
-        classification = "error";
-        detail = "Endpoint triggered a server-side error, so the path exists or is handled but did not respond cleanly.";
-      } else if (response.statusCode >= 200 && response.statusCode < 300) {
-        if ((contentType || "").includes("application/json")) {
-          classification = "public";
-          detail = "Public JSON-style endpoint responded successfully.";
-          issues.push(`${probe.label} appears publicly reachable at ${probe.path}.`);
-        } else if ((contentType || "").includes("text/html") && isAccessDeniedHtml(response.headers, response.body)) {
-          classification = "restricted";
-          detail = "Endpoint response appears to be a web application firewall or access-denied page.";
-          strengths.push(`${probe.label} appears blocked by edge protection.`);
-        } else if ((contentType || "").includes("text/html")) {
-          classification = "fallback";
-          detail = classifyHtmlApiFallback(
-            probe.path,
-            finalUrl,
-            resolvedUrl,
-            response.body,
-            homepageSignature,
-            homepageTitle,
-          )
-            ? "Endpoint appears to return the site's standard HTML page rather than an API response."
-            : "Endpoint returns an HTML page rather than a machine-readable API response.";
-        } else {
-          classification = "interesting";
-          detail = "Endpoint responded successfully but does not clearly look like JSON.";
-        }
-      } else if (response.statusCode >= 300 && response.statusCode < 400) {
-        classification = "interesting";
-        detail = "Endpoint redirected.";
-      } else if (response.statusCode > 0) {
-        classification = "interesting";
-        detail = "Endpoint returned a non-success response that may still indicate application handling on this path.";
-      }
-
-      probes.push({
-        label: probe.label,
-        path: probe.path,
-        statusCode: response.statusCode,
-        finalUrl: resolvedUrl.toString(),
-        classification,
-        contentType,
-        detail,
-      });
-    } catch (error) {
-      probes.push({
-        label: probe.label,
-        path: probe.path,
-        statusCode: 0,
-        finalUrl: targetUrl.toString(),
-        classification: "absent",
-        contentType: null,
-        detail: error instanceof Error ? error.message : "Probe failed.",
-      });
-    }
-  }
-
-  if (!issues.length) {
-    strengths.push("No obviously public API endpoints were detected in the limited probe set.");
-  }
-
-  if (probes.some((probe) => probe.classification === "fallback")) {
-    strengths.push("Some API-style paths appear to be frontend route fallbacks rather than exposed APIs.");
-  }
-
-  return {
-    probes,
-    issues,
-    strengths,
-  };
-}
-
 async function safeResolve<T>(operation: () => Promise<T>): Promise<T | null> {
   try {
     return await operation();
@@ -2587,7 +2234,7 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   }
   const htmlSecurity = analyzeHtmlSecurity(finalUrl, htmlDocument);
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
-  const publicSignals = await fetchPublicSignals(result.host);
+  const publicSignals = await fetchPublicSignals(result.host, { requestText });
   const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
   const identityProvider = await analyzeIdentityProvider(
     finalUrl,
@@ -2609,9 +2256,27 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     htmlSecurity,
     aiSurface: htmlSecurity.aiSurface,
     thirdPartyTrust,
-    exposure: await analyzeExposure(finalUrl),
-    corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders),
-    apiSurface: await analyzeApiSurface(finalUrl, htmlDocument),
+    exposure: await analyzeExposure(finalUrl, {
+      exposureProbes: EXPOSURE_PROBES,
+      requestOnce,
+      requestText,
+      fetchWithRedirects,
+      headerValue,
+      formatErrorMessage,
+      isAccessDeniedHtml,
+    }),
+    corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders, {
+      requestWithHeaders,
+      headerValue,
+    }),
+    apiSurface: await analyzeApiSurface(finalUrl, htmlDocument, {
+      apiSurfaceProbes: API_SURFACE_PROBES,
+      requestText,
+      fetchWithRedirects,
+      headerValue,
+      isAccessDeniedHtml,
+      classifyHtmlApiFallback,
+    }),
     publicSignals,
   };
 
