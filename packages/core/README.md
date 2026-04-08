@@ -47,6 +47,34 @@ See also:
 
 ## Public API
 
+## CLI
+
+The package now includes a pipe-friendly CLI:
+
+```bash
+npx @ktbatterham/external-posture-core scan example.com
+```
+
+Available output formats:
+
+```bash
+npx @ktbatterham/external-posture-core scan example.com --format summary
+npx @ktbatterham/external-posture-core scan example.com --format json
+npx @ktbatterham/external-posture-core scan example.com --format markdown
+```
+
+Write results to a file:
+
+```bash
+npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
+```
+
+Show usage:
+
+```bash
+npx @ktbatterham/external-posture-core --help
+```
+
 ### `analyzeTarget(url)`
 
 Run a full posture analysis for a public target.

@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { access } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
+
+const execFile = promisify(execFileCallback);
 
 test("package surface exports expected public functions", async () => {
   const pkg = await import("../dist/index.js");
@@ -8,4 +13,12 @@ test("package surface exports expected public functions", async () => {
   assert.equal(typeof pkg.analyzeUrl, "function");
   assert.equal(typeof pkg.analyzeHtmlDocument, "function");
   assert.equal(typeof pkg.formatErrorMessage, "function");
+});
+
+test("package surface includes a working CLI help entrypoint", async () => {
+  await access(new URL("../dist/cli.js", import.meta.url));
+  const { stdout } = await execFile(process.execPath, [new URL("../dist/cli.js", import.meta.url).pathname, "--help"]);
+
+  assert.match(stdout, /External Posture Insight CLI/);
+  assert.match(stdout, /scan <target>/);
 });
