@@ -7,9 +7,7 @@ import type {
   ThirdPartyProvider,
   ThirdPartyTrustInfo,
 } from "./types.js";
-
-const unique = <T>(values: Array<T | null | undefined | false>): T[] =>
-  [...new Set(values.filter((value): value is T => Boolean(value)))];
+import { unique } from "./utils.js";
 
 const addDetectedTechnology = (
   target: TechnologyResult[],

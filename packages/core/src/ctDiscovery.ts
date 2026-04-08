@@ -1,7 +1,10 @@
 import type { CtDiscoveryInfo, CtDiscoveredHost, CtHostObservation } from "./types.js";
+import { unique } from "./utils.js";
 
 const CT_SUBDOMAIN_LIMIT = 20;
 const CT_WILDCARD_LIMIT = 5;
+// Keep CT enrichment fast and best-effort so third-party log latency does not
+// dominate the main posture scan.
 const CT_LOOKUP_TIMEOUT_MS = 1_500;
 const CT_CACHE_TTL_MS = 15 * 60 * 1000;
 const CT_SAMPLE_LIMIT = 4;
@@ -26,9 +29,6 @@ type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => 
 type RequestTextFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => Promise<TextResponse>;
 
 const ctCache = new Map<string, CtCacheEntry>();
-
-const unique = <T>(values: Array<T | null | undefined | false>): T[] =>
-  [...new Set(values.filter((value): value is T => Boolean(value)))];
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;

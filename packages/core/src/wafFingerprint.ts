@@ -1,10 +1,8 @@
 import { URL } from "node:url";
 import type { RedirectHop, WafFingerprintInfo } from "./types.js";
+import { unique } from "./utils.js";
 
 type ResponseHeaders = Record<string, string | string[] | undefined>;
-
-const unique = <T>(values: Array<T | null | undefined | false>): T[] =>
-  [...new Set(values.filter((value): value is T => Boolean(value)))];
 
 const headerValue = (headers: ResponseHeaders, name: string) => {
   const value = headers[name];

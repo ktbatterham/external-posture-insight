@@ -1,5 +1,7 @@
 import { URL } from "node:url";
 import type { CtDiscoveryInfo, HtmlSecurityInfo, IdentityProviderInfo, RedirectHop } from "./types.js";
+import { DISCOVERY_PATH_LIMIT, SUMMARY_EVIDENCE_LIMIT } from "./scannerConfig.js";
+import { unique } from "./utils.js";
 
 interface JsonResponse<T = unknown> {
   statusCode: number;
@@ -8,12 +10,7 @@ interface JsonResponse<T = unknown> {
 
 type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => Promise<JsonResponse>;
 
-const DISCOVERY_PATH_LIMIT = 10;
-const SUMMARY_EVIDENCE_LIMIT = 3;
 const AUTH_HOST_LIMIT = 5;
-
-const unique = <T>(values: Array<T | null | undefined | false>): T[] =>
-  [...new Set(values.filter((value): value is T => Boolean(value)))];
 
 const IDENTITY_PROVIDER_PATTERNS = [
   { provider: "Microsoft Entra ID", pattern: /(^|\.)login\.microsoftonline\.com$/i },

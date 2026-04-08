@@ -20,6 +20,17 @@ import {
   analyzeExposure,
   fetchPublicSignals,
 } from "./surfaceEnrichment.js";
+import {
+  CLIENT_EXPOSURE_EVIDENCE_LIMIT,
+  DISCOVERY_PATH_LIMIT,
+  HTML_SIGNATURE_LIMIT,
+  REDIRECT_LIMIT,
+  REQUEST_TIMEOUT_MS,
+  SUMMARY_EVIDENCE_LIMIT,
+  TEXT_BODY_LIMIT,
+  TLS_HANDSHAKE_TIMEOUT_MS,
+} from "./scannerConfig.js";
+import { unique } from "./utils.js";
 import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type {
   AnalysisResult,
@@ -36,14 +47,6 @@ import type {
 type ResponseHeaders = http.IncomingHttpHeaders;
 
 const SCANNER_USER_AGENT = "ExternalPostureInsight/1.0";
-const REQUEST_TIMEOUT_MS = 12_000;
-const TLS_HANDSHAKE_TIMEOUT_MS = 10_000;
-const TEXT_BODY_LIMIT = 256_000;
-const HTML_SIGNATURE_LIMIT = 280;
-const DISCOVERY_PATH_LIMIT = 10;
-const SUMMARY_EVIDENCE_LIMIT = 3;
-const CLIENT_EXPOSURE_EVIDENCE_LIMIT = 6;
-const REDIRECT_LIMIT = 5;
 
 // Deliberately disabled only for observational scanning so invalid or expired
 // certificates can still be described. This must never be reused for
@@ -1456,10 +1459,6 @@ async function fetchSecurityTxt(finalUrl: URL): Promise<SecurityTxtInfo> {
     raw: null,
     issues: ["No security.txt file found at /.well-known/security.txt or /security.txt."],
   };
-}
-
-function unique<T>(values: Array<T | null | undefined | false>): T[] {
-  return [...new Set(values.filter((value): value is T => Boolean(value)))];
 }
 
 function isLikelyPagePath(pathname) {
