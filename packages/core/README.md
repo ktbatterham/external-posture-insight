@@ -75,16 +75,18 @@ Show usage:
 npx @ktbatterham/external-posture-core --help
 ```
 
-### `analyzeTarget(url)`
+### `analyzeUrl(url)`
 
 Run a full posture analysis for a public target.
 
 ```js
-import { analyzeTarget } from "@ktbatterham/external-posture-core";
+import { analyzeUrl } from "@ktbatterham/external-posture-core";
 
-const result = await analyzeTarget("https://example.com");
+const result = await analyzeUrl("https://example.com");
 console.log(result.score, result.grade);
 ```
+
+`analyzeTarget` remains available as a compatibility alias, but `analyzeUrl` is the primary public entrypoint.
 
 ### `analyzeHtmlDocument(url, html)`
 

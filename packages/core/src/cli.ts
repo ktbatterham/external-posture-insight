@@ -2,7 +2,7 @@
 
 import { writeFile } from "node:fs/promises";
 import process from "node:process";
-import { analyzeTarget, formatErrorMessage } from "./index.js";
+import { analyzeUrl, formatErrorMessage } from "./index.js";
 import type { AnalysisResult } from "./types.js";
 
 type OutputFormat = "json" | "markdown" | "summary";
@@ -150,7 +150,7 @@ const main = async () => {
       return;
     }
 
-    const analysis = await analyzeTarget(parsed.target);
+    const analysis = await analyzeUrl(parsed.target);
     const output = renderOutput(analysis, parsed.format);
 
     if (parsed.outputPath) {
