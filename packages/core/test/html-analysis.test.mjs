@@ -45,3 +45,19 @@ test("preserves positive client exposure and auth signals when they are explicit
   assert.equal(htmlSecurity.forms.some((form) => form.hasPasswordField), true);
   assert.equal(htmlSecurity.firstPartyPaths.includes("/login"), true);
 });
+
+test("extracts explicit versioned client library fingerprints from script URLs", () => {
+  const htmlSecurity = analyzeHtmlDocument(
+    "https://example.com/",
+    `<!doctype html><html><head>
+      <script src="https://cdn.example.com/assets/jquery-3.4.0.min.js"></script>
+      <script src="https://cdn.example.com/assets/bootstrap.bundle-5.3.3.min.js"></script>
+    </head><body></body></html>`,
+  );
+
+  assert.deepEqual(
+    htmlSecurity.libraryFingerprints.map((item) => `${item.packageName}@${item.version}`),
+    ["jquery@3.4.0", "bootstrap@5.3.3"],
+  );
+  assert.equal(htmlSecurity.libraryRiskSignals.length, 0);
+});

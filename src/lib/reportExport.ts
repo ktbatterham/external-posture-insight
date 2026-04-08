@@ -30,6 +30,20 @@ const buildPassiveLeakLines = (analysis: AnalysisResult) =>
       )
     : ["- No passive leak or fingerprinting signals recorded."];
 
+const buildLibraryRiskLines = (analysis: AnalysisResult) =>
+  analysis.htmlSecurity.libraryRiskSignals.length
+    ? analysis.htmlSecurity.libraryRiskSignals.flatMap((signal) => [
+        `- ${signal.packageName} ${signal.version} (${signal.confidence} confidence)`,
+        `  Source: ${signal.sourceUrl}`,
+        ...signal.vulnerabilities.map(
+          (item) =>
+            `  - ${item.id}${item.aliases.length ? ` [${item.aliases.join(", ")}]` : ""} (${item.severity}): ${item.summary}`,
+        ),
+      ])
+    : analysis.htmlSecurity.libraryFingerprints.length
+      ? ["- Explicitly versioned client libraries were detected, but no OSV advisory matches were returned."]
+      : ["- No explicit versioned client-library fingerprints were detected."];
+
 const buildThirdPartyLines = (analysis: AnalysisResult) =>
   analysis.thirdPartyTrust.providers.length
     ? analysis.thirdPartyTrust.providers.map(
@@ -220,6 +234,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     `- Same-origin paths discovered: ${analysis.htmlSecurity.firstPartyPaths.length}`,
     ...buildDiscoveryLines(analysis),
     ...buildPassiveLeakLines(analysis),
+    ...buildLibraryRiskLines(analysis),
     "",
     "## Auth Surface",
     "",
@@ -314,6 +329,9 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     ? analysis.htmlSecurity.firstPartyPaths.map((path) => `<li>${path}</li>`).join("")
     : "<li>No same-origin paths discovered from the fetched page.</li>";
   const passiveLeakItems = buildPassiveLeakLines(analysis)
+    .map((line) => `<li>${line.slice(2)}</li>`)
+    .join("");
+  const libraryRiskItems = buildLibraryRiskLines(analysis)
     .map((line) => `<li>${line.slice(2)}</li>`)
     .join("");
   const ctItems = buildCtLines(analysis)
@@ -452,6 +470,8 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
       <ul>${discoveryItems}</ul>
       <p>Passive leak and fingerprinting signals:</p>
       <ul>${passiveLeakItems}</ul>
+      <p>Library version risk:</p>
+      <ul>${libraryRiskItems}</ul>
     </div>
     <div class="card">
       <h2>Auth Surface</h2>

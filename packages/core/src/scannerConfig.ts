@@ -17,6 +17,9 @@ export const HTML_SIGNATURE_LIMIT = 280;
 export const DISCOVERY_PATH_LIMIT = 10;
 export const SUMMARY_EVIDENCE_LIMIT = 3;
 export const CLIENT_EXPOSURE_EVIDENCE_LIMIT = 6;
+export const LIBRARY_RISK_LOOKUP_LIMIT = 8;
+export const OSV_QUERY_TIMEOUT_MS = 3_000;
+export const OSV_DETAIL_LOOKUP_LIMIT = 12;
 
 // Redirect following stays shallow to reduce SSRF risk and keep scans close to
 // normal browser behavior.

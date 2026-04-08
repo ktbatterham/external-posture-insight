@@ -30,6 +30,7 @@ import {
   TEXT_BODY_LIMIT,
   TLS_HANDSHAKE_TIMEOUT_MS,
 } from "./scannerConfig.js";
+import { collectLibraryFingerprints, fetchLibraryRiskSignals } from "./libraryRisk.js";
 import { unique } from "./utils.js";
 import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type {
@@ -550,6 +551,16 @@ function classifyIssueTaxonomy(issue) {
   const mitre = [];
 
   if (
+    text.includes("outdated component") ||
+    text.includes("known advis") ||
+    text.includes("osv") ||
+    text.includes("vulnerab") ||
+    text.includes("library ")
+  ) {
+    owasp.push("A06 Vulnerable and Outdated Components");
+  }
+
+  if (
     issue.area === "transport" ||
     issue.area === "certificate" ||
     text.includes("https") ||
@@ -633,6 +644,31 @@ function classifyIssueTaxonomy(issue) {
     owasp: unique(owasp),
     mitre: unique(mitre),
   };
+}
+
+function buildLibraryRiskIssues(libraryRiskSignals) {
+  return libraryRiskSignals.map((signal) => {
+    const highestSeverity = signal.vulnerabilities.some((item) => item.severity === "critical" || item.severity === "high")
+      ? "critical"
+      : signal.vulnerabilities.some((item) => item.severity === "moderate")
+        ? "warning"
+        : "info";
+    const references = signal.vulnerabilities
+      .flatMap((item) => item.aliases)
+      .filter(Boolean)
+      .slice(0, 3);
+
+    return {
+      severity: highestSeverity,
+      area: "headers",
+      title: `${signal.packageName} ${signal.version} has known advisories`,
+      detail: `OSV returned ${signal.vulnerabilities.length} advisory match${signal.vulnerabilities.length === 1 ? "" : "es"} for this publicly referenced library version.${references.length ? ` References: ${references.join(", ")}.` : ""}`,
+      confidence: signal.confidence,
+      source: "observed",
+      owasp: [],
+      mitre: [],
+    };
+  });
 }
 
 function scoreAnalysis({ isHttps, headerResults, certificate, cookies, redirects }) {
@@ -1537,6 +1573,8 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
         firstPartyPaths: [],
         passiveLeakSignals: [],
         clientExposureSignals: [],
+        libraryFingerprints: [],
+        libraryRiskSignals: [],
         detectedTechnologies: [],
         aiSurface: {
           detected: false,
@@ -1687,6 +1725,8 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
       firstPartyPaths,
       passiveLeakSignals,
       clientExposureSignals,
+      libraryFingerprints: collectLibraryFingerprints(externalScriptUrls),
+      libraryRiskSignals: [],
       detectedTechnologies: detectHtmlTechnologies(
         html,
         finalUrl,
@@ -1714,6 +1754,8 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
       firstPartyPaths: [],
       passiveLeakSignals: [],
       clientExposureSignals: [],
+      libraryFingerprints: [],
+      libraryRiskSignals: [],
       detectedTechnologies: [],
       aiSurface: {
         detected: false,
@@ -2232,7 +2274,23 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   } catch {
     htmlDocument = null;
   }
-  const htmlSecurity = analyzeHtmlSecurity(finalUrl, htmlDocument);
+  const baseHtmlSecurity = analyzeHtmlSecurity(finalUrl, htmlDocument);
+  const libraryRiskSignals = await fetchLibraryRiskSignals(baseHtmlSecurity.libraryFingerprints);
+  const htmlSecurity = {
+    ...baseHtmlSecurity,
+    libraryRiskSignals,
+    issues: [
+      ...baseHtmlSecurity.issues,
+      ...libraryRiskSignals.map(
+        (signal) =>
+          `${signal.packageName} ${signal.version} matched ${signal.vulnerabilities.length} OSV advisor${signal.vulnerabilities.length === 1 ? "y" : "ies"} from public script references.`,
+      ),
+    ],
+    strengths:
+      baseHtmlSecurity.libraryFingerprints.length > 0 && libraryRiskSignals.length === 0
+        ? [...baseHtmlSecurity.strengths, "No OSV advisory matches were found for the explicitly versioned client libraries detected on the fetched page."]
+        : baseHtmlSecurity.strengths,
+  };
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
   const publicSignals = await fetchPublicSignals(result.host, { requestText });
   const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
@@ -2254,6 +2312,7 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
 
   const enrichedResult = {
     ...result,
+    issues: [...result.issues, ...buildLibraryRiskIssues(libraryRiskSignals).map(classifyIssueTaxonomy)],
     technologies: mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies),
     crawl: await crawlRelatedPages(result, discovery),
     securityTxt: await fetchSecurityTxt(finalUrl),

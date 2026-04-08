@@ -13,6 +13,21 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
     return null;
   }
 
+  const trendPoints = [...history].slice(0, 8).reverse();
+  const trendScores = trendPoints.map((snapshot) => snapshot.score);
+  const minScore = Math.min(...trendScores);
+  const maxScore = Math.max(...trendScores);
+  const range = Math.max(maxScore - minScore, 1);
+  const sparkline = trendPoints
+    .map((snapshot, index) => {
+      const x = trendPoints.length === 1 ? 0 : (index / (trendPoints.length - 1)) * 100;
+      const y = 100 - ((snapshot.score - minScore) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const trendDelta = trendPoints.length > 1 ? trendPoints.at(-1)!.score - trendPoints[0].score : 0;
+  const trendLabel = trendDelta >= 5 ? "Improving" : trendDelta <= -5 ? "Degrading" : "Stable";
+
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
@@ -22,8 +37,8 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {diff && diff.previousScore !== null && (
-          <div className="grid gap-4 md:grid-cols-2">
+        {diff && diff.previousScore !== null ? (
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score change</p>
               <div className="mt-2 flex items-center gap-2">
@@ -55,8 +70,69 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
                 </Badge>
               </div>
             </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score trend</p>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-slate-950">{trendLabel}</p>
+                  <p className="text-sm text-slate-500">
+                    {trendDelta > 0 ? "+" : ""}
+                    {trendDelta} over {trendPoints.length} saved scan{trendPoints.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <svg viewBox="0 0 100 40" className="h-10 w-28 overflow-visible">
+                  <polyline
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={trendDelta >= 0 ? "text-emerald-600" : "text-rose-600"}
+                    points={sparkline
+                      .split(" ")
+                      .map((point) => {
+                        const [x, y] = point.split(",");
+                        return `${x},${Number(y) * 0.4}`;
+                      })
+                      .join(" ")}
+                  />
+                </svg>
+              </div>
+            </div>
           </div>
-        )}
+        ) : trendPoints.length > 1 ? (
+          <div className="grid gap-4 md:grid-cols-1">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score trend</p>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-slate-950">{trendLabel}</p>
+                  <p className="text-sm text-slate-500">
+                    {trendDelta > 0 ? "+" : ""}
+                    {trendDelta} over {trendPoints.length} saved scan{trendPoints.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <svg viewBox="0 0 100 40" className="h-10 w-28 overflow-visible">
+                  <polyline
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={trendDelta >= 0 ? "text-emerald-600" : "text-rose-600"}
+                    points={sparkline
+                      .split(" ")
+                      .map((point) => {
+                        const [x, y] = point.split(",");
+                        return `${x},${Number(y) * 0.4}`;
+                      })
+                      .join(" ")}
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {diff && (
           <div className="grid gap-4 md:grid-cols-3">

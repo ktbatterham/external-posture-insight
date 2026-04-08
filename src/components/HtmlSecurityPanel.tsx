@@ -19,7 +19,7 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Page title</p>
             <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950">
@@ -47,6 +47,13 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
             <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.passiveLeakSignals.length}</p>
             {warningLeakSignals.length ? (
               <p className="mt-1 text-xs text-amber-700">{warningLeakSignals.length} higher-priority review item{warningLeakSignals.length === 1 ? "" : "s"}</p>
+            ) : null}
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Library risk signals</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.libraryRiskSignals.length}</p>
+            {htmlSecurity.libraryFingerprints.length ? (
+              <p className="mt-1 text-xs text-slate-500">{htmlSecurity.libraryFingerprints.length} versioned client librar{htmlSecurity.libraryFingerprints.length === 1 ? "y" : "ies"} observed</p>
             ) : null}
           </div>
         </div>
@@ -131,6 +138,47 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {(htmlSecurity.libraryFingerprints.length > 0 || htmlSecurity.libraryRiskSignals.length > 0) && (
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Library version risk</p>
+            <div className="mt-3 space-y-3">
+              {htmlSecurity.libraryRiskSignals.length ? (
+                htmlSecurity.libraryRiskSignals.map((signal) => (
+                  <div key={`${signal.packageName}-${signal.version}`} className="rounded-xl bg-white p-4 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-slate-950">
+                        {signal.packageName} {signal.version}
+                      </p>
+                      <Badge variant="secondary">{signal.confidence} confidence</Badge>
+                      <Badge variant="destructive">
+                        {signal.vulnerabilities.length} advisor{signal.vulnerabilities.length === 1 ? "y" : "ies"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-slate-600">{signal.evidence}</p>
+                    <p className="mt-1 break-all text-xs text-slate-500">{signal.sourceUrl}</p>
+                    <div className="mt-3 space-y-2">
+                      {signal.vulnerabilities.map((item) => (
+                        <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                          <p className="font-medium text-slate-900">
+                            {item.id}
+                            {item.aliases.length ? ` • ${item.aliases.join(", ")}` : ""}
+                          </p>
+                          <p className="mt-1 text-slate-700">{item.summary}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">Severity: {item.severity}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl bg-white p-4 text-sm text-slate-700">
+                  Explicitly versioned client libraries were detected, but no matching OSV advisories were returned.
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@ export type OwaspCategory =
   | "A02 Cryptographic Failures"
   | "A03 Injection"
   | "A05 Security Misconfiguration"
+  | "A06 Vulnerable and Outdated Components"
   | "A07 Identification and Authentication Failures";
 export type MitreRelevance =
   | "Reconnaissance"
@@ -292,6 +293,31 @@ export interface ClientExposureSignal {
   evidence: string[];
 }
 
+export interface LibraryFingerprint {
+  packageName: string;
+  version: string;
+  sourceUrl: string;
+  confidence: IssueConfidence;
+  evidence: string;
+}
+
+export interface LibraryVulnerability {
+  id: string;
+  summary: string;
+  severity: "low" | "moderate" | "high" | "critical" | "unknown";
+  aliases: string[];
+  referenceUrl: string | null;
+}
+
+export interface LibraryRiskSignal {
+  packageName: string;
+  version: string;
+  confidence: IssueConfidence;
+  sourceUrl: string;
+  evidence: string;
+  vulnerabilities: LibraryVulnerability[];
+}
+
 export interface HtmlSecurityInfo {
   fetched: boolean;
   pageUrl: string | null;
@@ -307,6 +333,8 @@ export interface HtmlSecurityInfo {
   firstPartyPaths: string[];
   passiveLeakSignals: PassiveLeakSignal[];
   clientExposureSignals: ClientExposureSignal[];
+  libraryFingerprints: LibraryFingerprint[];
+  libraryRiskSignals: LibraryRiskSignal[];
   detectedTechnologies: TechnologyResult[];
   aiSurface: AiSurfaceInfo;
   issues: string[];
