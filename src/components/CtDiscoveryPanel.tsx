@@ -4,7 +4,15 @@ interface CtDiscoveryPanelProps {
   ctDiscovery: CtDiscoveryInfo;
 }
 
-export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => (
+export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
+  const strengthItems = ctDiscovery.strengths.length
+    ? ctDiscovery.strengths
+    : ["CT enrichment did not add any positive coverage signals for this target."];
+  const reviewItems = ctDiscovery.issues.length
+    ? ctDiscovery.issues
+    : ["No CT-specific review issues were identified."];
+
+  return (
   <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
     <div className="flex items-center justify-between gap-3">
       <div>
@@ -120,7 +128,7 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => (
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700">Strengths</h3>
         <ul className="mt-3 space-y-2 text-sm text-emerald-900">
-          {(ctDiscovery.strengths.length ? ctDiscovery.strengths : ["No CT strengths recorded yet."]).map((item) => (
+          {strengthItems.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
@@ -128,7 +136,7 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => (
       <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-700">Review points</h3>
         <ul className="mt-3 space-y-2 text-sm text-amber-900">
-          {(ctDiscovery.issues.length ? ctDiscovery.issues : ["No CT review issues were identified."]).map((item) => (
+          {reviewItems.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
@@ -136,3 +144,4 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => (
     </div>
   </section>
 );
+};

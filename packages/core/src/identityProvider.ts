@@ -39,11 +39,15 @@ const inferProtocol = ({
   authorizationEndpoint,
   tokenEndpoint,
   redirectOrigins,
+  redirectUriSignals,
+  loginPaths,
 }: {
   openIdConfigurationUrl: string | null;
   authorizationEndpoint: string | null;
   tokenEndpoint: string | null;
   redirectOrigins: string[];
+  redirectUriSignals: string[];
+  loginPaths: string[];
 }): IdentityProviderInfo["protocol"] => {
   if (openIdConfigurationUrl || authorizationEndpoint || tokenEndpoint) {
     return "oidc";
@@ -51,7 +55,11 @@ const inferProtocol = ({
   if (redirectOrigins.some((origin) => /saml|adfs/i.test(origin))) {
     return "saml";
   }
-  if (redirectOrigins.length) {
+  if (
+    redirectOrigins.length ||
+    redirectUriSignals.length ||
+    loginPaths.some((path) => /oauth|authorize|sso|auth/i.test(path))
+  ) {
     return "oauth";
   }
   return null;
@@ -194,16 +202,22 @@ export const analyzeIdentityProvider = async (
   const redirectOrigins = unique(
     redirects
       .map((hop) => hop.location)
-      .filter(Boolean)
+      .filter((location): location is string => Boolean(location))
       .map((location) => {
         try {
-          return new URL(location as string, finalUrl).origin;
+          const resolved = new URL(location, finalUrl);
+          const looksAuthRelated =
+            resolved.origin !== finalUrl.origin ||
+            /login|signin|oauth|authorize|sso|auth|adfs|saml/i.test(resolved.pathname) ||
+            detectIdentityProviderName([resolved.hostname]) !== null;
+          return looksAuthRelated ? resolved.origin : null;
         } catch {
           return null;
         }
       }),
   );
   const redirectHosts = redirectOrigins.map((origin) => new URL(origin).hostname);
+  const dedicatedRedirectOrigins = redirectOrigins.filter((origin) => origin !== finalUrl.origin);
   const loginPaths = unique(
     htmlSecurity.firstPartyPaths.filter((path) => /login|signin|oauth|authorize|sso|auth/i.test(path)),
   ).slice(0, DISCOVERY_PATH_LIMIT);
@@ -251,7 +265,9 @@ export const analyzeIdentityProvider = async (
     openIdConfigurationUrl,
     authorizationEndpoint,
     tokenEndpoint,
-    redirectOrigins,
+    redirectOrigins: dedicatedRedirectOrigins,
+    redirectUriSignals,
+    loginPaths,
   });
   const { tenantBrand, tenantRegion, tenantSignals } = extractTenantSignals(provider, issuer, metadataSnapshot);
 
@@ -264,7 +280,7 @@ export const analyzeIdentityProvider = async (
   if (protocol) {
     strengths.push(`Passive evidence suggests a ${protocol.toUpperCase()}-style identity flow.`);
   }
-  if (redirectOrigins.some((origin) => origin !== finalUrl.origin)) {
+  if (dedicatedRedirectOrigins.length) {
     strengths.push("Authentication redirects point to a dedicated identity origin.");
   }
   if (loginPaths.length) {
@@ -279,12 +295,15 @@ export const analyzeIdentityProvider = async (
   if (redirectUriSignals.length) {
     issues.push("Public markup exposed OAuth redirect_uri-style parameters worth review.");
   }
+  if (protocol && !provider && !openIdConfigurationUrl) {
+    issues.push("Identity-related flow signals were observed, but no provider or public metadata endpoint could be confirmed.");
+  }
   if (!provider && !openIdConfigurationUrl && !loginPaths.length && !redirectOrigins.length) {
     strengths.push("No obvious public IdP or OAuth surface was detected from passive signals.");
   }
 
   return {
-    detected: Boolean(provider || openIdConfigurationUrl || redirectOrigins.length || loginPaths.length),
+    detected: Boolean(provider || openIdConfigurationUrl || dedicatedRedirectOrigins.length || loginPaths.length || redirectUriSignals.length),
     provider,
     protocol,
     redirectOrigins,
