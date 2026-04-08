@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-08
+
+### Added
+
+- Added a real CLI for the published core package with summary, JSON, and Markdown output modes
+- Added richer monitoring diff reporting across transport, providers, AI, identity, WAF, and CT host changes
+- Added passive WAF and edge fingerprinting plus richer CT coverage rollups
+
+### Changed
+
+- Deepened passive IdP/OAuth posture analysis while reducing weak same-origin false positives
+- Tightened passive signal panel messaging so neutral states no longer read as contradictory
+- Polished domain, public trust, disclosure, and third-party trust panel rendering for more consistent report visuals
+- Consolidated duplicated core helpers and documented scanner configuration limits
+
+### Verified
+
+- `npm run release:core:check`
+- Local CLI smoke tests for summary, JSON, and Markdown output
+- Browser sanity checks across the revised trust/identity/third-party panels
+
 ## 2026-04-07
 
 ### Added

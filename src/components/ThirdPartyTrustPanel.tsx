@@ -34,6 +34,8 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
       return riskRank[left.risk] - riskRank[right.risk];
     })
     .slice(0, 6);
+  const footprintLabel =
+    thirdPartyTrust.totalProviders === 0 ? "Minimal" : thirdPartyTrust.totalProviders <= 5 ? "Moderate" : "Broad";
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -44,8 +46,9 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5">
-          <p className="text-sm text-slate-700">{thirdPartyTrust.summary}</p>
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-sky-700">Classification</p>
+          <p className="mt-2 text-lg font-semibold text-sky-950">{thirdPartyTrust.summary}</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -59,14 +62,14 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Footprint</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">
-              {thirdPartyTrust.totalProviders === 0 ? "Minimal" : thirdPartyTrust.totalProviders <= 5 ? "Moderate" : "Broad"}
-            </p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{footprintLabel}</p>
           </div>
         </div>
 
         {highlightedProviders.length > 0 && (
-          <div className="grid gap-3">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Highlighted providers</p>
+            <div className="mt-3 grid gap-3">
             {highlightedProviders.map((provider) => (
               <div key={provider.domain} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -85,6 +88,7 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
                 Showing the most important {highlightedProviders.length} providers from a total of {thirdPartyTrust.providers.length}.
               </p>
             )}
+            </div>
           </div>
         )}
 

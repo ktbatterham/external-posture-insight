@@ -9,7 +9,7 @@ interface DomainSecurityPanelProps {
 
 export const DomainSecurityPanel = ({ domainSecurity }: DomainSecurityPanelProps) => {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="h-full border-slate-200 shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mail className="h-5 w-5" />
@@ -18,36 +18,36 @@ export const DomainSecurityPanel = ({ domainSecurity }: DomainSecurityPanelProps
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">SPF</p>
-            <p className="mt-2 break-all text-sm text-slate-700">{domainSecurity.spf ?? "Not found"}</p>
+            <p className="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-700">{domainSecurity.spf ?? "Not found"}</p>
           </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">DMARC</p>
-            <p className="mt-2 break-all text-sm text-slate-700">{domainSecurity.dmarc ?? "Not found"}</p>
+            <p className="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-700">{domainSecurity.dmarc ?? "Not found"}</p>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">MX records</p>
-            <div className="mt-2 space-y-1 text-sm text-slate-700">
-              {domainSecurity.mxRecords.length ? domainSecurity.mxRecords.map((record) => <p key={record}>{record}</p>) : <p>None</p>}
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+              {domainSecurity.mxRecords.length ? domainSecurity.mxRecords.map((record) => <p key={record} className="overflow-hidden break-words">{record}</p>) : <p>None</p>}
             </div>
           </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">CAA records</p>
-            <div className="mt-2 space-y-1 text-sm text-slate-700">
-              {domainSecurity.caaRecords.length ? domainSecurity.caaRecords.map((record) => <p key={record}>{record}</p>) : <p>None</p>}
+            <div className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+              {domainSecurity.caaRecords.length ? domainSecurity.caaRecords.map((record) => <p key={record} className="overflow-hidden break-words">{record}</p>) : <p>None</p>}
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500">MTA-STS</p>
-          <div className="mt-2 space-y-2 text-sm text-slate-700">
-            <p>DNS: {domainSecurity.mtaSts.dns ?? "Not found"}</p>
-            {domainSecurity.mtaSts.policyUrl && <p>Policy URL: {domainSecurity.mtaSts.policyUrl}</p>}
+          <div className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+            <p className="overflow-hidden break-words">DNS: {domainSecurity.mtaSts.dns ?? "Not found"}</p>
+            {domainSecurity.mtaSts.policyUrl && <p className="overflow-hidden break-words">Policy URL: {domainSecurity.mtaSts.policyUrl}</p>}
             {domainSecurity.mtaSts.policy && (
               <pre className="overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-slate-100">
                 <code>{domainSecurity.mtaSts.policy}</code>
@@ -56,9 +56,9 @@ export const DomainSecurityPanel = ({ domainSecurity }: DomainSecurityPanelProps
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           {domainSecurity.nsRecords.slice(0, 6).map((record) => (
-            <Badge key={record} variant="outline">
+            <Badge key={record} variant="outline" className="max-w-full overflow-hidden break-all text-left">
               {record}
             </Badge>
           ))}

@@ -22,7 +22,7 @@ const formatStatus = (status: PublicSignalsInfo["hstsPreload"]["status"]) =>
 
 export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) => {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="h-full border-slate-200 shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Radar className="h-5 w-5" />
@@ -30,14 +30,14 @@ export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) =
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">HSTS preload dataset</p>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[publicSignals.hstsPreload.status]}`}>
               {formatStatus(publicSignals.hstsPreload.status)}
             </span>
           </div>
-          <p className="mt-3 text-sm text-slate-700">{publicSignals.hstsPreload.summary}</p>
+          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-slate-700">{publicSignals.hstsPreload.summary}</p>
           <a
             href={publicSignals.hstsPreload.sourceUrl}
             target="_blank"

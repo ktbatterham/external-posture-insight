@@ -6,6 +6,19 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-08
+
+### Added
+- A first-class CLI entrypoint with `scan`, summary/JSON/Markdown output, and file output support.
+- Richer monitoring diffs covering certificate windows, third-party providers, AI vendors, identity-provider changes, WAF changes, and CT priority-host changes.
+- WAF and edge fingerprinting with passive provider inference.
+- Certificate Transparency coverage rollups with prioritized and sampled hosts.
+
+### Changed
+- Deepened passive identity discovery with stronger OAuth/OIDC heuristics and less eager same-origin redirect attribution.
+- Improved passive-signal messaging and UI consistency for identity, CT, third-party trust, and disclosure/domain trust panels.
+- Consolidated duplicated core helpers and documented scanner limits in shared config.
+
 ## [0.2.0] - 2026-04-07
 
 ### Added
