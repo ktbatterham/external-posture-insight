@@ -181,6 +181,30 @@ export const getMonitoringAlerts = (analysis: AnalysisResult, diff: HistoryDiff 
     });
   }
 
+  if (diff?.newThirdPartyProviders.length) {
+    alerts.push({
+      title: "New third-party provider observed",
+      detail: `${diff.newThirdPartyProviders.length} new third-party provider${diff.newThirdPartyProviders.length === 1 ? "" : "s"} appeared since the previous snapshot.`,
+      severity: "info",
+    });
+  }
+
+  if (diff?.wafProviderChanges.newProviders.length) {
+    alerts.push({
+      title: "Edge or WAF posture changed",
+      detail: `New edge-protection signal${diff.wafProviderChanges.newProviders.length === 1 ? "" : "s"} appeared: ${diff.wafProviderChanges.newProviders.join(", ")}.`,
+      severity: "info",
+    });
+  }
+
+  if (diff?.identityProviderChange) {
+    alerts.push({
+      title: "Identity posture changed",
+      detail: `Identity provider changed from ${diff.identityProviderChange.from ?? "none"} to ${diff.identityProviderChange.to ?? "none"}.`,
+      severity: "warning",
+    });
+  }
+
   if (analysis.publicSignals.hstsPreload.status === "pending") {
     alerts.push({
       title: "HSTS preload submission appears pending",

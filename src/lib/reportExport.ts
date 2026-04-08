@@ -1,5 +1,5 @@
 import { getAiSurfaceClassificationSummary } from "@/lib/aiSurface";
-import { AnalysisResult } from "@/types/analysis";
+import { AnalysisResult, HistoryDiff } from "@/types/analysis";
 import { getAreaScores, getUnifiedIssueSummary } from "@/lib/posture";
 import { getAuthSurfaceSummary, getDataCollectionSummary } from "@/lib/passiveSurface";
 import { getPriorityActions } from "@/lib/priorities";
@@ -82,7 +82,7 @@ const buildThemeHtmlItems = (
         .join("")
     : "<li>No taxonomy themes recorded.</li>";
 
-export const buildMarkdownReport = (analysis: AnalysisResult) => {
+export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff | null = null) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
   const priorityActions = getPriorityActions(analysis);
@@ -139,6 +139,21 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
     ...(priorityActions.length
       ? priorityActions.map((action, index) => `- ${index + 1}. [${action.severity}] ${action.title}: ${action.detail}`)
       : ["- No priority actions generated."]),
+    "",
+    "## Changes Since Last Scan",
+    "",
+    ...(diff
+      ? [
+          `- Score delta: ${diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}${diff.scoreDelta ?? 0}`,
+          `- New issues: ${diff.newIssues.length}`,
+          `- Resolved issues: ${diff.resolvedIssues.length}`,
+          `- Header changes: ${diff.headerChanges.length}`,
+          `- New third parties: ${diff.newThirdPartyProviders.length}`,
+          `- New AI vendors: ${diff.newAiVendors.length}`,
+          `- New WAF signals: ${diff.wafProviderChanges.newProviders.length}`,
+          ...(diff.summary.length ? diff.summary.map((item) => `- ${item}`) : ["- No material posture changes summarized."]),
+        ]
+      : ["- No previous local snapshot available for comparison."]),
     "",
     "## security.txt",
     "",
@@ -259,7 +274,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult) => {
   ].join("\n");
 };
 
-export const buildHtmlReport = (analysis: AnalysisResult) => {
+export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | null = null) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
   const priorityActions = getPriorityActions(analysis);
@@ -362,6 +377,21 @@ export const buildHtmlReport = (analysis: AnalysisResult) => {
     <div class="card">
       <h2>Priority Actions</h2>
       <ul>${priorityItems}</ul>
+    </div>
+    <div class="card">
+      <h2>Changes Since Last Scan</h2>
+      ${diff
+        ? `
+      <p>Score delta: ${diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}${diff.scoreDelta ?? 0}</p>
+      <p>New issues: ${diff.newIssues.length}</p>
+      <p>Resolved issues: ${diff.resolvedIssues.length}</p>
+      <p>Header changes: ${diff.headerChanges.length}</p>
+      <p>New third parties: ${diff.newThirdPartyProviders.length}</p>
+      <p>New AI vendors: ${diff.newAiVendors.length}</p>
+      <p>New WAF signals: ${diff.wafProviderChanges.newProviders.length}</p>
+      <ul>${diff.summary.length ? diff.summary.map((item) => `<li>${item}</li>`).join("") : "<li>No material posture changes summarized.</li>"}</ul>
+      `
+        : "<p>No previous local snapshot available for comparison.</p>"}
     </div>
     <div class="card">
       <h2>Domain &amp; Email Security</h2>

@@ -180,6 +180,12 @@ const snapshotFromAnalysis = (analysis: AnalysisResult): HistorySnapshot => ({
   grade: analysis.grade,
   statusCode: analysis.statusCode,
   responseTimeMs: analysis.responseTimeMs,
+  certificateDaysRemaining: analysis.certificate.daysRemaining,
+  thirdPartyProviders: analysis.thirdPartyTrust.providers.map((provider) => provider.name),
+  aiVendors: analysis.aiSurface.vendors.map((vendor) => vendor.name),
+  identityProvider: analysis.identityProvider.provider,
+  wafProviders: analysis.wafFingerprint.providers.map((provider) => provider.name),
+  ctPriorityHosts: analysis.ctDiscovery.prioritizedHosts.map((host) => host.host),
   headers: analysis.headers.map((header) => ({
     label: header.label,
     status: header.status,
@@ -223,11 +229,58 @@ const buildHistoryDiff = (history: HistorySnapshot[]): HistoryDiff | null => {
   const currentIssues = new Set(current.issues.map((issue) => issue.title));
   const previousIssues = new Set(previous.issues.map((issue) => issue.title));
   const previousHeaders = new Map(previous.headers.map((header) => [header.label, header.status]));
+  const currentThirdParties = new Set(current.thirdPartyProviders ?? []);
+  const previousThirdParties = new Set(previous.thirdPartyProviders ?? []);
+  const currentAiVendors = new Set(current.aiVendors ?? []);
+  const previousAiVendors = new Set(previous.aiVendors ?? []);
+  const currentWafProviders = new Set(current.wafProviders ?? []);
+  const previousWafProviders = new Set(previous.wafProviders ?? []);
+  const currentCtPriorityHosts = new Set(current.ctPriorityHosts ?? []);
+  const previousCtPriorityHosts = new Set(previous.ctPriorityHosts ?? []);
+
+  const scoreDelta = current.score - previous.score;
+  const certificateDaysRemainingDelta =
+    current.certificateDaysRemaining !== null &&
+    current.certificateDaysRemaining !== undefined &&
+    previous.certificateDaysRemaining !== null &&
+    previous.certificateDaysRemaining !== undefined
+      ? current.certificateDaysRemaining - previous.certificateDaysRemaining
+      : null;
+
+  const summary = [
+    scoreDelta > 0 ? `Score improved by ${scoreDelta} point${scoreDelta === 1 ? "" : "s"}.` : null,
+    scoreDelta < 0 ? `Score regressed by ${Math.abs(scoreDelta)} point${Math.abs(scoreDelta) === 1 ? "" : "s"}.` : null,
+    current.statusCode !== previous.statusCode ? `HTTP status changed from ${previous.statusCode} to ${current.statusCode}.` : null,
+    (current.identityProvider ?? null) !== (previous.identityProvider ?? null)
+      ? `Identity provider changed from ${previous.identityProvider ?? "none"} to ${current.identityProvider ?? "none"}.`
+      : null,
+    [...currentWafProviders].filter((provider) => !previousWafProviders.has(provider)).length
+      ? `New WAF or edge signals appeared: ${[...currentWafProviders].filter((provider) => !previousWafProviders.has(provider)).join(", ")}.`
+      : null,
+    [...currentThirdParties].filter((provider) => !previousThirdParties.has(provider)).length
+      ? `New third-party providers were observed: ${[...currentThirdParties].filter((provider) => !previousThirdParties.has(provider)).join(", ")}.`
+      : null,
+    [...currentCtPriorityHosts].filter((host) => !previousCtPriorityHosts.has(host)).length
+      ? `New high-priority CT hosts appeared: ${[...currentCtPriorityHosts].filter((host) => !previousCtPriorityHosts.has(host)).join(", ")}.`
+      : null,
+    certificateDaysRemainingDelta !== null && certificateDaysRemainingDelta < 0
+      ? `Certificate window shortened by ${Math.abs(certificateDaysRemainingDelta)} day${Math.abs(certificateDaysRemainingDelta) === 1 ? "" : "s"}.`
+      : null,
+  ].filter((item): item is string => Boolean(item));
 
   return {
     previousScore: previous.score,
-    scoreDelta: current.score - previous.score,
+    scoreDelta,
     previousGrade: previous.grade,
+    statusCodeDelta: {
+      from: previous.statusCode,
+      to: current.statusCode,
+    },
+    certificateDaysRemainingDelta: {
+      from: previous.certificateDaysRemaining ?? null,
+      to: current.certificateDaysRemaining ?? null,
+      delta: certificateDaysRemainingDelta,
+    },
     newIssues: [...currentIssues].filter((issue) => !previousIssues.has(issue)),
     resolvedIssues: [...previousIssues].filter((issue) => !currentIssues.has(issue)),
     headerChanges: current.headers
@@ -237,6 +290,26 @@ const buildHistoryDiff = (history: HistorySnapshot[]): HistoryDiff | null => {
         to: header.status,
       }))
       .filter((change) => change.from !== change.to),
+    newThirdPartyProviders: [...currentThirdParties].filter((provider) => !previousThirdParties.has(provider)),
+    removedThirdPartyProviders: [...previousThirdParties].filter((provider) => !currentThirdParties.has(provider)),
+    newAiVendors: [...currentAiVendors].filter((vendor) => !previousAiVendors.has(vendor)),
+    removedAiVendors: [...previousAiVendors].filter((vendor) => !currentAiVendors.has(vendor)),
+    identityProviderChange:
+      (current.identityProvider ?? null) !== (previous.identityProvider ?? null)
+        ? {
+            from: previous.identityProvider ?? null,
+            to: current.identityProvider ?? null,
+          }
+        : null,
+    wafProviderChanges: {
+      newProviders: [...currentWafProviders].filter((provider) => !previousWafProviders.has(provider)),
+      removedProviders: [...previousWafProviders].filter((provider) => !currentWafProviders.has(provider)),
+    },
+    ctPriorityHostChanges: {
+      newHosts: [...currentCtPriorityHosts].filter((host) => !previousCtPriorityHosts.has(host)),
+      removedHosts: [...previousCtPriorityHosts].filter((host) => !currentCtPriorityHosts.has(host)),
+    },
+    summary,
   };
 };
 
@@ -425,7 +498,7 @@ const Index = () => {
     if (!analysisData) return;
     downloadFile(
       `security-report-${analysisData.host}.md`,
-      buildMarkdownReport(analysisData),
+      buildMarkdownReport(analysisData, historyDiff),
       "text/markdown;charset=utf-8",
     );
   };
@@ -434,7 +507,7 @@ const Index = () => {
     if (!analysisData) return;
     downloadFile(
       `security-report-${analysisData.host}.html`,
-      buildHtmlReport(analysisData),
+      buildHtmlReport(analysisData, historyDiff),
       "text/html;charset=utf-8",
     );
   };
@@ -480,7 +553,7 @@ const Index = () => {
     }
 
     frameDocument.open();
-    frameDocument.write(buildHtmlReport(analysisData));
+    frameDocument.write(buildHtmlReport(analysisData, historyDiff));
     frameDocument.close();
   };
 

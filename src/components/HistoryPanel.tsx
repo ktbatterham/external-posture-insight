@@ -85,6 +85,77 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
           </div>
         )}
 
+        {diff && (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-semibold text-sky-900">Third-party changes</p>
+              <div className="mt-3 space-y-2 text-sm text-sky-900">
+                {diff.newThirdPartyProviders.length
+                  ? diff.newThirdPartyProviders.map((provider) => <p key={`new-third-party-${provider}`}>New: {provider}</p>)
+                  : <p>No new providers</p>}
+                {diff.removedThirdPartyProviders.length
+                  ? diff.removedThirdPartyProviders.map((provider) => <p key={`old-third-party-${provider}`}>Removed: {provider}</p>)
+                  : null}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+              <p className="text-sm font-semibold text-violet-900">Identity / WAF</p>
+              <div className="mt-3 space-y-2 text-sm text-violet-900">
+                {diff.identityProviderChange ? (
+                  <p>
+                    IdP: {diff.identityProviderChange.from ?? "none"} {"->"} {diff.identityProviderChange.to ?? "none"}
+                  </p>
+                ) : (
+                  <p>No IdP change</p>
+                )}
+                {diff.wafProviderChanges.newProviders.length
+                  ? diff.wafProviderChanges.newProviders.map((provider) => <p key={`new-waf-${provider}`}>New WAF: {provider}</p>)
+                  : null}
+                {diff.wafProviderChanges.removedProviders.length
+                  ? diff.wafProviderChanges.removedProviders.map((provider) => <p key={`old-waf-${provider}`}>Removed WAF: {provider}</p>)
+                  : null}
+                {!diff.wafProviderChanges.newProviders.length && !diff.wafProviderChanges.removedProviders.length ? <p>No WAF change</p> : null}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-sm font-semibold text-emerald-900">CT / AI changes</p>
+              <div className="mt-3 space-y-2 text-sm text-emerald-900">
+                {diff.ctPriorityHostChanges.newHosts.length
+                  ? diff.ctPriorityHostChanges.newHosts.map((host) => <p key={`new-ct-${host}`}>New CT host: {host}</p>)
+                  : <p>No new CT priority hosts</p>}
+                {diff.newAiVendors.length
+                  ? diff.newAiVendors.map((vendor) => <p key={`new-ai-${vendor}`}>New AI vendor: {vendor}</p>)
+                  : null}
+                {diff.removedAiVendors.length
+                  ? diff.removedAiVendors.map((vendor) => <p key={`old-ai-${vendor}`}>Removed AI vendor: {vendor}</p>)
+                  : null}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">Transport delta</p>
+              <div className="mt-3 space-y-2 text-sm text-slate-700">
+                <p>
+                  HTTP: {diff.statusCodeDelta?.from ?? "unknown"} {"->"} {diff.statusCodeDelta?.to ?? "unknown"}
+                </p>
+                <p>
+                  Cert days: {diff.certificateDaysRemainingDelta?.from ?? "unknown"} {"->"} {diff.certificateDaysRemainingDelta?.to ?? "unknown"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {diff?.summary.length ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">What changed</p>
+            <div className="mt-3 space-y-2 text-sm text-slate-700">
+              {diff.summary.map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="grid gap-3">
           {history.map((snapshot) => (
             <div key={`${snapshot.scannedAt}-${snapshot.finalUrl}`} className="rounded-2xl border border-slate-200 bg-white p-4">

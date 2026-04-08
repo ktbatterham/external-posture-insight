@@ -120,6 +120,12 @@ export interface HistorySnapshot {
   grade: string;
   statusCode: number;
   responseTimeMs: number;
+  certificateDaysRemaining: number | null;
+  thirdPartyProviders: string[];
+  aiVendors: string[];
+  identityProvider: string | null;
+  wafProviders: string[];
+  ctPriorityHosts: string[];
   headers: Pick<SecurityHeaderResult, "label" | "status" | "value">[];
   issues: Pick<ScanIssue, "severity" | "title" | "detail" | "confidence" | "source">[];
 }
@@ -128,6 +134,15 @@ export interface HistoryDiff {
   previousScore: number | null;
   scoreDelta: number | null;
   previousGrade: string | null;
+  statusCodeDelta: {
+    from: number | null;
+    to: number | null;
+  } | null;
+  certificateDaysRemainingDelta: {
+    from: number | null;
+    to: number | null;
+    delta: number | null;
+  } | null;
   newIssues: string[];
   resolvedIssues: string[];
   headerChanges: Array<{
@@ -135,6 +150,23 @@ export interface HistoryDiff {
     from: string;
     to: string;
   }>;
+  newThirdPartyProviders: string[];
+  removedThirdPartyProviders: string[];
+  newAiVendors: string[];
+  removedAiVendors: string[];
+  identityProviderChange: {
+    from: string | null;
+    to: string | null;
+  } | null;
+  wafProviderChanges: {
+    newProviders: string[];
+    removedProviders: string[];
+  };
+  ctPriorityHostChanges: {
+    newHosts: string[];
+    removedHosts: string[];
+  };
+  summary: string[];
 }
 
 export interface SecurityTxtInfo {
