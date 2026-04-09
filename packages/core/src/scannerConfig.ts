@@ -20,6 +20,9 @@ export const CLIENT_EXPOSURE_EVIDENCE_LIMIT = 6;
 export const LIBRARY_RISK_LOOKUP_LIMIT = 8;
 export const OSV_QUERY_TIMEOUT_MS = 3_000;
 export const OSV_DETAIL_LOOKUP_LIMIT = 12;
+export const CT_LOOKUP_TIMEOUT_MS = 1_500;
+export const CT_CACHE_TTL_MS = 15 * 60 * 1_000;
+export const CT_SAMPLE_LIMIT = 4;
 
 // Redirect following stays shallow to reduce SSRF risk and keep scans close to
 // normal browser behavior.

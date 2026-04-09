@@ -12,9 +12,26 @@ const projectRoot = path.resolve(__dirname, "..");
 const distDir = path.join(projectRoot, "dist");
 const publicDir = path.join(projectRoot, "public");
 const port = Number(process.env.PORT || 8787);
+const isProduction = process.env.NODE_ENV === "production";
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
 const rateLimitBuckets = new Map();
+
+const log = (level, event, details = {}) => {
+  const payload = {
+    level,
+    event,
+    time: new Date().toISOString(),
+    ...details,
+  };
+
+  const line = JSON.stringify(payload);
+  if (level === "error" || level === "warn") {
+    console.error(line);
+    return;
+  }
+  console.log(line);
+};
 
 function getClientIp(request) {
   const forwarded = request.headers["x-forwarded-for"];
@@ -157,12 +174,17 @@ function serveStatic(requestPath, method, response) {
     return;
   }
 
+  const connectSources = ["'self'"];
+  if (!isProduction) {
+    connectSources.push("http://127.0.0.1:8787", "http://localhost:8787");
+  }
+
   response.writeHead(200, {
     "Content-Type": getMimeType(preferredPath),
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self' http://127.0.0.1:8787 http://localhost:8787;",
+    "Content-Security-Policy": `default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src ${connectSources.join(" ")};`,
   });
   if (method === "HEAD") {
     response.end();
@@ -182,6 +204,10 @@ const server = http.createServer(async (request, response) => {
   if (requestUrl.pathname === "/api/analyze") {
     const clientIp = getClientIp(request) || "unknown";
     if (rateLimitExceeded(clientIp)) {
+      log("warn", "rate_limit_exceeded", {
+        clientIp,
+        path: requestUrl.pathname,
+      });
       sendJson(response, 429, {
         error: "Too many analysis requests from this client. Please try again later.",
       });
@@ -191,11 +217,16 @@ const server = http.createServer(async (request, response) => {
     try {
       const target = requestUrl.searchParams.get("url") || "";
       const validatedTarget = await assertPublicHttpUrl(target);
+      log("info", "analysis_requested", {
+        clientIp,
+        target: validatedTarget.toString(),
+      });
       const result = await analyzeUrl(validatedTarget.toString());
       sendJson(response, 200, result);
     } catch (error) {
-      console.error("Analyze request failed", {
+      log("warn", "analysis_failed", {
         message: formatErrorMessage(error),
+        clientIp,
         target: requestUrl.searchParams.get("url") || "",
       });
       sendJson(response, 400, {
@@ -215,5 +246,9 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(port, () => {
-  console.log(`Secure Header Insight API listening on http://127.0.0.1:${port}`);
+  log("info", "server_started", {
+    port,
+    url: `http://127.0.0.1:${port}`,
+    production: isProduction,
+  });
 });

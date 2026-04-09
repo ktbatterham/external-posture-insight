@@ -1,13 +1,13 @@
+import {
+  CT_CACHE_TTL_MS,
+  CT_LOOKUP_TIMEOUT_MS,
+  CT_SAMPLE_LIMIT,
+} from "./scannerConfig.js";
 import type { CtDiscoveryInfo, CtDiscoveredHost, CtHostObservation } from "./types.js";
 import { unique } from "./utils.js";
 
 const CT_SUBDOMAIN_LIMIT = 20;
 const CT_WILDCARD_LIMIT = 5;
-// Keep CT enrichment fast and best-effort so third-party log latency does not
-// dominate the main posture scan.
-const CT_LOOKUP_TIMEOUT_MS = 1_500;
-const CT_CACHE_TTL_MS = 15 * 60 * 1000;
-const CT_SAMPLE_LIMIT = 4;
 
 interface CtCacheEntry {
   expiresAt: number;
