@@ -1880,6 +1880,7 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
     txtDmarcByHost,
     caaByHost,
     txtMtaStsByHost,
+    dsByHost,
   ] = await Promise.all([
     Promise.all(candidateHosts.map((candidate) => safeResolve(() => dns.resolveMx(candidate)))),
     Promise.all(candidateHosts.map((candidate) => safeResolve(() => dns.resolveNs(candidate)))),
@@ -1887,6 +1888,7 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
     Promise.all(candidateHosts.map((candidate) => safeResolve(() => dns.resolveTxt(`_dmarc.${candidate}`)))),
     Promise.all(candidateHosts.map((candidate) => safeResolve(() => dns.resolveCaa(candidate)))),
     Promise.all(candidateHosts.map((candidate) => safeResolve(() => dns.resolveTxt(`_mta-sts.${candidate}`)))),
+    Promise.all(candidateHosts.map((candidate) => safeResolve(() => dns.resolve(candidate, "DS")))),
   ]);
 
   const pickFirst = (values) => values.find((value) => value && value.length) || null;
@@ -1896,6 +1898,7 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
   const txtDmarc = pickFirst(txtDmarcByHost) || [];
   const caaRaw = pickFirst(caaByHost) || [];
   const txtMtaSts = pickFirst(txtMtaStsByHost) || [];
+  const dsRaw = pickFirst(dsByHost) || [];
 
   const mxRecords = (mxRecordsRaw || [])
     .sort((a, b) => a.priority - b.priority)
@@ -1909,6 +1912,7 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
       .filter(([key]) => key !== "critical")
       .map(([tag, value]) => `${tag} ${value}`),
   );
+  const dsRecords = (dsRaw || []).map((record) => `${record.keyTag} ${record.algorithm} ${record.digestType} ${record.digest}`);
   const spf = txtValues.find((value) => value.toLowerCase().startsWith("v=spf1")) || null;
   const dmarc = dmarcValues.find((value) => value.toLowerCase().startsWith("v=dmarc1")) || null;
   const mtaStsDns = mtaStsValues.find((value) => value.toLowerCase().startsWith("v=stsv1")) || null;
@@ -1948,6 +1952,12 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
     strengths.push("CAA records restrict which certificate authorities may issue for the domain.");
   }
 
+  if (!dsRecords.length) {
+    issues.push("No DNSSEC DS records detected at the domain apex.");
+  } else {
+    strengths.push("DNSSEC DS records are published.");
+  }
+
   if (!mtaStsDns) {
     issues.push("No MTA-STS DNS policy record detected.");
   } else if (!mtaStsPolicy.policy) {
@@ -1961,6 +1971,11 @@ async function analyzeDomainSecurity(host: string): Promise<DomainSecurityInfo> 
     mxRecords,
     nsRecords,
     caaRecords,
+    dnssec: {
+      enabled: dsRecords.length > 0,
+      dsRecords,
+      status: dsRecords.length > 0 ? "signed" : "not_signed",
+    },
     spf,
     dmarc,
     mtaSts: {

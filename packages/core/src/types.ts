@@ -190,6 +190,11 @@ export interface DomainSecurityInfo {
   mxRecords: string[];
   nsRecords: string[];
   caaRecords: string[];
+  dnssec: {
+    enabled: boolean;
+    dsRecords: string[];
+    status: "signed" | "not_signed" | "unknown";
+  };
   spf: string | null;
   dmarc: string | null;
   mtaSts: {
@@ -239,6 +244,12 @@ export interface CtHostObservation {
   responseKind: "html" | "json" | "redirect" | "other" | "unknown";
   identityProvider: string | null;
   edgeProvider: string | null;
+  cnameTargets: string[];
+  suspectedTakeover: {
+    provider: string;
+    confidence: IssueConfidence;
+    evidence: string;
+  } | null;
   note: string;
 }
 

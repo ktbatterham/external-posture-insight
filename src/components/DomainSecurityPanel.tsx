@@ -44,6 +44,20 @@ export const DomainSecurityPanel = ({ domainSecurity }: DomainSecurityPanelProps
         </div>
 
         <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">DNSSEC</p>
+          <div className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
+            <p>Status: {domainSecurity.dnssec.status === "signed" ? "Signed" : domainSecurity.dnssec.status === "not_signed" ? "Not signed" : "Unknown"}</p>
+            {domainSecurity.dnssec.dsRecords.length ? (
+              domainSecurity.dnssec.dsRecords.map((record) => (
+                <p key={record} className="overflow-hidden break-words">{record}</p>
+              ))
+            ) : (
+              <p>No DS records detected.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500">MTA-STS</p>
           <div className="mt-2 space-y-2 text-sm leading-6 text-slate-700">
             <p className="overflow-hidden break-words">DNS: {domainSecurity.mtaSts.dns ?? "Not found"}</p>

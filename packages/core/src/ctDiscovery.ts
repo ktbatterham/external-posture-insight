@@ -1,3 +1,4 @@
+import dns from "node:dns/promises";
 import {
   CT_CACHE_TTL_MS,
   CT_LOOKUP_TIMEOUT_MS,
@@ -29,6 +30,14 @@ type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => 
 type RequestTextFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => Promise<TextResponse>;
 
 const ctCache = new Map<string, CtCacheEntry>();
+
+const safeResolve = async <T>(operation: () => Promise<T>): Promise<T | null> => {
+  try {
+    return await operation();
+  } catch {
+    return null;
+  }
+};
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -90,6 +99,39 @@ const WAF_PATTERNS = [
   { name: "Sucuri", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(headerValue(headers, "x-sucuri-id") || headerValue(headers, "x-sucuri-cache") || /sucuri/i.test(headerValue(headers, "server") || "") || /sucuri website firewall/i.test(body)) },
   { name: "Fastly", test: (headers: Record<string, string | string[] | undefined>) => Boolean((headerValue(headers, "x-served-by") || "").toLowerCase().includes("cache-") || (headerValue(headers, "x-cache") || "").toLowerCase().includes("fastly")) },
   { name: "AWS WAF / CloudFront", test: (headers: Record<string, string | string[] | undefined>) => Boolean(headerValue(headers, "x-amz-cf-id") || /cloudfront/i.test(headerValue(headers, "server") || "")) },
+];
+
+const TAKEOVER_SIGNATURES = [
+  {
+    provider: "GitHub Pages",
+    targetPattern: /\.github\.io\.?$/i,
+    bodyPattern: /there isn't a github pages site here/i,
+    evidence: "CNAME points at GitHub Pages and the response matches the unclaimed-site pattern.",
+  },
+  {
+    provider: "Amazon S3",
+    targetPattern: /\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com\.?$/i,
+    bodyPattern: /<code>nosuchbucket<\/code>|the specified bucket does not exist/i,
+    evidence: "CNAME points at Amazon S3 and the response matches a missing-bucket pattern.",
+  },
+  {
+    provider: "Azure App Service",
+    targetPattern: /\.azurewebsites\.net\.?$/i,
+    bodyPattern: /404 web site not found|app service unavailable/i,
+    evidence: "CNAME points at Azure App Service and the response matches an unassigned-site pattern.",
+  },
+  {
+    provider: "Heroku",
+    targetPattern: /\.herokudns\.com\.?$/i,
+    bodyPattern: /no such app/i,
+    evidence: "CNAME points at Heroku and the response matches a missing-app pattern.",
+  },
+  {
+    provider: "Netlify",
+    targetPattern: /\.netlify\.app\.?$/i,
+    bodyPattern: /page not found|not found - request id/i,
+    evidence: "CNAME points at Netlify and the response looks like an unclaimed site.",
+  },
 ];
 
 const categorizeHost = (host: string): CtDiscoveredHost["category"] => {
@@ -211,7 +253,11 @@ const summarizeObservationNote = (
   location: string | null,
   identityProvider: string | null,
   edgeProvider: string | null,
+  suspectedTakeover: CtHostObservation["suspectedTakeover"],
 ) => {
+  if (suspectedTakeover) {
+    return `Possible takeover signal via ${suspectedTakeover.provider}. ${suspectedTakeover.evidence}`;
+  }
   if (location && identityProvider) {
     return `Redirects toward ${identityProvider} identity infrastructure.`;
   }
@@ -236,6 +282,23 @@ const summarizeObservationNote = (
   return `Observed HTTP ${statusCode}.`;
 };
 
+const detectTakeoverSignal = (cnameTargets: string[], body: string): CtHostObservation["suspectedTakeover"] => {
+  const normalizedTargets = cnameTargets.map((value) => value.toLowerCase());
+  const bodyLower = body.toLowerCase();
+
+  for (const signature of TAKEOVER_SIGNATURES) {
+    if (normalizedTargets.some((target) => signature.targetPattern.test(target)) && signature.bodyPattern.test(bodyLower)) {
+      return {
+        provider: signature.provider,
+        confidence: "medium",
+        evidence: signature.evidence,
+      };
+    }
+  }
+
+  return null;
+};
+
 const observeSampledHosts = async (
   prioritizedHosts: CtDiscoveredHost[],
   requestText: RequestTextFn,
@@ -244,6 +307,7 @@ const observeSampledHosts = async (
   const observations = await Promise.all(
     samples.map(async (hostInfo) => {
       const target = new URL(`https://${hostInfo.host}/`);
+      const cnameTargets = (await safeResolve(() => dns.resolveCname(hostInfo.host))) || [];
 
       try {
         const response = await withTimeout(
@@ -261,6 +325,7 @@ const observeSampledHosts = async (
         ].filter((value): value is string => Boolean(value)));
         const edgeProvider = detectEdgeProvider(response.headers, response.body);
         const responseKind = classifyResponseKind(response.statusCode, response.headers, response.body);
+        const suspectedTakeover = detectTakeoverSignal(cnameTargets, response.body);
 
         return {
           host: hostInfo.host,
@@ -272,7 +337,9 @@ const observeSampledHosts = async (
           responseKind,
           identityProvider,
           edgeProvider,
-          note: summarizeObservationNote(response.statusCode, responseKind, location, identityProvider, edgeProvider),
+          cnameTargets,
+          suspectedTakeover,
+          note: summarizeObservationNote(response.statusCode, responseKind, location, identityProvider, edgeProvider, suspectedTakeover),
         } satisfies CtHostObservation;
       } catch (error) {
         return {
@@ -285,6 +352,8 @@ const observeSampledHosts = async (
           responseKind: "unknown",
           identityProvider: null,
           edgeProvider: null,
+          cnameTargets,
+          suspectedTakeover: null,
           note: error instanceof Error ? error.message : "CT sample request failed.",
         } satisfies CtHostObservation;
       }
@@ -335,6 +404,7 @@ export const fetchCtDiscovery = async (
     const sampledHosts = await observeSampledHosts(prioritizedHosts, requestText);
     const authCount = prioritizedHosts.filter((entry) => entry.category === "auth").length;
     const edgeHits = sampledHosts.filter((entry) => entry.edgeProvider).length;
+    const takeoverHits = sampledHosts.filter((entry) => entry.suspectedTakeover);
     const coverageSummary = subdomains.length
       ? `CT logs surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} for ${queriedDomain}; ${prioritizedHosts.filter((entry) => entry.priority === "high").length} look high-priority and ${sampledHosts.length} were lightly sampled.`
       : `CT logs did not surface distinct subdomains for ${queriedDomain}.`;
@@ -354,6 +424,10 @@ export const fetchCtDiscovery = async (
         ...(authCount
           ? [`CT logs surfaced ${authCount} auth- or login-like host${authCount === 1 ? "" : "s"} worth reviewing.`]
           : []),
+        ...takeoverHits.map(
+          (entry) =>
+            `Possible subdomain takeover signal on ${entry.host} via ${entry.suspectedTakeover?.provider}. Review the DNS target and service ownership.`,
+        ),
       ],
       strengths: [
         ...(subdomains.length
@@ -364,6 +438,9 @@ export const fetchCtDiscovery = async (
           : []),
         ...(edgeHits
           ? [`${edgeHits} sampled host${edgeHits === 1 ? "" : "s"} showed edge or protection-provider signals.`]
+          : []),
+        ...(!takeoverHits.length && sampledHosts.some((entry) => entry.cnameTargets.length)
+          ? ["No obvious takeover-style signatures were observed among the sampled CT hosts."]
           : []),
       ],
     };

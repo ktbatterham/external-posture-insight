@@ -179,6 +179,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     "",
     `- SPF: ${analysis.domainSecurity.spf ?? "Not found"}`,
     `- DMARC: ${analysis.domainSecurity.dmarc ?? "Not found"}`,
+    `- DNSSEC: ${analysis.domainSecurity.dnssec.status}`,
     `- MX count: ${analysis.domainSecurity.mxRecords.length}`,
     `- CAA count: ${analysis.domainSecurity.caaRecords.length}`,
     "",
@@ -204,6 +205,11 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     `- Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}`,
     ...buildCtLines(analysis),
     ...buildCtSampleLines(analysis),
+    ...(analysis.ctDiscovery.sampledHosts.some((host) => host.suspectedTakeover)
+      ? analysis.ctDiscovery.sampledHosts
+          .filter((host) => host.suspectedTakeover)
+          .map((host) => `- Possible takeover: ${host.host} via ${host.suspectedTakeover?.provider} (${host.suspectedTakeover?.confidence} confidence)`)
+      : ["- No takeover-style signatures were observed in the sampled CT hosts."]),
     "",
     "## WAF & Edge Fingerprint",
     "",
@@ -415,6 +421,7 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
       <h2>Domain &amp; Email Security</h2>
       <p>SPF: ${analysis.domainSecurity.spf ?? "Not found"}</p>
       <p>DMARC: ${analysis.domainSecurity.dmarc ?? "Not found"}</p>
+      <p>DNSSEC: ${analysis.domainSecurity.dnssec.status}</p>
       <p>MX count: ${analysis.domainSecurity.mxRecords.length}</p>
       <p>CAA count: ${analysis.domainSecurity.caaRecords.length}</p>
     </div>
@@ -440,6 +447,12 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
       <p>Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}</p>
       <ul>${ctItems}</ul>
       <ul>${buildCtSampleLines(analysis).map((line) => `<li>${line.slice(2)}</li>`).join("")}</ul>
+      <ul>${analysis.ctDiscovery.sampledHosts.some((host) => host.suspectedTakeover)
+        ? analysis.ctDiscovery.sampledHosts
+            .filter((host) => host.suspectedTakeover)
+            .map((host) => `<li>Possible takeover: ${host.host} via ${host.suspectedTakeover?.provider} (${host.suspectedTakeover?.confidence} confidence)</li>`)
+            .join("")
+        : "<li>No takeover-style signatures were observed in the sampled CT hosts.</li>"}</ul>
     </div>
     <div class="card">
       <h2>WAF &amp; Edge Fingerprint</h2>

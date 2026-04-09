@@ -109,6 +109,14 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">{host.note}</p>
+                {host.suspectedTakeover ? (
+                  <p className="mt-2 text-xs font-medium text-amber-700">
+                    Possible takeover: {host.suspectedTakeover.provider} ({host.suspectedTakeover.confidence} confidence)
+                  </p>
+                ) : null}
+                {host.cnameTargets.length ? (
+                  <p className="mt-2 break-all text-xs text-slate-500">CNAME: {host.cnameTargets.join(", ")}</p>
+                ) : null}
                 {(host.identityProvider || host.edgeProvider) && (
                   <p className="mt-2 text-xs text-slate-600">
                     {host.identityProvider ? `IdP: ${host.identityProvider}` : "IdP: none"}
