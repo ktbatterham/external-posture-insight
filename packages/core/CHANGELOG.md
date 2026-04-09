@@ -6,6 +6,20 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-09
+
+### Added
+- Passive library risk detection from explicitly versioned script URLs with OSV-backed advisory lookups.
+- Score trending in the monitoring UI and a shared history-diff model exported from the core package.
+- CLI baseline comparison support via `--baseline <report.json>`.
+- Passive DNSSEC posture and certificate-transparency takeover clues from sampled CNAME evidence.
+
+### Changed
+- Hardened scan dispatch with stricter public-target revalidation on outbound requests.
+- Added explicit timeout handling around OIDC discovery and improved hosted-mode server boundary controls.
+- Versioned browser-local monitoring storage and surfaced clearer target-cap feedback in the app.
+- Unified app and package diff logic so monitoring and CLI comparisons use the same change model.
+
 ## [0.3.0] - 2026-04-08
 
 ### Added

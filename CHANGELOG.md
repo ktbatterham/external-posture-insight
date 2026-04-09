@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-09
+
+### Added
+
+- Added passive library version risk analysis backed by OSV for explicitly versioned client-side assets
+- Added score trending in monitoring history plus shared diff helpers now exposed by the core package
+- Added CLI baseline comparison mode for report-vs-report change summaries
+- Added DNSSEC posture and passive takeover clues from CT/CNAME observations
+
+### Changed
+
+- Hardened outbound scan requests with stricter public-IP revalidation and tighter OIDC discovery timeout handling
+- Added hosted-mode API key support, rate-limit bucket cleanup, and versioned browser-local monitoring storage
+- Unified app and package diff generation so browser monitoring and CLI comparisons now share the same model
+
+### Verified
+
+- `npm run release:core:check`
+- CLI smoke tests including `--baseline`
+- Local build, core tests, lint, and server syntax checks
+
 ## 2026-04-08
 
 ### Added
