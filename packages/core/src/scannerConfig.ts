@@ -23,6 +23,7 @@ export const OSV_DETAIL_LOOKUP_LIMIT = 12;
 export const CT_LOOKUP_TIMEOUT_MS = 1_500;
 export const CT_CACHE_TTL_MS = 15 * 60 * 1_000;
 export const CT_SAMPLE_LIMIT = 4;
+export const OIDC_DISCOVERY_TIMEOUT_MS = 4_000;
 
 // Redirect following stays shallow to reduce SSRF risk and keep scans close to
 // normal browser behavior.

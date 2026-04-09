@@ -46,6 +46,8 @@ import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
 const HISTORY_KEY = "secure-header-insight:history";
 const MONITORED_TARGETS_KEY = "secure-header-insight:monitored-targets";
+const STORAGE_SCHEMA_VERSION = 1;
+const MONITORED_TARGET_LIMIT = 12;
 
 interface RecentScan {
   url: string;
@@ -61,6 +63,11 @@ interface MonitoredTarget {
   lastScannedAt: string | null;
 }
 
+interface StorageEnvelope<T> {
+  version: number;
+  data: T;
+}
+
 const METRIC_CARD_CLASS =
   "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur";
 
@@ -74,17 +81,46 @@ const REPORT_SECTIONS = [
   { id: "cookies", label: "Cookies" },
 ] as const;
 
-const loadRecentScans = (): RecentScan[] => {
+const readStorageValue = <T,>(key: string, fallback: T): T => {
   if (typeof window === "undefined") {
-    return [];
+    return fallback;
   }
 
   try {
-    const raw = window.localStorage.getItem(RECENT_SCANS_KEY);
-    return raw ? (JSON.parse(raw) as RecentScan[]) : [];
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return fallback;
+    }
+
+    const parsed = JSON.parse(raw) as T | StorageEnvelope<T>;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "version" in parsed &&
+      "data" in parsed &&
+      typeof parsed.version === "number"
+    ) {
+      return parsed.version === STORAGE_SCHEMA_VERSION ? parsed.data : fallback;
+    }
+
+    return parsed as T;
   } catch {
-    return [];
+    return fallback;
   }
+};
+
+const writeStorageValue = <T,>(key: string, value: T) => {
+  window.localStorage.setItem(
+    key,
+    JSON.stringify({
+      version: STORAGE_SCHEMA_VERSION,
+      data: value,
+    } satisfies StorageEnvelope<T>),
+  );
+};
+
+const loadRecentScans = (): RecentScan[] => {
+  return readStorageValue<RecentScan[]>(RECENT_SCANS_KEY, []);
 };
 
 const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
@@ -92,25 +128,16 @@ const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
 
 const saveRecentScan = (current: RecentScan[], scan: RecentScan) => {
   const next = buildRecentScans(current, scan);
-  window.localStorage.setItem(RECENT_SCANS_KEY, JSON.stringify(next));
+  writeStorageValue(RECENT_SCANS_KEY, next);
   return next;
 };
 
 const loadMonitoredTargets = (): MonitoredTarget[] => {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(MONITORED_TARGETS_KEY);
-    return raw ? (JSON.parse(raw) as MonitoredTarget[]) : [];
-  } catch {
-    return [];
-  }
+  return readStorageValue<MonitoredTarget[]>(MONITORED_TARGETS_KEY, []);
 };
 
 const saveMonitoredTargets = (targets: MonitoredTarget[]) => {
-  window.localStorage.setItem(MONITORED_TARGETS_KEY, JSON.stringify(targets));
+  writeStorageValue(MONITORED_TARGETS_KEY, targets);
   return targets;
 };
 
@@ -160,16 +187,7 @@ const toMonitoredTargetView = (target: MonitoredTarget): MonitoredTargetView => 
 };
 
 const loadHistory = (): Record<string, HistorySnapshot[]> => {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(HISTORY_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, HistorySnapshot[]>) : {};
-  } catch {
-    return {};
-  }
+  return readStorageValue<Record<string, HistorySnapshot[]>>(HISTORY_KEY, {});
 };
 
 const snapshotFromAnalysis = (analysis: AnalysisResult): HistorySnapshot => ({
@@ -206,7 +224,7 @@ const saveHistorySnapshot = (analysis: AnalysisResult) => {
   const snapshot = snapshotFromAnalysis(analysis);
   const nextForHost = [snapshot, ...(current[key] || [])].slice(0, 10);
   const next = { ...current, [key]: nextForHost };
-  window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  writeStorageValue(HISTORY_KEY, next);
   return nextForHost;
 };
 
@@ -413,6 +431,12 @@ const Index = () => {
       return;
     }
 
+    const alreadyTracked = monitoredTargets.some((target) => target.url === analysisData.finalUrl);
+    if (!alreadyTracked && monitoredTargets.length >= MONITORED_TARGET_LIMIT) {
+      toast.error(`You can save up to ${MONITORED_TARGET_LIMIT} monitoring targets in this browser. Remove one first to add another.`);
+      return;
+    }
+
     setMonitoredTargets((current) => {
       const next = [
         {
@@ -423,7 +447,7 @@ const Index = () => {
           lastScannedAt: analysisData.scannedAt,
         },
         ...current.filter((target) => target.url !== analysisData.finalUrl),
-      ].slice(0, 12);
+      ].slice(0, MONITORED_TARGET_LIMIT);
       saveMonitoredTargets(next);
       return next;
     });

@@ -13,6 +13,7 @@ const distDir = path.join(projectRoot, "dist");
 const publicDir = path.join(projectRoot, "public");
 const port = Number(process.env.PORT || 8787);
 const isProduction = process.env.NODE_ENV === "production";
+const apiKey = process.env.API_KEY || "";
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
 const rateLimitBuckets = new Map();
@@ -116,6 +117,14 @@ async function assertPublicHttpUrl(rawTarget) {
   return targetUrl;
 }
 
+function getPresentedApiKey(request) {
+  const candidate = request.headers["x-api-key"];
+  if (Array.isArray(candidate)) {
+    return candidate[0] || "";
+  }
+  return typeof candidate === "string" ? candidate : "";
+}
+
 function rateLimitExceeded(clientIp) {
   const now = Date.now();
   const current = rateLimitBuckets.get(clientIp) || [];
@@ -124,6 +133,20 @@ function rateLimitExceeded(clientIp) {
   rateLimitBuckets.set(clientIp, recent);
   return recent.length > RATE_LIMIT_MAX_REQUESTS;
 }
+
+function sweepRateLimitBuckets() {
+  const now = Date.now();
+  for (const [clientIp, timestamps] of rateLimitBuckets.entries()) {
+    const recent = timestamps.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
+    if (recent.length) {
+      rateLimitBuckets.set(clientIp, recent);
+    } else {
+      rateLimitBuckets.delete(clientIp);
+    }
+  }
+}
+
+setInterval(sweepRateLimitBuckets, RATE_LIMIT_WINDOW_MS).unref();
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -203,6 +226,17 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === "/api/analyze") {
     const clientIp = getClientIp(request) || "unknown";
+    if (apiKey && getPresentedApiKey(request) !== apiKey) {
+      log("warn", "api_key_rejected", {
+        clientIp,
+        path: requestUrl.pathname,
+      });
+      sendJson(response, 401, {
+        error: "A valid API key is required to analyze targets from this deployment.",
+      });
+      return;
+    }
+
     if (rateLimitExceeded(clientIp)) {
       log("warn", "rate_limit_exceeded", {
         clientIp,

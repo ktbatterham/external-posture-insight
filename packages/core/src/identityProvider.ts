@@ -1,6 +1,6 @@
 import { URL } from "node:url";
 import type { CtDiscoveryInfo, HtmlSecurityInfo, IdentityProviderInfo, RedirectHop } from "./types.js";
-import { DISCOVERY_PATH_LIMIT, SUMMARY_EVIDENCE_LIMIT } from "./scannerConfig.js";
+import { DISCOVERY_PATH_LIMIT, OIDC_DISCOVERY_TIMEOUT_MS, SUMMARY_EVIDENCE_LIMIT } from "./scannerConfig.js";
 import { unique } from "./utils.js";
 
 interface JsonResponse<T = unknown> {
@@ -11,6 +11,23 @@ interface JsonResponse<T = unknown> {
 type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => Promise<JsonResponse>;
 
 const AUTH_HOST_LIMIT = 5;
+
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
 
 const IDENTITY_PROVIDER_PATTERNS = [
   { provider: "Microsoft Entra ID", pattern: /(^|\.)login\.microsoftonline\.com$/i },
@@ -244,7 +261,11 @@ export const analyzeIdentityProvider = async (
 
   for (const candidate of deriveOpenIdCandidates(finalUrl, redirects, htmlSecurity, authHostCandidates)) {
     try {
-      const response = await requestJson(new URL(candidate));
+      const response = await withTimeout(
+        requestJson(new URL(candidate)),
+        OIDC_DISCOVERY_TIMEOUT_MS,
+        "OIDC discovery timed out.",
+      );
       if (response.statusCode >= 200 && response.statusCode < 300 && response.json) {
         const metadata = response.json as Record<string, string | undefined>;
         metadataSnapshot = metadata;

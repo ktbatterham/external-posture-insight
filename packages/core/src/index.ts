@@ -947,7 +947,23 @@ function requestOnce(targetUrl: URL, method = "HEAD"): Promise<RequestHeadResult
   return requestWithHeaders(targetUrl, method);
 }
 
-function requestWithHeaders(targetUrl: URL, method = "HEAD", extraHeaders = {}): Promise<RequestHeadResult> {
+async function assertPublicRequestTarget(targetUrl: URL) {
+  if (isLocalHostname(targetUrl.hostname) || isPrivateAddress(targetUrl.hostname)) {
+    throw new Error(`Target ${targetUrl.hostname} is not public and was blocked.`);
+  }
+
+  if (net.isIP(targetUrl.hostname)) {
+    return;
+  }
+
+  const lookups = await dns.lookup(targetUrl.hostname, { all: true });
+  if (!lookups.length || lookups.some((entry) => isPrivateAddress(entry.address))) {
+    throw new Error(`Target ${targetUrl.hostname} did not resolve exclusively to public IP addresses.`);
+  }
+}
+
+async function requestWithHeaders(targetUrl: URL, method = "HEAD", extraHeaders = {}): Promise<RequestHeadResult> {
+  await assertPublicRequestTarget(targetUrl);
   const isHttps = targetUrl.protocol === "https:";
   const transport = isHttps ? https : http;
   const startedAt = Date.now();
@@ -983,7 +999,8 @@ function requestWithHeaders(targetUrl: URL, method = "HEAD", extraHeaders = {}):
   });
 }
 
-function requestText(targetUrl: URL, extraHeaders = {}): Promise<RequestTextResult> {
+async function requestText(targetUrl: URL, extraHeaders = {}): Promise<RequestTextResult> {
+  await assertPublicRequestTarget(targetUrl);
   const isHttps = targetUrl.protocol === "https:";
   const transport = isHttps ? https : http;
 
