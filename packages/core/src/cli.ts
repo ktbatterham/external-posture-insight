@@ -1,22 +1,29 @@
-#!/usr/bin/env node
-
 import { writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import process from "node:process";
-import { analyzeUrl, formatErrorMessage } from "./index.js";
-import type { AnalysisResult } from "./types.js";
+import { analyzeUrl, buildHistoryDiffFromSnapshots, formatErrorMessage, snapshotFromAnalysis } from "./index.js";
+import type { AnalysisResult, HistoryDiff } from "./types.js";
 
 type OutputFormat = "json" | "markdown" | "summary";
+type ScanCommand = {
+  command: "scan";
+  target: string;
+  format: OutputFormat;
+  outputPath: string | null;
+  baselinePath: string | null;
+};
 
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target> [--format json|markdown|summary] [--output <file>]
+  external-posture-insight scan <target> [--format json|markdown|summary] [--baseline <report.json>] [--output <file>]
   external-posture-insight --help
 
 Examples:
   npx @ktbatterham/external-posture-core scan example.com
   npx @ktbatterham/external-posture-core scan https://example.com --format markdown
   npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
+  npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
 `;
 
 const parseArgs = (argv: string[]) => {
@@ -38,6 +45,7 @@ const parseArgs = (argv: string[]) => {
 
   let format: OutputFormat = "summary";
   let outputPath: string | null = null;
+  let baselinePath: string | null = null;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -61,6 +69,16 @@ const parseArgs = (argv: string[]) => {
       continue;
     }
 
+    if (arg === "--baseline") {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error("Missing --baseline value.");
+      }
+      baselinePath = value;
+      index += 1;
+      continue;
+    }
+
     if (arg === "--help" || arg === "-h") {
       return { command: "help" as const };
     }
@@ -73,10 +91,41 @@ const parseArgs = (argv: string[]) => {
     target,
     format,
     outputPath,
+    baselinePath,
   };
 };
 
-const formatSummary = (analysis: AnalysisResult) =>
+const parseBaselineAnalysis = async (baselinePath: string) => {
+  const raw = await readFile(baselinePath, "utf8");
+  const parsed = JSON.parse(raw) as AnalysisResult | { analysis?: AnalysisResult };
+
+  if (parsed && typeof parsed === "object" && "analysis" in parsed && parsed.analysis) {
+    return parsed.analysis;
+  }
+
+  if (parsed && typeof parsed === "object" && "finalUrl" in parsed && "score" in parsed) {
+    return parsed as AnalysisResult;
+  }
+
+  throw new Error("Baseline file must contain a prior analysis JSON report.");
+};
+
+const formatDiffSummary = (diff: HistoryDiff | null) => {
+  if (!diff) {
+    return "Changes since baseline: No comparable baseline was provided.";
+  }
+
+  return [
+    "Changes since baseline:",
+    ...(
+      diff.summary.length
+        ? diff.summary
+        : ["No material posture changes summarized."]
+    ).map((item) => `- ${item}`),
+  ].join("\n");
+};
+
+const formatSummary = (analysis: AnalysisResult, diff: HistoryDiff | null = null) =>
   [
     `Target: ${analysis.inputUrl}`,
     `Final URL: ${analysis.finalUrl}`,
@@ -87,9 +136,10 @@ const formatSummary = (analysis: AnalysisResult) =>
     `Identity: ${analysis.identityProvider.provider ?? "None observed"}${analysis.identityProvider.protocol ? ` (${analysis.identityProvider.protocol.toUpperCase()})` : ""}`,
     `WAF/Edge: ${analysis.wafFingerprint.providers.length ? analysis.wafFingerprint.providers.map((provider) => provider.name).join(", ") : "None conclusively identified"}`,
     `CT coverage: ${analysis.ctDiscovery.coverageSummary}`,
+    ...(diff ? ["", formatDiffSummary(diff)] : []),
   ].join("\n");
 
-const formatMarkdown = (analysis: AnalysisResult) =>
+const formatMarkdown = (analysis: AnalysisResult, diff: HistoryDiff | null = null) =>
   [
     `# External Posture Insight: ${analysis.host}`,
     "",
@@ -130,16 +180,24 @@ const formatMarkdown = (analysis: AnalysisResult) =>
     ...(analysis.ctDiscovery.prioritizedHosts.length
       ? analysis.ctDiscovery.prioritizedHosts.slice(0, 8).map((host) => `- ${host.host} [${host.priority} ${host.category}]`)
       : ["- No prioritized CT hosts recorded."]),
+    ...(diff
+      ? [
+          "",
+          "## Changes Since Baseline",
+          "",
+          ...(diff.summary.length ? diff.summary.map((item) => `- ${item}`) : ["- No material posture changes summarized."]),
+        ]
+      : []),
   ].join("\n");
 
-const renderOutput = (analysis: AnalysisResult, format: OutputFormat) => {
+const renderOutput = (analysis: AnalysisResult, format: OutputFormat, diff: HistoryDiff | null = null) => {
   if (format === "json") {
-    return `${JSON.stringify(analysis, null, 2)}\n`;
+    return `${JSON.stringify(diff ? { analysis, diff } : analysis, null, 2)}\n`;
   }
   if (format === "markdown") {
-    return `${formatMarkdown(analysis)}\n`;
+    return `${formatMarkdown(analysis, diff)}\n`;
   }
-  return `${formatSummary(analysis)}\n`;
+  return `${formatSummary(analysis, diff)}\n`;
 };
 
 const main = async () => {
@@ -151,7 +209,11 @@ const main = async () => {
     }
 
     const analysis = await analyzeUrl(parsed.target);
-    const output = renderOutput(analysis, parsed.format);
+    const baselineAnalysis = parsed.baselinePath ? await parseBaselineAnalysis(parsed.baselinePath) : null;
+    const diff = baselineAnalysis
+      ? buildHistoryDiffFromSnapshots(snapshotFromAnalysis(analysis), snapshotFromAnalysis(baselineAnalysis))
+      : null;
+    const output = renderOutput(analysis, parsed.format, diff);
 
     if (parsed.outputPath) {
       await writeFile(parsed.outputPath, output, "utf8");

@@ -12,6 +12,8 @@ test("package surface exports expected public functions", async () => {
   assert.equal(typeof pkg.analyzeTarget, "function");
   assert.equal(typeof pkg.analyzeUrl, "function");
   assert.equal(typeof pkg.analyzeHtmlDocument, "function");
+  assert.equal(typeof pkg.snapshotFromAnalysis, "function");
+  assert.equal(typeof pkg.buildHistoryDiffFromSnapshots, "function");
   assert.equal(typeof pkg.formatErrorMessage, "function");
 });
 
@@ -21,4 +23,5 @@ test("package surface includes a working CLI help entrypoint", async () => {
 
   assert.match(stdout, /External Posture Insight CLI/);
   assert.match(stdout, /scan <target>/);
+  assert.match(stdout, /--baseline/);
 });

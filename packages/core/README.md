@@ -69,6 +69,12 @@ Write results to a file:
 npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
 ```
 
+Compare against a previously saved JSON report:
+
+```bash
+npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
+```
+
 Show usage:
 
 ```bash
@@ -87,6 +93,15 @@ console.log(result.score, result.grade);
 ```
 
 `analyzeTarget` remains available as a compatibility alias, but `analyzeUrl` is the primary public entrypoint.
+
+When a baseline report is supplied to the CLI, summary and Markdown output append a `Changes Since Baseline` section. JSON output returns:
+
+```json
+{
+  "analysis": { "...": "latest scan result" },
+  "diff": { "...": "structured change summary" }
+}
+```
 
 ### `analyzeHtmlDocument(url, html)`
 

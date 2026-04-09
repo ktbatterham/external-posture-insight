@@ -2387,4 +2387,5 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
 
 export const analyzeTarget = analyzeUrl;
 export { formatErrorMessage };
-export type { AnalysisResult, AnalyzeTargetOptions, HtmlSecurityInfo } from "./types";
+export { buildHistoryDiff, buildHistoryDiffFromSnapshots, snapshotFromAnalysis } from "./historyDiff.js";
+export type { AnalysisResult, AnalyzeTargetOptions, HistoryDiff, HistorySnapshot, HtmlSecurityInfo } from "./types";
