@@ -14,6 +14,8 @@ const publicDir = path.join(projectRoot, "public");
 const port = Number(process.env.PORT || 8787);
 const isProduction = process.env.NODE_ENV === "production";
 const apiKey = process.env.API_KEY || "";
+const allowUnauthenticated = process.env.ALLOW_UNAUTHENTICATED === "true";
+const trustProxy = process.env.TRUST_PROXY === "true";
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
 const rateLimitBuckets = new Map();
@@ -35,10 +37,12 @@ const log = (level, event, details = {}) => {
 };
 
 function getClientIp(request) {
-  const forwarded = request.headers["x-forwarded-for"];
-  const candidate = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  if (typeof candidate === "string" && candidate.trim()) {
-    return candidate.split(",")[0].trim();
+  if (trustProxy) {
+    const forwarded = request.headers["x-forwarded-for"];
+    const candidate = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.split(",")[0].trim();
+    }
   }
 
   const remoteAddress = request.socket.remoteAddress || "";
@@ -283,10 +287,33 @@ const server = http.createServer(async (request, response) => {
   response.end("Not found");
 });
 
+if (!apiKey) {
+  if (isProduction && !allowUnauthenticated) {
+    log("error", "server_start_blocked", {
+      reason: "API_KEY missing and ALLOW_UNAUTHENTICATED was not explicitly enabled.",
+    });
+    process.exit(1);
+  }
+
+  log("warn", "unauthenticated_mode", {
+    production: isProduction,
+    explicitOptIn: allowUnauthenticated,
+  });
+}
+
+if (trustProxy) {
+  log("warn", "trusted_proxy_mode", {
+    message: "TRUST_PROXY is enabled; X-Forwarded-For will be used for client IP attribution.",
+  });
+}
+
 server.listen(port, () => {
   log("info", "server_started", {
     port,
     url: `http://127.0.0.1:${port}`,
     production: isProduction,
+    authenticated: Boolean(apiKey),
+    allowUnauthenticated,
+    trustProxy,
   });
 });

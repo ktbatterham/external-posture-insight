@@ -5,6 +5,14 @@ import { getAuthSurfaceSummary, getDataCollectionSummary } from "@/lib/passiveSu
 import { getPriorityActions } from "@/lib/priorities";
 import { getDisclosurePosture, getDominantThemes } from "@/lib/reportInsights";
 
+const escapeHtml = (value: unknown) =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const buildExposureLines = (analysis: AnalysisResult) =>
   analysis.exposure.probes.map(
     (probe) => `- ${probe.label} (${probe.path}): ${probe.finding} (${probe.statusCode}) - ${probe.detail}`,
@@ -91,7 +99,7 @@ const buildThemeHtmlItems = (
     ? themes
         .map(
           (item) =>
-            `<li><strong>${item.label}</strong> (${item.count})<br>${item.summary}<br><em>Why it matters:</em> ${item.whyItMatters}${item.examples.length ? `<br><em>Driving findings:</em> ${item.examples.join("; ")}` : ""}</li>`,
+            `<li><strong>${escapeHtml(item.label)}</strong> (${item.count})<br>${escapeHtml(item.summary)}<br><em>Why it matters:</em> ${escapeHtml(item.whyItMatters)}${item.examples.length ? `<br><em>Driving findings:</em> ${escapeHtml(item.examples.join("; "))}` : ""}</li>`,
         )
         .join("")
     : "<li>No taxonomy themes recorded.</li>";
@@ -308,40 +316,40 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     ? analysis.issues
         .map(
           (issue) =>
-            `<li><strong>[${issue.severity} | ${issue.confidence} confidence | ${issue.source}${issue.owasp.length ? ` | OWASP: ${issue.owasp.join(", ")}` : ""}${issue.mitre.length ? ` | MITRE: ${issue.mitre.join(", ")}` : ""}] ${issue.title}</strong><br>${issue.detail}</li>`,
+            `<li><strong>[${escapeHtml(issue.severity)} | ${escapeHtml(issue.confidence)} confidence | ${escapeHtml(issue.source)}${issue.owasp.length ? ` | OWASP: ${escapeHtml(issue.owasp.join(", "))}` : ""}${issue.mitre.length ? ` | MITRE: ${escapeHtml(issue.mitre.join(", "))}` : ""}] ${escapeHtml(issue.title)}</strong><br>${escapeHtml(issue.detail)}</li>`,
         )
         .join("")
     : "<li>No core findings recorded.</li>";
   const areaItems = areas
-    .map((area) => `<li><strong>${area.label}</strong>: ${area.score}/100 (${area.status})</li>`)
+    .map((area) => `<li><strong>${escapeHtml(area.label)}</strong>: ${area.score}/100 (${escapeHtml(area.status)})</li>`)
     .join("");
   const priorityItems = priorityActions.length
     ? priorityActions
-        .map((action) => `<li><strong>[${action.severity}] ${action.title}</strong><br>${action.detail}</li>`)
+        .map((action) => `<li><strong>[${escapeHtml(action.severity)}] ${escapeHtml(action.title)}</strong><br>${escapeHtml(action.detail)}</li>`)
         .join("")
     : "<li>No priority actions generated.</li>";
   const exposureItems = buildExposureLines(analysis)
-    .map((line) => `<li>${line.slice(2)}</li>`)
+    .map((line) => `<li>${escapeHtml(line.slice(2))}</li>`)
     .join("");
   const technologyItems = analysis.technologies.length
     ? analysis.technologies
         .map(
           (tech) =>
-            `<li><strong>${tech.name}</strong> (${tech.category}, ${tech.detection}, ${tech.confidence} confidence)<br>${tech.evidence}</li>`,
+            `<li><strong>${escapeHtml(tech.name)}</strong> (${escapeHtml(tech.category)}, ${escapeHtml(tech.detection)}, ${escapeHtml(tech.confidence)} confidence)<br>${escapeHtml(tech.evidence)}</li>`,
         )
         .join("")
     : "<li>No stack signals recorded.</li>";
   const discoveryItems = analysis.htmlSecurity.firstPartyPaths.length
-    ? analysis.htmlSecurity.firstPartyPaths.map((path) => `<li>${path}</li>`).join("")
+    ? analysis.htmlSecurity.firstPartyPaths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")
     : "<li>No same-origin paths discovered from the fetched page.</li>";
   const passiveLeakItems = buildPassiveLeakLines(analysis)
-    .map((line) => `<li>${line.slice(2)}</li>`)
+    .map((line) => `<li>${escapeHtml(line.slice(2))}</li>`)
     .join("");
   const libraryRiskItems = buildLibraryRiskLines(analysis)
-    .map((line) => `<li>${line.slice(2)}</li>`)
+    .map((line) => `<li>${escapeHtml(line.slice(2))}</li>`)
     .join("");
   const ctItems = buildCtLines(analysis)
-    .map((line) => `<li>${line.slice(2)}</li>`)
+    .map((line) => `<li>${escapeHtml(line.slice(2))}</li>`)
     .join("");
   const owaspThemeItems = buildThemeHtmlItems(taxonomy.owasp);
   const mitreThemeItems = buildThemeHtmlItems(taxonomy.mitre);
@@ -351,7 +359,7 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Security Report - ${analysis.host}</title>
+    <title>Security Report - ${escapeHtml(analysis.host)}</title>
     <style>
       body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 40px; color: #0f172a; }
       h1, h2 { margin-bottom: 8px; }
@@ -361,19 +369,19 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     </style>
   </head>
   <body>
-    <h1>Security Report: ${analysis.host}</h1>
+    <h1>Security Report: ${escapeHtml(analysis.host)}</h1>
     <div class="meta">
-      <p>Final URL: ${analysis.finalUrl}</p>
-      <p>Scanned: ${new Date(analysis.scannedAt).toLocaleString()}</p>
-      <p>Grade: ${analysis.grade}</p>
+      <p>Final URL: ${escapeHtml(analysis.finalUrl)}</p>
+      <p>Scanned: ${escapeHtml(new Date(analysis.scannedAt).toLocaleString())}</p>
+      <p>Grade: ${escapeHtml(analysis.grade)}</p>
       <p>Score: ${analysis.score}/100</p>
       <p>Status: ${analysis.statusCode}</p>
     </div>
     <div class="card">
       <h2>Executive Readout</h2>
-      <p>${analysis.executiveSummary.overview}</p>
-      <p><strong>Main risk:</strong> ${analysis.executiveSummary.mainRisk}</p>
-      <ul>${analysis.executiveSummary.takeaways.map((takeaway) => `<li>${takeaway}</li>`).join("")}</ul>
+      <p>${escapeHtml(analysis.executiveSummary.overview)}</p>
+      <p><strong>Main risk:</strong> ${escapeHtml(analysis.executiveSummary.mainRisk)}</p>
+      <ul>${analysis.executiveSummary.takeaways.map((takeaway) => `<li>${escapeHtml(takeaway)}</li>`).join("")}</ul>
     </div>
     <div class="card">
       <h2>Summary</h2>
@@ -383,7 +391,7 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     </div>
     <div class="card">
       <h2>Risk Themes</h2>
-      <p>${taxonomy.summary}</p>
+      <p>${escapeHtml(taxonomy.summary)}</p>
       <p><strong>OWASP themes</strong></p>
       <ul>${owaspThemeItems}</ul>
       <p><strong>MITRE relevance</strong></p>
@@ -413,73 +421,73 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
       <p>New third parties: ${diff.newThirdPartyProviders.length}</p>
       <p>New AI vendors: ${diff.newAiVendors.length}</p>
       <p>New WAF signals: ${diff.wafProviderChanges.newProviders.length}</p>
-      <ul>${diff.summary.length ? diff.summary.map((item) => `<li>${item}</li>`).join("") : "<li>No material posture changes summarized.</li>"}</ul>
+      <ul>${diff.summary.length ? diff.summary.map((item) => `<li>${escapeHtml(item)}</li>`).join("") : "<li>No material posture changes summarized.</li>"}</ul>
       `
         : "<p>No previous local snapshot available for comparison.</p>"}
     </div>
     <div class="card">
       <h2>Domain &amp; Email Security</h2>
-      <p>SPF: ${analysis.domainSecurity.spf ?? "Not found"}</p>
-      <p>DMARC: ${analysis.domainSecurity.dmarc ?? "Not found"}</p>
-      <p>DNSSEC: ${analysis.domainSecurity.dnssec.status}</p>
+      <p>SPF: ${escapeHtml(analysis.domainSecurity.spf ?? "Not found")}</p>
+      <p>DMARC: ${escapeHtml(analysis.domainSecurity.dmarc ?? "Not found")}</p>
+      <p>DNSSEC: ${escapeHtml(analysis.domainSecurity.dnssec.status)}</p>
       <p>MX count: ${analysis.domainSecurity.mxRecords.length}</p>
       <p>CAA count: ${analysis.domainSecurity.caaRecords.length}</p>
     </div>
     <div class="card">
       <h2>Identity Provider &amp; OAuth Surface</h2>
       <p>Detected: ${analysis.identityProvider.detected ? "Yes" : "No"}</p>
-      <p>Provider: ${analysis.identityProvider.provider ?? "Not identified"}</p>
-      <p>Protocol: ${analysis.identityProvider.protocol ?? "Not inferred"}</p>
-      <p>OIDC config: ${analysis.identityProvider.openIdConfigurationUrl ?? "Not observed"}</p>
-      <p>Redirect origins: ${analysis.identityProvider.redirectOrigins.length ? analysis.identityProvider.redirectOrigins.join(", ") : "None recorded"}</p>
-      <p>Auth-like hosts: ${analysis.identityProvider.authHostCandidates.length ? analysis.identityProvider.authHostCandidates.join(", ") : "None recorded"}</p>
-      <p>Login paths: ${analysis.identityProvider.loginPaths.length ? analysis.identityProvider.loginPaths.join(", ") : "None recorded"}</p>
-      <p>Tenant clues: ${analysis.identityProvider.tenantSignals.length ? analysis.identityProvider.tenantSignals.join(", ") : "None recorded"}</p>
+      <p>Provider: ${escapeHtml(analysis.identityProvider.provider ?? "Not identified")}</p>
+      <p>Protocol: ${escapeHtml(analysis.identityProvider.protocol ?? "Not inferred")}</p>
+      <p>OIDC config: ${escapeHtml(analysis.identityProvider.openIdConfigurationUrl ?? "Not observed")}</p>
+      <p>Redirect origins: ${escapeHtml(analysis.identityProvider.redirectOrigins.length ? analysis.identityProvider.redirectOrigins.join(", ") : "None recorded")}</p>
+      <p>Auth-like hosts: ${escapeHtml(analysis.identityProvider.authHostCandidates.length ? analysis.identityProvider.authHostCandidates.join(", ") : "None recorded")}</p>
+      <p>Login paths: ${escapeHtml(analysis.identityProvider.loginPaths.length ? analysis.identityProvider.loginPaths.join(", ") : "None recorded")}</p>
+      <p>Tenant clues: ${escapeHtml(analysis.identityProvider.tenantSignals.length ? analysis.identityProvider.tenantSignals.join(", ") : "None recorded")}</p>
       <ul>${analysis.identityProvider.redirectUriSignals.length
-        ? analysis.identityProvider.redirectUriSignals.map((signal) => `<li>Review redirect URI signal: ${signal}</li>`).join("")
+        ? analysis.identityProvider.redirectUriSignals.map((signal) => `<li>Review redirect URI signal: ${escapeHtml(signal)}</li>`).join("")
         : "<li>No public redirect_uri-style parameters were recorded.</li>"}</ul>
     </div>
     <div class="card">
       <h2>Certificate Transparency</h2>
-      <p>Queried domain: ${analysis.ctDiscovery.queriedDomain}</p>
-      <p>${analysis.ctDiscovery.coverageSummary}</p>
+      <p>Queried domain: ${escapeHtml(analysis.ctDiscovery.queriedDomain)}</p>
+      <p>${escapeHtml(analysis.ctDiscovery.coverageSummary)}</p>
       <p>Subdomains discovered: ${analysis.ctDiscovery.subdomains.length}</p>
       <p>Wildcard entries: ${analysis.ctDiscovery.wildcardEntries.length}</p>
       <ul>${ctItems}</ul>
-      <ul>${buildCtSampleLines(analysis).map((line) => `<li>${line.slice(2)}</li>`).join("")}</ul>
+      <ul>${buildCtSampleLines(analysis).map((line) => `<li>${escapeHtml(line.slice(2))}</li>`).join("")}</ul>
       <ul>${analysis.ctDiscovery.sampledHosts.some((host) => host.suspectedTakeover)
         ? analysis.ctDiscovery.sampledHosts
             .filter((host) => host.suspectedTakeover)
-            .map((host) => `<li>Possible takeover: ${host.host} via ${host.suspectedTakeover?.provider} (${host.suspectedTakeover?.confidence} confidence)</li>`)
+            .map((host) => `<li>Possible takeover: ${escapeHtml(host.host)} via ${escapeHtml(host.suspectedTakeover?.provider)} (${escapeHtml(host.suspectedTakeover?.confidence)} confidence)</li>`)
             .join("")
         : "<li>No takeover-style signatures were observed in the sampled CT hosts.</li>"}</ul>
     </div>
     <div class="card">
       <h2>WAF &amp; Edge Fingerprint</h2>
-      <p>${analysis.wafFingerprint.summary}</p>
-      <ul>${buildWafLines(analysis).map((line) => `<li>${line.slice(2)}</li>`).join("")}</ul>
+      <p>${escapeHtml(analysis.wafFingerprint.summary)}</p>
+      <ul>${buildWafLines(analysis).map((line) => `<li>${escapeHtml(line.slice(2))}</li>`).join("")}</ul>
       <ul>${analysis.wafFingerprint.edgeSignals.length
-        ? analysis.wafFingerprint.edgeSignals.map((signal) => `<li>${signal}</li>`).join("")
+        ? analysis.wafFingerprint.edgeSignals.map((signal) => `<li>${escapeHtml(signal)}</li>`).join("")
         : "<li>No extra edge evidence recorded.</li>"}</ul>
     </div>
     <div class="card">
       <h2>Public Trust Signals</h2>
-      <p>HSTS preload status: ${analysis.publicSignals.hstsPreload.status}</p>
-      <p>${analysis.publicSignals.hstsPreload.summary}</p>
+      <p>HSTS preload status: ${escapeHtml(analysis.publicSignals.hstsPreload.status)}</p>
+      <p>${escapeHtml(analysis.publicSignals.hstsPreload.summary)}</p>
     </div>
     <div class="card">
       <h2>Disclosure & Trust</h2>
-      <p>${disclosure.summary}</p>
+      <p>${escapeHtml(disclosure.summary)}</p>
       <ul>
-        ${disclosure.discoveredPages.length ? disclosure.discoveredPages.map((item) => `<li>Discovered page: ${item}</li>`).join("") : "<li>No obvious trust or policy pages discovered.</li>"}
-        ${disclosure.strengths.map((item) => `<li>${item}</li>`).join("")}
-        ${disclosure.issues.map((item) => `<li>${item}</li>`).join("")}
+        ${disclosure.discoveredPages.length ? disclosure.discoveredPages.map((item) => `<li>Discovered page: ${escapeHtml(item)}</li>`).join("") : "<li>No obvious trust or policy pages discovered.</li>"}
+        ${disclosure.strengths.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        ${disclosure.issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
     </div>
     <div class="card">
       <h2>Passive Discovery</h2>
-      <p>Page title: ${analysis.htmlSecurity.pageTitle ?? "Unavailable"}</p>
-      <p>Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}</p>
+      <p>Page title: ${escapeHtml(analysis.htmlSecurity.pageTitle ?? "Unavailable")}</p>
+      <p>Discovery sources: ${escapeHtml(analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded")}</p>
       <ul>${discoveryItems}</ul>
       <p>Passive leak and fingerprinting signals:</p>
       <ul>${passiveLeakItems}</ul>
@@ -488,23 +496,23 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     </div>
     <div class="card">
       <h2>Auth Surface</h2>
-      <p>${authSurface.summary}</p>
+      <p>${escapeHtml(authSurface.summary)}</p>
       <p>Auth paths: ${authSurface.authPaths.length}</p>
       <p>Password forms: ${authSurface.passwordFormCount}</p>
       <p>External password targets: ${authSurface.externalPasswordForms.length}</p>
       <ul>${authSurface.authPaths.length
-        ? authSurface.authPaths.map((item) => `<li>${item.path} (${item.category})</li>`).join("")
+        ? authSurface.authPaths.map((item) => `<li>${escapeHtml(item.path)} (${escapeHtml(item.category)})</li>`).join("")
         : "<li>No auth-adjacent paths discovered passively.</li>"}</ul>
     </div>
     <div class="card">
       <h2>Data Collection Surface</h2>
-      <p>${dataCollection.summary}</p>
+      <p>${escapeHtml(dataCollection.summary)}</p>
       <p>Public forms: ${dataCollection.totalForms}</p>
       <p>POST forms: ${dataCollection.postForms}</p>
       <p>External form targets: ${dataCollection.externalForms.length}</p>
       <p>Insecure form submits: ${dataCollection.insecureForms}</p>
       <ul>${dataCollection.externalForms.length
-        ? dataCollection.externalForms.map((target) => `<li>${target}</li>`).join("")
+        ? dataCollection.externalForms.map((target) => `<li>${escapeHtml(target)}</li>`).join("")
         : "<li>No external form targets were detected.</li>"}</ul>
     </div>
     <div class="card">
@@ -513,22 +521,22 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     </div>
     <div class="card">
       <h2>Third-Party Trust</h2>
-      <p>${analysis.thirdPartyTrust.summary}</p>
+      <p>${escapeHtml(analysis.thirdPartyTrust.summary)}</p>
       <p>Providers detected: ${analysis.thirdPartyTrust.totalProviders}</p>
       <p>Higher-risk providers: ${analysis.thirdPartyTrust.highRiskProviders}</p>
       <ul>${analysis.thirdPartyTrust.providers.length
-        ? analysis.thirdPartyTrust.providers.map((provider) => `<li><strong>${provider.name}</strong> [${provider.category} | ${provider.risk} risk] ${provider.domain}<br>${provider.evidence}</li>`).join("")
+        ? analysis.thirdPartyTrust.providers.map((provider) => `<li><strong>${escapeHtml(provider.name)}</strong> [${escapeHtml(provider.category)} | ${escapeHtml(provider.risk)} risk] ${escapeHtml(provider.domain)}<br>${escapeHtml(provider.evidence)}</li>`).join("")
         : "<li>No third-party providers recorded.</li>"}</ul>
     </div>
     <div class="card">
       <h2>AI Surface</h2>
-      <p>Classification: ${aiSummary}</p>
+      <p>Classification: ${escapeHtml(aiSummary)}</p>
       <p>AI detected: ${analysis.aiSurface.detected ? "Yes" : "No"}</p>
       <p>Assistant visible: ${analysis.aiSurface.assistantVisible ? "Yes" : "No"}</p>
-      <p>Vendors: ${analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected"}</p>
-      <p>AI paths: ${analysis.aiSurface.discoveredPaths.length ? analysis.aiSurface.discoveredPaths.join(", ") : "None detected"}</p>
-      <p>AI privacy signals: ${analysis.aiSurface.privacySignals.length ? analysis.aiSurface.privacySignals.join(" ") : "None detected"}</p>
-      <p>AI governance signals: ${analysis.aiSurface.governanceSignals.length ? analysis.aiSurface.governanceSignals.join(" ") : "None detected"}</p>
+      <p>Vendors: ${escapeHtml(analysis.aiSurface.vendors.length ? analysis.aiSurface.vendors.map((vendor) => vendor.name).join(", ") : "None detected")}</p>
+      <p>AI paths: ${escapeHtml(analysis.aiSurface.discoveredPaths.length ? analysis.aiSurface.discoveredPaths.join(", ") : "None detected")}</p>
+      <p>AI privacy signals: ${escapeHtml(analysis.aiSurface.privacySignals.length ? analysis.aiSurface.privacySignals.join(" ") : "None detected")}</p>
+      <p>AI governance signals: ${escapeHtml(analysis.aiSurface.governanceSignals.length ? analysis.aiSurface.governanceSignals.join(" ") : "None detected")}</p>
     </div>
     <div class="card">
       <h2>Low-Noise Exposure Checks</h2>

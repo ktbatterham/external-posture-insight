@@ -5,13 +5,6 @@ import { analyzeUrl, buildHistoryDiffFromSnapshots, formatErrorMessage, snapshot
 import type { AnalysisResult, HistoryDiff } from "./types.js";
 
 type OutputFormat = "json" | "markdown" | "summary";
-type ScanCommand = {
-  command: "scan";
-  target: string;
-  format: OutputFormat;
-  outputPath: string | null;
-  baselinePath: string | null;
-};
 
 const usage = `External Posture Insight CLI
 
@@ -97,7 +90,13 @@ const parseArgs = (argv: string[]) => {
 
 const parseBaselineAnalysis = async (baselinePath: string) => {
   const raw = await readFile(baselinePath, "utf8");
-  const parsed = JSON.parse(raw) as AnalysisResult | { analysis?: AnalysisResult };
+  let parsed: AnalysisResult | { analysis?: AnalysisResult };
+
+  try {
+    parsed = JSON.parse(raw) as AnalysisResult | { analysis?: AnalysisResult };
+  } catch {
+    throw new Error("Baseline file is not valid JSON.");
+  }
 
   if (parsed && typeof parsed === "object" && "analysis" in parsed && parsed.analysis) {
     return parsed.analysis;

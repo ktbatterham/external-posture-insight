@@ -26,12 +26,6 @@ const PATH_LABELS = [
   { pattern: /\/accessibility/i, label: "Accessibility" },
 ] as const;
 
-const formatLabel = (value: string) =>
-  value
-    .split(/\s+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-
 const countByLabel = <T extends string>(labels: T[]) => {
   const counts = new Map<T, number>();
   for (const label of labels) {

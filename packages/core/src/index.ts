@@ -37,10 +37,8 @@ import type {
   AnalysisResult,
   AnalyzeTargetOptions,
   CertificateResult,
-  CorsSecurityInfo,
   DomainSecurityInfo,
   HtmlSecurityInfo,
-  PublicSignalsInfo,
   RemediationSnippet,
   SecurityTxtInfo,
 } from "./types.js";
@@ -1234,7 +1232,6 @@ function collectPassiveLeakSignals(html, finalUrl, metaGenerator, externalScript
 
 function collectClientExposureSignals(html, finalUrl) {
   const signals = [];
-  const htmlLower = html.toLowerCase();
   const isLikelyApiAsset = (value) =>
     /\/assets?\//i.test(value) ||
     /\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot)(?:[?#]|$)/i.test(value);
