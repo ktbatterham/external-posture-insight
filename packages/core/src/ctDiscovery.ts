@@ -5,7 +5,8 @@ import {
   CT_SAMPLE_LIMIT,
 } from "./scannerConfig.js";
 import type { CtDiscoveryInfo, CtDiscoveredHost, CtHostObservation } from "./types.js";
-import { unique } from "./utils.js";
+import { detectIdentityProviderName } from "./identityProvider.js";
+import { headerValue, safeResolve, unique, withTimeout } from "./utils.js";
 
 const CT_SUBDOMAIN_LIMIT = 20;
 const CT_WILDCARD_LIMIT = 5;
@@ -31,31 +32,6 @@ type RequestTextFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => 
 
 const ctCache = new Map<string, CtCacheEntry>();
 
-const safeResolve = async <T>(operation: () => Promise<T>): Promise<T | null> => {
-  try {
-    return await operation();
-  } catch {
-    return null;
-  }
-};
-
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
-};
-
 const toDiscoveryDomain = (host: string) => {
   const normalized = host.replace(/\.$/, "").toLowerCase();
   const labels = normalized.split(".").filter(Boolean);
@@ -72,25 +48,6 @@ const toDiscoveryDomain = (host: string) => {
 
   return labels.slice(-2).join(".");
 };
-
-const headerValue = (headers: Record<string, string | string[] | undefined>, name: string) => {
-  const value = headers[name];
-  if (Array.isArray(value)) {
-    return value.join(", ");
-  }
-  return value ?? null;
-};
-
-const IDENTITY_PROVIDER_PATTERNS = [
-  { provider: "Microsoft Entra ID", pattern: /(^|\.)login\.microsoftonline\.com$/i },
-  { provider: "Okta", pattern: /(^|\.)okta(?:-emea)?\.com$/i },
-  { provider: "Auth0", pattern: /(^|\.)auth0\.com$/i },
-  { provider: "Ping Identity", pattern: /(^|\.)ping(?:one|identity)\.com$/i },
-  { provider: "OneLogin", pattern: /(^|\.)onelogin\.com$/i },
-  { provider: "Amazon Cognito", pattern: /amazoncognito\.com$/i },
-  { provider: "Google Identity", pattern: /(^|\.)accounts\.google\.com$/i },
-  { provider: "Keycloak", pattern: /keycloak/i },
-];
 
 const WAF_PATTERNS = [
   { name: "Cloudflare", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(headerValue(headers, "cf-ray") || /cloudflare/i.test(headerValue(headers, "server") || "") || /attention required|cloudflare/i.test(body)) },
@@ -206,17 +163,6 @@ const rankHosts = (hosts: string[]): CtDiscoveredHost[] =>
       );
     });
 
-const detectIdentityProvider = (values: string[]) => {
-  for (const value of values) {
-    for (const entry of IDENTITY_PROVIDER_PATTERNS) {
-      if (entry.pattern.test(value)) {
-        return entry.provider;
-      }
-    }
-  }
-  return null;
-};
-
 const detectEdgeProvider = (headers: Record<string, string | string[] | undefined>, body: string) => {
   for (const entry of WAF_PATTERNS) {
     if (entry.test(headers, body)) {
@@ -317,7 +263,7 @@ const observeSampledHosts = async (
         );
         const location = headerValue(response.headers, "location");
         const redirectTarget = location ? new URL(location, target).hostname : null;
-        const identityProvider = detectIdentityProvider([
+        const identityProvider = detectIdentityProviderName([
           hostInfo.host,
           redirectTarget,
           response.body,

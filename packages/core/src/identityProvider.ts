@@ -1,7 +1,7 @@
 import { URL } from "node:url";
 import type { CtDiscoveryInfo, HtmlSecurityInfo, IdentityProviderInfo, RedirectHop } from "./types.js";
 import { DISCOVERY_PATH_LIMIT, OIDC_DISCOVERY_TIMEOUT_MS, SUMMARY_EVIDENCE_LIMIT } from "./scannerConfig.js";
-import { unique } from "./utils.js";
+import { unique, withTimeout } from "./utils.js";
 
 interface JsonResponse<T = unknown> {
   statusCode: number;
@@ -12,24 +12,7 @@ type RequestJsonFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => 
 
 const AUTH_HOST_LIMIT = 5;
 
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
-};
-
-const IDENTITY_PROVIDER_PATTERNS = [
+export const IDENTITY_PROVIDER_PATTERNS = [
   { provider: "Microsoft Entra ID", pattern: /(^|\.)login\.microsoftonline\.com$/i },
   { provider: "Okta", pattern: /(^|\.)okta(?:-emea)?\.com$/i },
   { provider: "Auth0", pattern: /(^|\.)auth0\.com$/i },
@@ -40,7 +23,7 @@ const IDENTITY_PROVIDER_PATTERNS = [
   { provider: "Keycloak", pattern: /keycloak/i },
 ];
 
-const detectIdentityProviderName = (candidates: string[]) => {
+export const detectIdentityProviderName = (candidates: string[]) => {
   for (const candidate of candidates) {
     for (const entry of IDENTITY_PROVIDER_PATTERNS) {
       if (entry.pattern.test(candidate)) {
