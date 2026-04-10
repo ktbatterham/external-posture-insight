@@ -1,1 +1,1 @@
-export * from "../../packages/core/src/types";
+export * from "@ktbatterham/external-posture-core";

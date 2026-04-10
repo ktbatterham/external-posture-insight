@@ -82,6 +82,80 @@ const REPORT_SECTIONS = [
   { id: "cookies", label: "Cookies" },
 ] as const;
 
+const pruneStorageValue = (key: string) => {
+  const raw = window.localStorage.getItem(key);
+  if (!raw) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const unwrapData = (
+      value: unknown,
+    ): {
+      versioned: boolean;
+      data: unknown;
+    } => {
+      if (
+        value &&
+        typeof value === "object" &&
+        "version" in value &&
+        "data" in value
+      ) {
+        return {
+          versioned: true,
+          data: (value as StorageEnvelope<unknown>).data,
+        };
+      }
+
+      return {
+        versioned: false,
+        data: value,
+      };
+    };
+
+    const { versioned, data } = unwrapData(parsed);
+
+    if (Array.isArray(data)) {
+      if (!data.length) {
+        return false;
+      }
+      const next = data.slice(0, -1);
+      writeStorageValue(key, next);
+      return true;
+    }
+
+    if (data && typeof data === "object") {
+      const entries = Object.entries(data as Record<string, unknown>);
+      if (!entries.length) {
+        return false;
+      }
+
+      const nextRecord = Object.fromEntries(
+        entries
+          .map(([recordKey, value]) => {
+            if (Array.isArray(value) && value.length > 1) {
+              return [recordKey, value.slice(0, -1)];
+            }
+            return [recordKey, value];
+          })
+          .filter(([, value]) => !Array.isArray(value) || value.length > 0),
+      );
+
+      if (Object.keys(nextRecord).length === entries.length && versioned) {
+        return false;
+      }
+
+      writeStorageValue(key, nextRecord);
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+};
+
 const readStorageValue = <T,>(key: string, fallback: T): T => {
   if (typeof window === "undefined") {
     return fallback;
@@ -111,13 +185,34 @@ const readStorageValue = <T,>(key: string, fallback: T): T => {
 };
 
 const writeStorageValue = <T,>(key: string, value: T) => {
-  window.localStorage.setItem(
-    key,
-    JSON.stringify({
-      version: STORAGE_SCHEMA_VERSION,
-      data: value,
-    } satisfies StorageEnvelope<T>),
-  );
+  const serialized = JSON.stringify({
+    version: STORAGE_SCHEMA_VERSION,
+    data: value,
+  } satisfies StorageEnvelope<T>);
+
+  try {
+    window.localStorage.setItem(key, serialized);
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "QuotaExceededError") {
+      throw error;
+    }
+
+    const pruned = pruneStorageValue(key);
+    if (!pruned) {
+      console.warn(`[storage] Could not persist ${key}; browser storage quota was exceeded.`);
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(key, serialized);
+    } catch (retryError) {
+      if (retryError instanceof DOMException && retryError.name === "QuotaExceededError") {
+        console.warn(`[storage] Could not persist ${key} after pruning existing entries.`);
+        return;
+      }
+      throw retryError;
+    }
+  }
 };
 
 const loadRecentScans = (): RecentScan[] => {

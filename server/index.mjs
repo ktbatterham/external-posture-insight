@@ -97,6 +97,10 @@ async function assertPublicHttpUrl(rawTarget) {
     throw new Error("Only http and https URLs are supported.");
   }
 
+  if (targetUrl.username || targetUrl.password) {
+    throw new Error("URLs with embedded credentials are not supported.");
+  }
+
   const hostname = targetUrl.hostname.toLowerCase();
   if (hostname === "localhost" || hostname.endsWith(".localhost")) {
     throw new Error("Localhost and private network targets are not allowed.");
