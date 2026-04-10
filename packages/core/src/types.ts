@@ -335,6 +335,7 @@ export interface HtmlSecurityInfo {
   pageTitle: string | null;
   metaGenerator: string | null;
   forms: HtmlFormInfo[];
+  sameSiteHosts: string[];
   externalScriptDomains: string[];
   externalStylesheetDomains: string[];
   insecureResourceUrls: string[];

@@ -22,6 +22,7 @@ import {
 import {
   classifyHtmlApiFallback,
   collectClientExposureSignals,
+  collectSameSiteHosts,
   collectPassiveLeakSignals,
   extractHtmlTitle,
   getHtmlTitle,
@@ -149,6 +150,7 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
         pageTitle: null,
         metaGenerator: null,
         forms: [],
+        sameSiteHosts: [],
         externalScriptDomains: [],
         externalStylesheetDomains: [],
         insecureResourceUrls: [],
@@ -210,6 +212,14 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
       .map((link) => $(link).attr("href"))
       .filter(Boolean)
       .map((href) => new URL(href as string, finalUrl).toString());
+    const sameSiteHosts = collectSameSiteHosts(finalUrl, [
+      ...$("a[href]")
+        .toArray()
+        .map((anchor) => $(anchor).attr("href")),
+      ...scriptElements.map((script) => $(script).attr("src")),
+      ...$('link[rel~="stylesheet"]').toArray().map((link) => $(link).attr("href")),
+      ...forms.map((form) => form.action),
+    ]);
     const firstPartyPaths = rankDiscoveredPaths([
       ...$("a[href]")
         .toArray()
@@ -257,6 +267,11 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
     if (forms.some((form) => form.hasPasswordField)) {
       strengths.push("Login-like form elements are present for passive inspection.");
     }
+    if (sameSiteHosts.length) {
+      strengths.push(
+        `Page content referenced ${sameSiteHosts.length} same-site host${sameSiteHosts.length === 1 ? "" : "s"} for passive discovery.`,
+      );
+    }
     if (forms.some((form) => form.insecureSubmission)) {
       issues.push("At least one form appears to submit over HTTP.");
     }
@@ -301,6 +316,7 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
       pageTitle,
       metaGenerator: metaGenerator || null,
       forms,
+      sameSiteHosts,
       externalScriptDomains,
       externalStylesheetDomains,
       insecureResourceUrls,
@@ -330,6 +346,7 @@ function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle:
       pageTitle: null,
       metaGenerator: null,
       forms: [],
+      sameSiteHosts: [],
       externalScriptDomains: [],
       externalStylesheetDomains: [],
       insecureResourceUrls: [],

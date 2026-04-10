@@ -1,5 +1,5 @@
 import { CLIENT_EXPOSURE_EVIDENCE_LIMIT, HTML_SIGNATURE_LIMIT, SUMMARY_EVIDENCE_LIMIT } from "./scannerConfig.js";
-import { headerValue, unique } from "./utils.js";
+import { getSiteDomain, headerValue, unique } from "./utils.js";
 
 type ResponseHeaders = Record<string, string | string[] | undefined>;
 
@@ -220,6 +220,31 @@ export function collectClientExposureSignals(html: string, finalUrl: URL) {
   }
 
   return signals;
+}
+
+export function collectSameSiteHosts(
+  finalUrl: URL,
+  values: Array<string | null | undefined>,
+): string[] {
+  const siteDomain = getSiteDomain(finalUrl.hostname);
+
+  const hosts = values
+    .map((value) => {
+      if (!value) {
+        return null;
+      }
+
+      try {
+        return new URL(value, finalUrl).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
+    })
+    .filter((hostname): hostname is string => Boolean(hostname))
+    .filter((hostname) => hostname !== finalUrl.hostname.toLowerCase())
+    .filter((hostname) => getSiteDomain(hostname) === siteDomain);
+
+  return unique(hosts);
 }
 
 export function classifyHtmlApiFallback(

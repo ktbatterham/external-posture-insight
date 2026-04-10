@@ -7,7 +7,7 @@ import type {
   ThirdPartyProvider,
   ThirdPartyTrustInfo,
 } from "./types.js";
-import { unique } from "./utils.js";
+import { getSiteDomain, unique } from "./utils.js";
 
 const addDetectedTechnology = (
   target: TechnologyResult[],
@@ -284,22 +284,6 @@ const classifyThirdPartyProvider = (domain: string): Omit<ThirdPartyProvider, "d
     risk: "medium",
     evidence: "Detected from third-party assets loaded by the page",
   };
-};
-
-const getSiteDomain = (hostname: string): string => {
-  const lower = hostname.toLowerCase();
-  const parts = lower.split(".").filter(Boolean);
-  if (parts.length <= 2) {
-    return lower;
-  }
-
-  const compoundSuffixes = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "co.nz"]);
-  const suffix = parts.slice(-2).join(".");
-  if (compoundSuffixes.has(suffix) && parts.length >= 3) {
-    return parts.slice(-3).join(".");
-  }
-
-  return parts.slice(-2).join(".");
 };
 
 export const analyzeThirdPartyTrust = (

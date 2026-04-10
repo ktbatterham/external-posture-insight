@@ -61,3 +61,16 @@ test("extracts explicit versioned client library fingerprints from script URLs",
   );
   assert.equal(htmlSecurity.libraryRiskSignals.length, 0);
 });
+
+test("extracts sibling same-site hosts from page content without treating third parties as internal", () => {
+  const htmlSecurity = analyzeHtmlDocument(
+    "https://www.bbc.co.uk/",
+    `<!doctype html><html><body>
+      <a href="https://account.bbc.co.uk/signin">Sign in</a>
+      <script src="https://static.bbc.co.uk/orbit.js"></script>
+      <a href="https://www.example-cdn.com/asset">CDN</a>
+    </body></html>`,
+  );
+
+  assert.deepEqual(htmlSecurity.sameSiteHosts, ["account.bbc.co.uk", "static.bbc.co.uk"]);
+});

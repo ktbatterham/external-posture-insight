@@ -19,7 +19,7 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Page title</p>
             <p className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950">
@@ -33,6 +33,10 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">External script domains</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.externalScriptDomains.length}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Same-site hosts</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{htmlSecurity.sameSiteHosts.length}</p>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Inline scripts</p>
@@ -58,8 +62,8 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
           </div>
         </div>
 
-        {(htmlSecurity.metaGenerator || htmlSecurity.firstPartyPaths.length > 0) && (
-          <div className="grid gap-4 md:grid-cols-2">
+        {(htmlSecurity.metaGenerator || htmlSecurity.firstPartyPaths.length > 0 || htmlSecurity.sameSiteHosts.length > 0) && (
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Meta generator</p>
               <p className="mt-2 text-sm font-medium text-slate-800">{htmlSecurity.metaGenerator || "Not declared"}</p>
@@ -73,6 +77,18 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
                   ))
                 ) : (
                   <span className="text-sm text-slate-500">No same-origin page links were discovered passively.</span>
+                )}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Referenced same-site hosts</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {htmlSecurity.sameSiteHosts.length ? (
+                  htmlSecurity.sameSiteHosts.map((host) => (
+                    <Badge key={host} variant="outline">{host}</Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-500">No sibling same-site hosts were referenced by the fetched page.</span>
                 )}
               </div>
             </div>
