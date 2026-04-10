@@ -69,13 +69,12 @@ const METRIC_CARD_CLASS =
   "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur";
 
 const REPORT_SECTIONS = [
-  { id: "overview", label: "Overview" },
-  { id: "findings", label: "Findings" },
+  { id: "overview", label: "Assessment" },
+  { id: "findings", label: "Risks" },
   { id: "trust", label: "Trust" },
-  { id: "discovery", label: "Discovery" },
+  { id: "client", label: "Client" },
   { id: "exposure", label: "Exposure" },
-  { id: "headers", label: "Headers" },
-  { id: "cookies", label: "Cookies" },
+  { id: "evidence", label: "Evidence" },
 ] as const;
 
 const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
@@ -148,6 +147,24 @@ const downloadFile = (filename: string, content: BlobPart, type: string) => {
 };
 
 const sectionTitleClass = "text-xs font-semibold uppercase tracking-[0.18em] text-slate-500";
+
+const ReportSectionHeader = ({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) => (
+  <div className="max-w-3xl space-y-3">
+    <p className={sectionTitleClass}>{eyebrow}</p>
+    <div className="space-y-2">
+      <h2 className="text-3xl font-black tracking-tight text-slate-950">{title}</h2>
+      <p className="text-sm leading-7 text-slate-600">{description}</p>
+    </div>
+  </div>
+);
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -573,7 +590,13 @@ const Index = () => {
               </div>
             )}
 
-            <div id="overview" className="space-y-5">
+            <div id="overview" className="space-y-6">
+              <ReportSectionHeader
+                eyebrow="Assessment"
+                title="Decision support first"
+                description="Start with the posture verdict, top actions, and any meaningful change since the last local scan. Everything below this section is supporting detail."
+              />
+
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <SecurityGrade
                   grade={analysisData.grade}
@@ -597,44 +620,74 @@ const Index = () => {
                 </div>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
                 <Card className="border-slate-200 shadow-sm">
-                  <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
-                    <div>
-                      <p className={sectionTitleClass}>Scanned target</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-950">{analysisData.host}</p>
-                      <p className="mt-1 text-sm text-slate-500">{analysisData.finalUrl}</p>
+                  <CardContent className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-[1.1fr_0.9fr_0.8fr]">
+                    <div className="space-y-3">
+                      <p className={sectionTitleClass}>Target and posture</p>
+                      <div>
+                        <p className="text-xl font-bold text-slate-950">{analysisData.host}</p>
+                        <p className="mt-1 break-all text-sm text-slate-500">{analysisData.finalUrl}</p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Main visible risk</p>
+                        <p className="mt-2 text-sm font-medium leading-6 text-slate-900">
+                          {analysisData.executiveSummary.mainRisk}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className={sectionTitleClass}>Overall posture</p>
-                      <p className="mt-2 text-lg font-semibold capitalize text-slate-950">
-                        {analysisData.executiveSummary.posture}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">{analysisData.executiveSummary.mainRisk}</p>
+
+                    <div className="space-y-3">
+                      <p className={sectionTitleClass}>Assessment read</p>
+                      <div>
+                        <p className="text-sm leading-7 text-slate-700">{analysisData.executiveSummary.overview}</p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">HTTP status</p>
+                          <p className="mt-2 text-2xl font-black text-slate-950">{analysisData.statusCode}</p>
+                          <p className="mt-1 text-sm text-slate-500">{getHttpStatusDetails(analysisData.statusCode).label}</p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Response time</p>
+                          <p className="mt-2 text-2xl font-black text-slate-950">{analysisData.responseTimeMs}ms</p>
+                          <p className="mt-1 text-sm text-slate-500">Observed from the latest completed scan.</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className={sectionTitleClass}>Scan timestamp</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-950">
-                        {new Date(analysisData.scannedAt).toLocaleString()}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">Latest completed scan for this target in this browser.</p>
-                    </div>
-                    <div>
-                      <p className={sectionTitleClass}>What to do first</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-950">
-                        {analysisData.headers.filter((header) => header.status !== "present").length > 0
-                          ? "Fix missing protections"
-                          : "Review deeper posture"}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Start with the executive readout and priority actions before drilling into raw details.
-                      </p>
+
+                    <div className="space-y-3">
+                      <p className={sectionTitleClass}>Orientation</p>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Overall posture</p>
+                        <p className="mt-2 text-lg font-semibold capitalize text-slate-950">
+                          {analysisData.executiveSummary.posture}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Scan timestamp</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-950">
+                          {new Date(analysisData.scannedAt).toLocaleString()}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">Latest completed scan stored in this browser.</p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">What to do first</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-950">
+                          {analysisData.headers.filter((header) => header.status !== "present").length > 0
+                            ? "Fix missing protections"
+                            : "Review deeper posture"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Focus on the action list first, then move into trust and exposure evidence.
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="border-slate-200 shadow-sm">
-                  <CardContent className="p-5">
+                  <CardContent className="space-y-4 p-5">
                     <p className={sectionTitleClass}>Jump to</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {REPORT_SECTIONS.map((section) => (
@@ -647,125 +700,166 @@ const Index = () => {
                         </a>
                       ))}
                     </div>
-                    <p className="mt-4 text-sm leading-6 text-slate-500">
-                      The report is organized from decision support first to raw evidence later, so you can skim the story before diving into the mechanics.
-                    </p>
+                    <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Reading order</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        The report now moves from assessment and actions into trust, client, and exposure layers before ending on raw evidence and supporting detail.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className={METRIC_CARD_CLASS}>
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                  <Activity className="h-4 w-4" />
-                  Response time
-                </div>
-                <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.responseTimeMs}ms</div>
-              </div>
-              <div className={METRIC_CARD_CLASS}>
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                  <Link2 className="h-4 w-4" />
-                  Final URL
-                </div>
-                <div className="mt-3 truncate text-lg font-bold text-slate-950">{analysisData.finalUrl}</div>
-              </div>
-              <div className={METRIC_CARD_CLASS}>
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                  <Server className="h-4 w-4" />
-                  HTTP status
-                </div>
-                <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.statusCode}</div>
-                <p className="mt-2 text-sm font-medium text-slate-500">
-                  {getHttpStatusDetails(analysisData.statusCode).label}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  {getHttpStatusDetails(analysisData.statusCode).meaning}
-                </p>
-              </div>
-              <div className={METRIC_CARD_CLASS}>
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                  <Clock3 className="h-4 w-4" />
-                  Scanned
-                </div>
-                <div className="mt-3 text-lg font-bold text-slate-950">
-                  {new Date(analysisData.scannedAt).toLocaleString()}
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.15fr_0.85fr]">
+                <ExecutiveSummaryPanel summary={analysisData.executiveSummary} />
+                <div className="space-y-4">
+                  <PriorityActionsPanel analysis={analysisData} />
+                  <MonitoringPanel analysis={analysisData} diff={historyDiff} />
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-              <ExecutiveSummaryPanel summary={analysisData.executiveSummary} />
-              <PostureSummaryPanel analysis={analysisData} />
+            <div id="findings" className="space-y-6">
+              <ReportSectionHeader
+                eyebrow="Risks"
+                title="What matters most"
+                description="This layer brings the scanner’s main story together: the strongest findings, category posture, taxonomy themes, and practical remediation."
+              />
+
+              <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+                <FindingsPanel issues={analysisData.issues} strengths={analysisData.strengths} />
+                <div className="space-y-8">
+                  <PostureSummaryPanel analysis={analysisData} />
+                  <TaxonomySummaryPanel analysis={analysisData} />
+                </div>
+              </div>
+
+              <RemediationPanel remediation={analysisData.remediation} />
             </div>
 
-            <TaxonomySummaryPanel analysis={analysisData} />
+            <div id="trust" className="space-y-6">
+              <ReportSectionHeader
+                eyebrow="Trust"
+                title="Domain, identity, and public trust posture"
+                description="These sections explain whether the organisation’s public-facing trust signals, identity surface, and edge posture reinforce or weaken the overall assessment."
+              />
 
-            <div id="findings" className="grid gap-8 xl:grid-cols-2">
-              <PriorityActionsPanel analysis={analysisData} />
-              <MonitoringPanel analysis={analysisData} diff={historyDiff} />
+              <div className="grid gap-8 xl:grid-cols-3">
+                <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
+                <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
+                <DisclosureTrustPanel analysis={analysisData} />
+              </div>
+
+              <div className="grid gap-8 xl:grid-cols-3">
+                <IdentityProviderPanel identityProvider={analysisData.identityProvider} />
+                <WafFingerprintPanel wafFingerprint={analysisData.wafFingerprint} />
+                <CtDiscoveryPanel ctDiscovery={analysisData.ctDiscovery} />
+              </div>
             </div>
 
-            <RemediationPanel remediation={analysisData.remediation} />
+            <div id="client" className="space-y-6">
+              <ReportSectionHeader
+                eyebrow="Client Surface"
+                title="What the application reveals about itself"
+                description="This layer groups passive page inspection, client-side exposure, ecosystem tooling, and data-collection behavior so the application surface reads as one story instead of several competing panels."
+              />
 
-            <div id="discovery" className="space-y-8">
-              <CrawlPanel crawl={analysisData.crawl} />
+              <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
 
-              <HistoryPanel history={history} diff={historyDiff} />
+              <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+                <ClientExposurePanel htmlSecurity={analysisData.htmlSecurity} />
+                <div className="space-y-8">
+                  <AiSurfacePanel aiSurface={analysisData.aiSurface} />
+                  <ThirdPartyTrustPanel thirdPartyTrust={analysisData.thirdPartyTrust} />
+                </div>
+              </div>
+
+              <div className="grid gap-8 xl:grid-cols-2">
+                <AuthSurfacePanel htmlSecurity={analysisData.htmlSecurity} />
+                <DataCollectionPanel htmlSecurity={analysisData.htmlSecurity} />
+              </div>
             </div>
 
-            <div id="trust" className="grid gap-8 xl:grid-cols-3">
-              <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
-              <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
-              <DisclosureTrustPanel analysis={analysisData} />
-            </div>
+            <div id="exposure" className="space-y-6">
+              <ReportSectionHeader
+                eyebrow="Exposure"
+                title="Public endpoints and browser-facing attack surface"
+                description="These checks focus on low-noise endpoint exposure, cross-origin behavior, and machine-readable surfaces that could widen the public attack surface."
+              />
 
-            <div className="grid gap-8 xl:grid-cols-3">
-              <IdentityProviderPanel identityProvider={analysisData.identityProvider} />
-              <CtDiscoveryPanel ctDiscovery={analysisData.ctDiscovery} />
-              <WafFingerprintPanel wafFingerprint={analysisData.wafFingerprint} />
-            </div>
-
-            <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
-            <ClientExposurePanel htmlSecurity={analysisData.htmlSecurity} />
-            <div className="grid gap-8 xl:grid-cols-2">
-              <AuthSurfacePanel htmlSecurity={analysisData.htmlSecurity} />
-              <DataCollectionPanel htmlSecurity={analysisData.htmlSecurity} />
-            </div>
-
-            <div className="grid gap-8 xl:grid-cols-2">
-              <AiSurfacePanel aiSurface={analysisData.aiSurface} />
-              <ThirdPartyTrustPanel thirdPartyTrust={analysisData.thirdPartyTrust} />
-            </div>
-
-            <div id="exposure" className="space-y-8">
               <ExposurePanel exposure={analysisData.exposure} />
 
-              <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
-
-              <ApiSurfacePanel apiSurface={analysisData.apiSurface} />
+              <div className="grid gap-8 xl:grid-cols-2">
+                <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
+                <ApiSurfacePanel apiSurface={analysisData.apiSurface} />
+              </div>
             </div>
 
-            <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
-              <div id="headers" className="space-y-8">
-                <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="mb-4 text-2xl font-bold text-slate-950">Security Headers</h2>
-                  <HeadersTable headers={analysisData.headers} />
+            <div id="evidence" className="space-y-6">
+              <ReportSectionHeader
+                eyebrow="Evidence"
+                title="Supporting detail and raw evidence"
+                description="This final layer keeps the operational detail available without forcing it to compete with the primary assessment above."
+              />
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className={METRIC_CARD_CLASS}>
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                    <Activity className="h-4 w-4" />
+                    Response time
+                  </div>
+                  <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.responseTimeMs}ms</div>
                 </div>
-                <RawHeadersPanel headers={analysisData.rawHeaders} />
+                <div className={METRIC_CARD_CLASS}>
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                    <Link2 className="h-4 w-4" />
+                    Final URL
+                  </div>
+                  <div className="mt-3 truncate text-lg font-bold text-slate-950">{analysisData.finalUrl}</div>
+                </div>
+                <div className={METRIC_CARD_CLASS}>
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                    <Server className="h-4 w-4" />
+                    HTTP status
+                  </div>
+                  <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.statusCode}</div>
+                  <p className="mt-2 text-sm font-medium text-slate-500">
+                    {getHttpStatusDetails(analysisData.statusCode).label}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    {getHttpStatusDetails(analysisData.statusCode).meaning}
+                  </p>
+                </div>
+                <div className={METRIC_CARD_CLASS}>
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                    <Clock3 className="h-4 w-4" />
+                    Scanned
+                  </div>
+                  <div className="mt-3 text-lg font-bold text-slate-950">
+                    {new Date(analysisData.scannedAt).toLocaleString()}
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-8">
-                <FindingsPanel issues={analysisData.issues} strengths={analysisData.strengths} />
-                <SecurityTxtPanel securityTxt={analysisData.securityTxt} />
-                <CertificateAnalysis certInfo={analysisData.certificate} />
-                <RedirectChain redirects={analysisData.redirects} />
-              </div>
-            </div>
+              <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+                <div className="space-y-8">
+                  <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 className="mb-4 text-2xl font-bold text-slate-950">Security Headers</h2>
+                    <HeadersTable headers={analysisData.headers} />
+                  </div>
+                  <RawHeadersPanel headers={analysisData.rawHeaders} />
+                  <CrawlPanel crawl={analysisData.crawl} />
+                  <HistoryPanel history={history} diff={historyDiff} />
+                </div>
 
-            <div id="cookies" className="grid gap-8 xl:grid-cols-2">
-              <TechnologyStack technologies={analysisData.technologies} />
-              <CookieAnalysis cookies={analysisData.cookies} />
+                <div className="space-y-8">
+                  <SecurityTxtPanel securityTxt={analysisData.securityTxt} />
+                  <CertificateAnalysis certInfo={analysisData.certificate} />
+                  <RedirectChain redirects={analysisData.redirects} />
+                  <TechnologyStack technologies={analysisData.technologies} />
+                  <CookieAnalysis cookies={analysisData.cookies} />
+                </div>
+              </div>
             </div>
           </section>
         )}
