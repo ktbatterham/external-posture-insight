@@ -42,6 +42,7 @@ import { ApiSurfacePanel } from "@/components/ApiSurfacePanel";
 import { AiSurfacePanel } from "@/components/AiSurfacePanel";
 import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
+import { readBrowserStorage, writeBrowserStorage } from "@/lib/browserStorage";
 import { buildHistoryDiff, snapshotFromAnalysis } from "../../packages/core/src/historyDiff";
 
 const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
@@ -64,11 +65,6 @@ interface MonitoredTarget {
   lastScannedAt: string | null;
 }
 
-interface StorageEnvelope<T> {
-  version: number;
-  data: T;
-}
-
 const METRIC_CARD_CLASS =
   "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur";
 
@@ -82,160 +78,8 @@ const REPORT_SECTIONS = [
   { id: "cookies", label: "Cookies" },
 ] as const;
 
-const pruneStorageValue = (key: string) => {
-  const raw = window.localStorage.getItem(key);
-  if (!raw) {
-    return false;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    const unwrapData = (
-      value: unknown,
-    ): {
-      versioned: boolean;
-      data: unknown;
-    } => {
-      if (
-        value &&
-        typeof value === "object" &&
-        "version" in value &&
-        "data" in value
-      ) {
-        return {
-          versioned: true,
-          data: (value as StorageEnvelope<unknown>).data,
-        };
-      }
-
-      return {
-        versioned: false,
-        data: value,
-      };
-    };
-
-    const { versioned, data } = unwrapData(parsed);
-
-    if (Array.isArray(data)) {
-      if (!data.length) {
-        return false;
-      }
-      const next = data.slice(0, -1);
-      writeStorageValue(key, next);
-      return true;
-    }
-
-    if (data && typeof data === "object") {
-      const entries = Object.entries(data as Record<string, unknown>);
-      if (!entries.length) {
-        return false;
-      }
-
-      const nextRecord = Object.fromEntries(
-        entries
-          .map(([recordKey, value]) => {
-            if (Array.isArray(value) && value.length > 1) {
-              return [recordKey, value.slice(0, -1)];
-            }
-            return [recordKey, value];
-          })
-          .filter(([, value]) => !Array.isArray(value) || value.length > 0),
-      );
-
-      if (Object.keys(nextRecord).length === entries.length && versioned) {
-        return false;
-      }
-
-      writeStorageValue(key, nextRecord);
-      return true;
-    }
-  } catch {
-    return false;
-  }
-
-  return false;
-};
-
-const readStorageValue = <T,>(key: string, fallback: T): T => {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) {
-      return fallback;
-    }
-
-    const parsed = JSON.parse(raw) as T | StorageEnvelope<T>;
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      "version" in parsed &&
-      "data" in parsed &&
-      typeof parsed.version === "number"
-    ) {
-      return parsed.version === STORAGE_SCHEMA_VERSION ? parsed.data : fallback;
-    }
-
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-};
-
-const writeStorageValue = <T,>(key: string, value: T) => {
-  const serialized = JSON.stringify({
-    version: STORAGE_SCHEMA_VERSION,
-    data: value,
-  } satisfies StorageEnvelope<T>);
-
-  try {
-    window.localStorage.setItem(key, serialized);
-  } catch (error) {
-    if (!(error instanceof DOMException) || error.name !== "QuotaExceededError") {
-      throw error;
-    }
-
-    const pruned = pruneStorageValue(key);
-    if (!pruned) {
-      console.warn(`[storage] Could not persist ${key}; browser storage quota was exceeded.`);
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(key, serialized);
-    } catch (retryError) {
-      if (retryError instanceof DOMException && retryError.name === "QuotaExceededError") {
-        console.warn(`[storage] Could not persist ${key} after pruning existing entries.`);
-        return;
-      }
-      throw retryError;
-    }
-  }
-};
-
-const loadRecentScans = (): RecentScan[] => {
-  return readStorageValue<RecentScan[]>(RECENT_SCANS_KEY, []);
-};
-
 const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
   [scan, ...current.filter((item) => item.url !== scan.url)].slice(0, 6);
-
-const saveRecentScan = (current: RecentScan[], scan: RecentScan) => {
-  const next = buildRecentScans(current, scan);
-  writeStorageValue(RECENT_SCANS_KEY, next);
-  return next;
-};
-
-const loadMonitoredTargets = (): MonitoredTarget[] => {
-  return readStorageValue<MonitoredTarget[]>(MONITORED_TARGETS_KEY, []);
-};
-
-const saveMonitoredTargets = (targets: MonitoredTarget[]) => {
-  writeStorageValue(MONITORED_TARGETS_KEY, targets);
-  return targets;
-};
 
 const syncMonitoredTargetFromAnalysis = (targets: MonitoredTarget[], payload: AnalysisResult) => {
   let changed = false;
@@ -282,18 +126,15 @@ const toMonitoredTargetView = (target: MonitoredTarget): MonitoredTargetView => 
   };
 };
 
-const loadHistory = (): Record<string, HistorySnapshot[]> => {
-  return readStorageValue<Record<string, HistorySnapshot[]>>(HISTORY_KEY, {});
-};
-
-const saveHistorySnapshot = (analysis: AnalysisResult) => {
-  const current = loadHistory();
+const saveHistorySnapshot = (
+  current: Record<string, HistorySnapshot[]>,
+  analysis: AnalysisResult,
+) => {
   const key = analysis.host;
   const snapshot = snapshotFromAnalysis(analysis);
   const nextForHost = [snapshot, ...(current[key] || [])].slice(0, 10);
   const next = { ...current, [key]: nextForHost };
-  writeStorageValue(HISTORY_KEY, next);
-  return nextForHost;
+  return { next, nextForHost };
 };
 
 const downloadFile = (filename: string, content: BlobPart, type: string) => {
@@ -311,10 +152,10 @@ const sectionTitleClass = "text-xs font-semibold uppercase tracking-[0.18em] tex
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
-  const [recentScans, setRecentScans] = useState<RecentScan[]>(loadRecentScans);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyDiff, setHistoryDiff] = useState<HistoryDiff | null>(null);
-  const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>(loadMonitoredTargets);
+  const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>([]);
   const [reportMode, setReportMode] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -323,6 +164,33 @@ const Index = () => {
   });
   const autoScanRanRef = useRef(false);
   const analyzeUrlRef = useRef<(url: string, setAsCurrent?: boolean) => Promise<AnalysisResult>>();
+  const historyByHostRef = useRef<Record<string, HistorySnapshot[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const [storedRecentScans, storedMonitoredTargets, storedHistory] = await Promise.all([
+        readBrowserStorage<RecentScan[]>(RECENT_SCANS_KEY, [], STORAGE_SCHEMA_VERSION),
+        readBrowserStorage<MonitoredTarget[]>(MONITORED_TARGETS_KEY, [], STORAGE_SCHEMA_VERSION),
+        readBrowserStorage<Record<string, HistorySnapshot[]>>(HISTORY_KEY, {}, STORAGE_SCHEMA_VERSION),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      historyByHostRef.current = storedHistory;
+      startTransition(() => {
+        setRecentScans(storedRecentScans);
+        setMonitoredTargets(storedMonitoredTargets);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const persistAnalysis = (payload: AnalysisResult, setAsCurrent = true) => {
     startTransition(() => {
@@ -330,21 +198,27 @@ const Index = () => {
         setAnalysisData(payload);
       }
       setRecentScans((current) =>
-        saveRecentScan(current, {
-          url: payload.finalUrl,
-          grade: payload.grade,
-          scannedAt: payload.scannedAt,
-        }),
+        {
+          const next = buildRecentScans(current, {
+            url: payload.finalUrl,
+            grade: payload.grade,
+            scannedAt: payload.scannedAt,
+          });
+          void writeBrowserStorage(RECENT_SCANS_KEY, next, STORAGE_SCHEMA_VERSION);
+          return next;
+        },
       );
-      const nextHistory = saveHistorySnapshot(payload);
+      const { next, nextForHost } = saveHistorySnapshot(historyByHostRef.current, payload);
+      historyByHostRef.current = next;
+      void writeBrowserStorage(HISTORY_KEY, next, STORAGE_SCHEMA_VERSION);
       if (setAsCurrent) {
-        setHistory(nextHistory);
-        setHistoryDiff(buildHistoryDiff(nextHistory));
+        setHistory(nextForHost);
+        setHistoryDiff(buildHistoryDiff(nextForHost));
       }
       setMonitoredTargets((current) => {
         const next = syncMonitoredTargetFromAnalysis(current, payload);
         if (next !== current) {
-          saveMonitoredTargets(next);
+          void writeBrowserStorage(MONITORED_TARGETS_KEY, next, STORAGE_SCHEMA_VERSION);
         }
         return next;
       });
@@ -423,7 +297,7 @@ const Index = () => {
         },
         ...current.filter((target) => target.url !== analysisData.finalUrl),
       ].slice(0, MONITORED_TARGET_LIMIT);
-      saveMonitoredTargets(next);
+      void writeBrowserStorage(MONITORED_TARGETS_KEY, next, STORAGE_SCHEMA_VERSION);
       return next;
     });
 
@@ -433,7 +307,7 @@ const Index = () => {
   const removeMonitoredTarget = (url: string) => {
     setMonitoredTargets((current) => {
       const next = current.filter((target) => target.url !== url);
-      saveMonitoredTargets(next);
+      void writeBrowserStorage(MONITORED_TARGETS_KEY, next, STORAGE_SCHEMA_VERSION);
       return next;
     });
   };
