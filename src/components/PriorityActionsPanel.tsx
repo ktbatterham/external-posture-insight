@@ -1,5 +1,6 @@
 import { ListTodo } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusAlert } from "@/components/ui/panel-primitives";
 import { AnalysisResult } from "@/types/analysis";
 import { getPriorityActions } from "@/lib/priorities";
 
@@ -7,10 +8,10 @@ interface PriorityActionsPanelProps {
   analysis: AnalysisResult;
 }
 
-const severityStyles = {
-  critical: "border-rose-200 bg-rose-50 text-rose-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  info: "border-sky-200 bg-sky-50 text-sky-900",
+const variantMap = {
+  critical: "critical",
+  warning: "warning",
+  info: "info",
 } as const;
 
 export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) => {
@@ -30,18 +31,19 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
       </CardHeader>
       <CardContent className="space-y-3">
         {actions.map((action, index) => (
-          <div
+          <StatusAlert
             key={`${action.area}-${action.title}`}
-            className={`rounded-2xl border px-4 py-4 text-sm ${severityStyles[action.severity]}`}
+            variant={variantMap[action.severity]}
+            className="py-4"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="font-semibold">
                 {index + 1}. {action.title}
               </div>
-              <span className="text-xs uppercase tracking-[0.16em] opacity-75">{action.area}</span>
+              <span className="text-xs uppercase tracking-[0.18em] opacity-75">{action.area}</span>
             </div>
             <p className="mt-2 opacity-90">{action.detail}</p>
-          </div>
+          </StatusAlert>
         ))}
       </CardContent>
     </Card>

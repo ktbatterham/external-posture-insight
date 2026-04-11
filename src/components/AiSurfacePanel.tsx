@@ -1,6 +1,7 @@
 import { Bot, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
 import { getAiSurfaceClassificationSummary } from "@/lib/aiSurface";
 import { AiSurfaceInfo } from "@/types/analysis";
 
@@ -32,112 +33,100 @@ export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-sky-700">Classification</p>
-          <p className="mt-2 text-lg font-semibold text-sky-950">{classificationSummary}</p>
-        </div>
+        <StatBox
+          variant="info"
+          label="Classification"
+          value={<p className="text-lg font-semibold">{classificationSummary}</p>}
+        />
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">AI detected</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{aiSurface.detected ? "Yes" : "No"}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Assistant visible</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{aiSurface.assistantVisible ? "Yes" : "No"}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Vendors</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{aiSurface.vendors.length}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">AI paths</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{aiSurface.discoveredPaths.length}</p>
-          </div>
+          <StatBox label="AI detected" value={<p className="text-2xl font-semibold">{aiSurface.detected ? "Yes" : "No"}</p>} />
+          <StatBox label="Assistant visible" value={<p className="text-2xl font-semibold">{aiSurface.assistantVisible ? "Yes" : "No"}</p>} />
+          <StatBox label="Vendors" value={<p className="text-2xl font-semibold">{aiSurface.vendors.length}</p>} />
+          <StatBox label="AI paths" value={<p className="text-2xl font-semibold">{aiSurface.discoveredPaths.length}</p>} />
         </div>
 
         {aiSurface.vendors.length > 0 && (
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Detected vendors</p>
-            <div className="mt-3 grid gap-3">
-              {aiSurface.vendors.map((vendor) => (
-                <div key={`${vendor.name}-${vendor.category}`} className="rounded-xl bg-white px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-900">{vendor.name}</span>
-                    <Badge variant="outline">{categoryLabel[vendor.category]}</Badge>
-                    <Badge variant="secondary" className={confidenceStyles[vendor.confidence]}>
-                      {vendor.confidence} confidence
-                    </Badge>
+          <StatBox
+            label="Detected vendors"
+            value={
+              <div className="grid gap-3">
+                {aiSurface.vendors.map((vendor) => (
+                  <div key={`${vendor.name}-${vendor.category}`} className="rounded-xl bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-slate-900">{vendor.name}</span>
+                      <Badge variant="outline">{categoryLabel[vendor.category]}</Badge>
+                      <Badge variant="secondary" className={confidenceStyles[vendor.confidence]}>
+                        {vendor.confidence} confidence
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{vendor.evidence}</p>
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">{vendor.evidence}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            }
+          />
         )}
 
         {aiSurface.discoveredPaths.length > 0 && (
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">AI-related paths</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {aiSurface.discoveredPaths.map((path) => (
-                <Badge key={path} variant="outline">{path}</Badge>
-              ))}
-            </div>
-          </div>
+          <StatBox
+            label="AI-related paths"
+            value={
+              <div className="flex flex-wrap gap-2">
+                {aiSurface.discoveredPaths.map((path) => (
+                  <Badge key={path} variant="outline">{path}</Badge>
+                ))}
+              </div>
+            }
+          />
         )}
 
         {(aiSurface.privacySignals.length > 0 || aiSurface.governanceSignals.length > 0) && (
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Privacy signals</p>
-              <div className="mt-3 space-y-2">
-                {aiSurface.privacySignals.length > 0 ? (
-                  aiSurface.privacySignals.map((signal) => (
-                    <p key={signal} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
-                      {signal}
-                    </p>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">No AI-related privacy guidance was identified on the fetched page.</p>
-                )}
-              </div>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Governance signals</p>
-              <div className="mt-3 space-y-2">
-                {aiSurface.governanceSignals.length > 0 ? (
-                  aiSurface.governanceSignals.map((signal) => (
-                    <p key={signal} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
-                      {signal}
-                    </p>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">No visible AI governance or human-review language was identified.</p>
-                )}
-              </div>
-            </div>
+            <StatBox
+              label="Privacy signals"
+              value={
+                <div className="space-y-2">
+                  {aiSurface.privacySignals.length > 0 ? (
+                    aiSurface.privacySignals.map((signal) => (
+                      <p key={signal} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+                        {signal}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-500">No AI-related privacy guidance was identified on the fetched page.</p>
+                  )}
+                </div>
+              }
+            />
+            <StatBox
+              label="Governance signals"
+              value={
+                <div className="space-y-2">
+                  {aiSurface.governanceSignals.length > 0 ? (
+                    aiSurface.governanceSignals.map((signal) => (
+                      <p key={signal} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+                        {signal}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-500">No visible AI governance or human-review language was identified.</p>
+                  )}
+                </div>
+              }
+            />
           </div>
         )}
 
         <div className="space-y-2">
           {aiSurface.strengths.map((strength) => (
-            <div key={strength} className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{strength}</span>
-            </div>
+            <StatusAlert key={strength} variant="success" icon={<ShieldCheck />}>{strength}</StatusAlert>
           ))}
           {aiSurface.disclosures.map((disclosure) => (
-            <div key={disclosure} className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{disclosure}</span>
-            </div>
+            <StatusAlert key={disclosure} variant="info" icon={<ShieldCheck />}>{disclosure}</StatusAlert>
           ))}
           {aiSurface.issues.map((issue) => (
-            <div key={issue} className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{issue}</span>
-            </div>
+            <StatusAlert key={issue} variant="warning" icon={<ShieldAlert />}>{issue}</StatusAlert>
           ))}
         </div>
       </CardContent>

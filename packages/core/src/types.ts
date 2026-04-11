@@ -335,6 +335,7 @@ export interface HtmlSecurityInfo {
   pageTitle: string | null;
   metaGenerator: string | null;
   forms: HtmlFormInfo[];
+  sameSiteHosts: string[];
   externalScriptDomains: string[];
   externalStylesheetDomains: string[];
   insecureResourceUrls: string[];
@@ -403,6 +404,13 @@ export interface ExecutiveSummaryInfo {
   mainRisk: string;
   posture: "strong" | "mixed" | "weak";
   takeaways: string[];
+}
+
+export interface AssessmentLimitation {
+  limited: boolean;
+  kind: "blocked_edge_response" | "auth_required" | "rate_limited" | "other" | null;
+  title: string | null;
+  detail: string | null;
 }
 
 export interface ExposureProbe {
@@ -487,6 +495,7 @@ export interface AnalysisResult {
   aiSurface: AiSurfaceInfo;
   thirdPartyTrust: ThirdPartyTrustInfo;
   executiveSummary: ExecutiveSummaryInfo;
+  assessmentLimitation: AssessmentLimitation;
   exposure: ExposureSummary;
   corsSecurity: CorsSecurityInfo;
   apiSurface: ApiSurfaceInfo;

@@ -2,6 +2,7 @@ import { Cookie, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState, StatusAlert } from "@/components/ui/panel-primitives";
 import { CookieResult } from "@/types/analysis";
 
 interface CookieAnalysisProps {
@@ -18,16 +19,14 @@ export const CookieAnalysis = ({ cookies }: CookieAnalysisProps) => {
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-slate-900">
+        <CardTitle className="flex items-center gap-2">
           <Cookie className="h-5 w-5" />
           Cookie Security
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {!cookies.length ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-            No `Set-Cookie` headers were returned on the scanned response.
-          </div>
+          <EmptyState>No `Set-Cookie` headers were returned on the scanned response.</EmptyState>
         ) : (
           <>
             <Table>
@@ -71,18 +70,16 @@ export const CookieAnalysis = ({ cookies }: CookieAnalysisProps) => {
               </TableBody>
             </Table>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {cookies.flatMap((cookie) =>
                 cookie.issues.map((issue) => (
-                  <div
+                  <StatusAlert
                     key={`${cookie.name}-${issue}`}
-                    className="flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+                    variant="critical"
+                    icon={<ShieldAlert />}
                   >
-                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>
-                      <span className="font-medium">{cookie.name}</span>: {issue}
-                    </span>
-                  </div>
+                    <span className="font-medium">{cookie.name}</span>: {issue}
+                  </StatusAlert>
                 )),
               )}
             </div>

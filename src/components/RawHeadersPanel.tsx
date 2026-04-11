@@ -1,5 +1,6 @@
 import { FileJson } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CodeBlock } from "@/components/ui/panel-primitives";
 
 interface RawHeadersPanelProps {
   headers: Record<string, string>;
@@ -15,11 +16,9 @@ export const RawHeadersPanel = ({ headers }: RawHeadersPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-          <pre className="overflow-x-auto whitespace-pre-wrap break-all">
-            {JSON.stringify(headers, null, 2)}
-          </pre>
-        </div>
+        <CodeBlock className="whitespace-pre-wrap break-all">
+          {JSON.stringify(headers, null, 2)}
+        </CodeBlock>
       </CardContent>
     </Card>
   );

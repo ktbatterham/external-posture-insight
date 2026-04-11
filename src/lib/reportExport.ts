@@ -31,6 +31,11 @@ const buildDiscoveryLines = (analysis: AnalysisResult) =>
     ? analysis.htmlSecurity.firstPartyPaths.map((path) => `- Path: ${path}`)
     : ["- No same-origin paths discovered from the fetched page."];
 
+const buildSameSiteHostLines = (analysis: AnalysisResult) =>
+  analysis.htmlSecurity.sameSiteHosts.length
+    ? analysis.htmlSecurity.sameSiteHosts.map((host) => `- Host: ${host}`)
+    : ["- No sibling same-site hosts were referenced by the fetched page."];
+
 const buildPassiveLeakLines = (analysis: AnalysisResult) =>
   analysis.htmlSecurity.passiveLeakSignals.length
     ? analysis.htmlSecurity.passiveLeakSignals.map(
@@ -246,7 +251,9 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     `- Page title: ${analysis.htmlSecurity.pageTitle ?? "Unavailable"}`,
     `- Discovery sources: ${analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded"}`,
     `- Same-origin paths discovered: ${analysis.htmlSecurity.firstPartyPaths.length}`,
+    `- Same-site hosts referenced: ${analysis.htmlSecurity.sameSiteHosts.length}`,
     ...buildDiscoveryLines(analysis),
+    ...buildSameSiteHostLines(analysis),
     ...buildPassiveLeakLines(analysis),
     ...buildLibraryRiskLines(analysis),
     "",
@@ -342,6 +349,9 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
   const discoveryItems = analysis.htmlSecurity.firstPartyPaths.length
     ? analysis.htmlSecurity.firstPartyPaths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")
     : "<li>No same-origin paths discovered from the fetched page.</li>";
+  const sameSiteHostItems = analysis.htmlSecurity.sameSiteHosts.length
+    ? analysis.htmlSecurity.sameSiteHosts.map((host) => `<li>${escapeHtml(host)}</li>`).join("")
+    : "<li>No sibling same-site hosts were referenced by the fetched page.</li>";
   const passiveLeakItems = buildPassiveLeakLines(analysis)
     .map((line) => `<li>${escapeHtml(line.slice(2))}</li>`)
     .join("");
@@ -488,7 +498,10 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
       <h2>Passive Discovery</h2>
       <p>Page title: ${escapeHtml(analysis.htmlSecurity.pageTitle ?? "Unavailable")}</p>
       <p>Discovery sources: ${escapeHtml(analysis.crawl.discoverySources.length ? analysis.crawl.discoverySources.join(", ") : "None recorded")}</p>
+      <p>Same-origin paths discovered: ${analysis.htmlSecurity.firstPartyPaths.length}</p>
       <ul>${discoveryItems}</ul>
+      <p>Same-site hosts referenced: ${analysis.htmlSecurity.sameSiteHosts.length}</p>
+      <ul>${sameSiteHostItems}</ul>
       <p>Passive leak and fingerprinting signals:</p>
       <ul>${passiveLeakItems}</ul>
       <p>Library version risk:</p>

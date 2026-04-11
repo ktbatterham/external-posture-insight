@@ -7,7 +7,7 @@ import type {
   ThirdPartyProvider,
   ThirdPartyTrustInfo,
 } from "./types.js";
-import { unique } from "./utils.js";
+import { getSiteDomain, unique } from "./utils.js";
 
 const addDetectedTechnology = (
   target: TechnologyResult[],
@@ -286,22 +286,6 @@ const classifyThirdPartyProvider = (domain: string): Omit<ThirdPartyProvider, "d
   };
 };
 
-const getSiteDomain = (hostname: string): string => {
-  const lower = hostname.toLowerCase();
-  const parts = lower.split(".").filter(Boolean);
-  if (parts.length <= 2) {
-    return lower;
-  }
-
-  const compoundSuffixes = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "co.nz"]);
-  const suffix = parts.slice(-2).join(".");
-  if (compoundSuffixes.has(suffix) && parts.length >= 3) {
-    return parts.slice(-3).join(".");
-  }
-
-  return parts.slice(-2).join(".");
-};
-
 export const analyzeThirdPartyTrust = (
   finalUrl: URL,
   htmlSecurity: Pick<AnalysisResult["htmlSecurity"], "externalScriptDomains" | "externalStylesheetDomains" | "missingSriScriptUrls">,
@@ -364,7 +348,7 @@ export const analyzeThirdPartyTrust = (
 };
 
 export const buildExecutiveSummary = (
-  result: Pick<AnalysisResult, "score" | "headers" | "thirdPartyTrust" | "aiSurface" | "domainSecurity" | "publicSignals">,
+  result: Pick<AnalysisResult, "score" | "headers" | "thirdPartyTrust" | "aiSurface" | "domainSecurity" | "publicSignals" | "assessmentLimitation">,
 ): ExecutiveSummaryInfo => {
   const missingHeaderCount = result.headers.filter((header) => header.status === "missing").length;
   const highRiskThirdParties = result.thirdPartyTrust.highRiskProviders;
@@ -381,6 +365,9 @@ export const buildExecutiveSummary = (
   }
 
   const takeaways = [
+    result.assessmentLimitation.limited && result.assessmentLimitation.detail
+      ? result.assessmentLimitation.detail
+      : null,
     missingHeaderCount > 0
       ? `${missingHeaderCount} browser-facing protections are missing or weak on the scanned response.`
       : "Core browser-facing protections look consistently present on the scanned response.",
@@ -392,8 +379,9 @@ export const buildExecutiveSummary = (
       : "No obvious public-facing AI or automation surface was detected.",
   ];
 
-  const overview =
-    posture === "strong"
+  const overview = result.assessmentLimitation.limited
+    ? "The scanner reached a blocked or edge-managed response, so this assessment is only a partial read of the target’s normal posture."
+    : posture === "strong"
       ? "External posture looks broadly solid, with only a few areas that still deserve tuning."
       : posture === "mixed"
         ? "External posture looks operationally mature in places, but the report still shows several areas that need tightening."
@@ -403,7 +391,7 @@ export const buildExecutiveSummary = (
     overview,
     mainRisk,
     posture,
-    takeaways,
+    takeaways: takeaways.filter((item): item is string => Boolean(item)),
   };
 };
 

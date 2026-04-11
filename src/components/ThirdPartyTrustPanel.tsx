@@ -1,6 +1,7 @@
 import { Boxes, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
 import { ThirdPartyTrustInfo } from "@/types/analysis";
 
 interface ThirdPartyTrustPanelProps {
@@ -46,64 +47,52 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-sky-700">Classification</p>
-          <p className="mt-2 text-lg font-semibold text-sky-950">{thirdPartyTrust.summary}</p>
-        </div>
+        <StatBox
+          variant="info"
+          label="Classification"
+          value={<p className="text-lg font-semibold">{thirdPartyTrust.summary}</p>}
+        />
 
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Providers</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{thirdPartyTrust.totalProviders}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">High risk</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{thirdPartyTrust.highRiskProviders}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Footprint</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">{footprintLabel}</p>
-          </div>
+          <StatBox label="Providers" value={<p className="text-2xl font-semibold">{thirdPartyTrust.totalProviders}</p>} />
+          <StatBox label="High risk" value={<p className="text-2xl font-semibold">{thirdPartyTrust.highRiskProviders}</p>} />
+          <StatBox label="Footprint" value={<p className="text-2xl font-semibold">{footprintLabel}</p>} />
         </div>
 
         {highlightedProviders.length > 0 && (
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Highlighted providers</p>
-            <div className="mt-3 grid gap-3">
-            {highlightedProviders.map((provider) => (
-              <div key={provider.domain} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-slate-900">{provider.name}</span>
-                  <Badge variant="outline">{categoryLabel[provider.category]}</Badge>
-                  <Badge variant="secondary" className={riskStyles[provider.risk]}>
-                    {provider.risk} risk
-                  </Badge>
-                </div>
-                <p className="mt-2 text-sm text-slate-600">{provider.domain}</p>
-                <p className="mt-1 text-xs text-slate-500">{provider.evidence}</p>
+          <StatBox
+            label="Highlighted providers"
+            value={
+              <div className="grid gap-3">
+                {highlightedProviders.map((provider) => (
+                  <div key={provider.domain} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-slate-900">{provider.name}</span>
+                      <Badge variant="outline">{categoryLabel[provider.category]}</Badge>
+                      <Badge variant="secondary" className={riskStyles[provider.risk]}>
+                        {provider.risk} risk
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">{provider.domain}</p>
+                    <p className="mt-1 text-xs text-slate-500">{provider.evidence}</p>
+                  </div>
+                ))}
+                {thirdPartyTrust.providers.length > highlightedProviders.length && (
+                  <p className="text-sm text-slate-500">
+                    Showing the most important {highlightedProviders.length} providers from a total of {thirdPartyTrust.providers.length}.
+                  </p>
+                )}
               </div>
-            ))}
-            {thirdPartyTrust.providers.length > highlightedProviders.length && (
-              <p className="text-sm text-slate-500">
-                Showing the most important {highlightedProviders.length} providers from a total of {thirdPartyTrust.providers.length}.
-              </p>
-            )}
-            </div>
-          </div>
+            }
+          />
         )}
 
         <div className="space-y-2">
           {thirdPartyTrust.strengths.map((strength) => (
-            <div key={strength} className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{strength}</span>
-            </div>
+            <StatusAlert key={strength} variant="success" icon={<ShieldCheck />}>{strength}</StatusAlert>
           ))}
           {thirdPartyTrust.issues.map((issue) => (
-            <div key={issue} className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{issue}</span>
-            </div>
+            <StatusAlert key={issue} variant="warning" icon={<ShieldAlert />}>{issue}</StatusAlert>
           ))}
         </div>
       </CardContent>

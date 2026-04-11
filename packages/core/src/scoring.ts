@@ -17,12 +17,14 @@ export function scoreAnalysis({
   certificate,
   cookies,
   redirects,
+  limitedResponse = false,
 }: {
   isHttps: boolean;
   headerResults: SecurityHeaderResult[];
   certificate: CertificateResult;
   cookies: CookieResult[];
   redirects: RedirectHop[];
+  limitedResponse?: boolean;
 }): { score: number; grade: string } {
   let score = 100;
 
@@ -33,7 +35,9 @@ export function scoreAnalysis({
   for (const header of headerResults) {
     const weights = HEADER_PENALTY[header.key] || { missing: 4, warning: 2 };
     if (header.status === "missing") {
-      score -= weights.missing;
+      if (!limitedResponse) {
+        score -= weights.missing;
+      }
     }
     if (header.status === "warning") {
       score -= weights.warning;
@@ -68,18 +72,24 @@ export function scoreAnalysis({
   }
 
   let cookiePenalty = 0;
-  for (const [name, cookie] of scoredCookies.entries()) {
-    const isLikelyPreferenceCookie = /(locale|lang|language|country|theme|consent|prefs?|preference|visitor|device|did)/i.test(name);
-    let perCookiePenalty = 0;
-    if (!cookie.secure) perCookiePenalty += 1;
-    if (!cookie.httpOnly && !isLikelyPreferenceCookie) perCookiePenalty += 1;
-    if (!cookie.sameSite) perCookiePenalty += 1;
-    cookiePenalty += Math.min(perCookiePenalty, 4);
+  if (!limitedResponse) {
+    for (const [name, cookie] of scoredCookies.entries()) {
+      const isLikelyPreferenceCookie = /(locale|lang|language|country|theme|consent|prefs?|preference|visitor|device|did)/i.test(name);
+      let perCookiePenalty = 0;
+      if (!cookie.secure) perCookiePenalty += 1;
+      if (!cookie.httpOnly && !isLikelyPreferenceCookie) perCookiePenalty += 1;
+      if (!cookie.sameSite) perCookiePenalty += 1;
+      cookiePenalty += Math.min(perCookiePenalty, 4);
+    }
   }
   score -= Math.min(cookiePenalty, 8);
 
   if (redirects.length > 1) {
     score -= Math.min(redirects.length - 1, 4) * 2;
+  }
+
+  if (limitedResponse) {
+    score = Math.min(score, 84);
   }
 
   score = Math.max(0, Math.min(100, score));
