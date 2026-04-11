@@ -1,17 +1,15 @@
-import { BellDot, Clock3, History, Radar } from "lucide-react";
+import { BellDot, Clock3, Radar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface HomeDashboardPanelProps {
   monitoredCount: number;
   dueCount: number;
-  recentCount: number;
   lastScanAt: string | null;
 }
 
 export const HomeDashboardPanel = ({
   monitoredCount,
   dueCount,
-  recentCount,
   lastScanAt,
 }: HomeDashboardPanelProps) => {
   return (
@@ -22,7 +20,7 @@ export const HomeDashboardPanel = ({
           Monitoring Dashboard
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-4">
+      <CardContent className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
             <BellDot className="h-4 w-4" />
@@ -36,13 +34,6 @@ export const HomeDashboardPanel = ({
             Due now
           </div>
           <div className="mt-3 text-3xl font-black text-slate-950">{dueCount}</div>
-        </div>
-        <div className="rounded-2xl bg-slate-50 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-            <History className="h-4 w-4" />
-            Recent scans
-          </div>
-          <div className="mt-3 text-3xl font-black text-slate-950">{recentCount}</div>
         </div>
         <div className="rounded-2xl bg-slate-50 p-4">
           <p className="text-sm font-medium text-slate-500">Last local scan</p>

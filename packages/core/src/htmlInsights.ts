@@ -348,7 +348,7 @@ export const analyzeThirdPartyTrust = (
 };
 
 export const buildExecutiveSummary = (
-  result: Pick<AnalysisResult, "score" | "headers" | "thirdPartyTrust" | "aiSurface" | "domainSecurity" | "publicSignals">,
+  result: Pick<AnalysisResult, "score" | "headers" | "thirdPartyTrust" | "aiSurface" | "domainSecurity" | "publicSignals" | "assessmentLimitation">,
 ): ExecutiveSummaryInfo => {
   const missingHeaderCount = result.headers.filter((header) => header.status === "missing").length;
   const highRiskThirdParties = result.thirdPartyTrust.highRiskProviders;
@@ -365,6 +365,9 @@ export const buildExecutiveSummary = (
   }
 
   const takeaways = [
+    result.assessmentLimitation.limited && result.assessmentLimitation.detail
+      ? result.assessmentLimitation.detail
+      : null,
     missingHeaderCount > 0
       ? `${missingHeaderCount} browser-facing protections are missing or weak on the scanned response.`
       : "Core browser-facing protections look consistently present on the scanned response.",
@@ -376,8 +379,9 @@ export const buildExecutiveSummary = (
       : "No obvious public-facing AI or automation surface was detected.",
   ];
 
-  const overview =
-    posture === "strong"
+  const overview = result.assessmentLimitation.limited
+    ? "The scanner reached a blocked or edge-managed response, so this assessment is only a partial read of the target’s normal posture."
+    : posture === "strong"
       ? "External posture looks broadly solid, with only a few areas that still deserve tuning."
       : posture === "mixed"
         ? "External posture looks operationally mature in places, but the report still shows several areas that need tightening."
@@ -387,7 +391,7 @@ export const buildExecutiveSummary = (
     overview,
     mainRisk,
     posture,
-    takeaways,
+    takeaways: takeaways.filter((item): item is string => Boolean(item)),
   };
 };
 

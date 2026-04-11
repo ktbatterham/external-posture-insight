@@ -406,6 +406,13 @@ export interface ExecutiveSummaryInfo {
   takeaways: string[];
 }
 
+export interface AssessmentLimitation {
+  limited: boolean;
+  kind: "blocked_edge_response" | "auth_required" | "rate_limited" | "other" | null;
+  title: string | null;
+  detail: string | null;
+}
+
 export interface ExposureProbe {
   label: string;
   path: string;
@@ -488,6 +495,7 @@ export interface AnalysisResult {
   aiSurface: AiSurfaceInfo;
   thirdPartyTrust: ThirdPartyTrustInfo;
   executiveSummary: ExecutiveSummaryInfo;
+  assessmentLimitation: AssessmentLimitation;
   exposure: ExposureSummary;
   corsSecurity: CorsSecurityInfo;
   apiSurface: ApiSurfaceInfo;

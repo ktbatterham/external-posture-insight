@@ -572,6 +572,12 @@ async function analyzeUrlCore(input: string | URL, options: AnalyzeTargetOptions
     issues: normalizedIssues,
     strengths,
     remediation: buildRemediation(headerResults),
+    assessmentLimitation: {
+      limited: false,
+      kind: null,
+      title: null,
+      detail: null,
+    },
   };
 }
 
@@ -721,6 +727,46 @@ async function crawlRelatedPages(rootResult, discovery) {
   };
 }
 
+function detectAssessmentLimitation(
+  statusCode: number,
+  headers: Record<string, string>,
+  html: string | null,
+) {
+  if (statusCode === 401) {
+    return {
+      limited: true,
+      kind: "auth_required" as const,
+      title: "Assessment limited by an authenticated response",
+      detail: "The target required authentication before serving the normal page, so this result reflects a restricted response rather than the full application surface.",
+    };
+  }
+
+  if (statusCode === 429) {
+    return {
+      limited: true,
+      kind: "rate_limited" as const,
+      title: "Assessment limited by rate limiting",
+      detail: "The target rate-limited the scanner, so this result reflects a throttled response rather than a normal page render.",
+    };
+  }
+
+  if (statusCode === 403 && html && isAccessDeniedHtml(headers, html)) {
+    return {
+      limited: true,
+      kind: "blocked_edge_response" as const,
+      title: "Assessment limited by a blocked edge response",
+      detail: "The target returned a generic blocked or protection-layer response, so missing headers on this page may not reflect the normal site posture.",
+    };
+  }
+
+  return {
+    limited: false,
+    kind: null,
+    title: null,
+    detail: null,
+  };
+}
+
 export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   const result = await analyzeUrlCore(input, { includeCertificate: true });
   const finalUrl = new URL(result.finalUrl);
@@ -766,9 +812,29 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     htmlDocument?.html || null,
     result.redirects,
   );
+  const assessmentLimitation = detectAssessmentLimitation(
+    result.statusCode,
+    result.rawHeaders,
+    htmlDocument?.html || null,
+  );
+  const rescoredResult = assessmentLimitation.limited
+    ? scoreAnalysis({
+        isHttps: finalUrl.protocol === "https:",
+        headerResults: result.headers,
+        certificate: result.certificate,
+        cookies: result.cookies,
+        redirects: result.redirects,
+        limitedResponse: true,
+      })
+    : { score: result.score, grade: result.grade };
 
   const enrichedResult = {
     ...result,
+    score: rescoredResult.score,
+    grade: rescoredResult.grade,
+    summary: assessmentLimitation.limited
+      ? "Assessment is limited because the target returned a blocked or restricted response."
+      : result.summary,
     issues: [...result.issues, ...buildLibraryRiskIssues(libraryRiskSignals).map(classifyIssueTaxonomy)],
     technologies: mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies),
     crawl: await crawlRelatedPages(result, discovery),
@@ -802,6 +868,7 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
       classifyHtmlApiFallback,
     }),
     publicSignals,
+    assessmentLimitation,
   };
 
   return {
