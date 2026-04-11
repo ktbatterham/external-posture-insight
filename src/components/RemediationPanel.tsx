@@ -3,6 +3,7 @@ import { Copy, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CodeBlock } from "@/components/ui/panel-primitives";
 import { RemediationSnippet } from "@/types/analysis";
 
 interface RemediationPanelProps {
@@ -70,9 +71,7 @@ export const RemediationPanel = ({ remediation }: RemediationPanelProps) => {
             </Button>
           </div>
 
-          <pre className="overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-            <code>{active.snippet}</code>
-          </pre>
+          <CodeBlock>{active.snippet}</CodeBlock>
         </div>
       </CardContent>
     </Card>

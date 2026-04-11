@@ -1,6 +1,7 @@
 import { Boxes, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusAlert } from "@/components/ui/panel-primitives";
 import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { ApiSurfaceInfo } from "@/types/analysis";
 
@@ -60,16 +61,10 @@ export const ApiSurfacePanel = ({ apiSurface }: ApiSurfacePanelProps) => {
 
         <div className="space-y-2">
           {apiSurface.strengths.map((strength) => (
-            <div key={strength} className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{strength}</span>
-            </div>
+            <StatusAlert key={strength} variant="success" icon={<ShieldCheck />}>{strength}</StatusAlert>
           ))}
           {apiSurface.issues.map((issue) => (
-            <div key={issue} className="flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{issue}</span>
-            </div>
+            <StatusAlert key={issue} variant="critical" icon={<ShieldAlert />}>{issue}</StatusAlert>
           ))}
         </div>
       </CardContent>

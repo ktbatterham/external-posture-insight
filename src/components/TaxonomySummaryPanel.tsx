@@ -19,7 +19,7 @@ export const TaxonomySummaryPanel = ({ analysis }: TaxonomySummaryPanelProps) =>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-[1.5rem] bg-slate-50 p-5">
+        <div className="rounded-2xl bg-slate-50 p-5">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Dominant read</p>
           <p className="mt-3 text-sm leading-7 text-slate-800">{themes.summary}</p>
         </div>
@@ -38,10 +38,10 @@ export const TaxonomySummaryPanel = ({ analysis }: TaxonomySummaryPanelProps) =>
                       </span>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-700">{item.summary}</p>
-                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Why it matters</p>
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Why it matters</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{item.whyItMatters}</p>
                     <div className="mt-3">
-                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Driving findings</p>
+                      <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Driving findings</p>
                       {item.examples.length ? (
                         <ul className="mt-2 space-y-1 text-sm text-slate-700">
                           {item.examples.map((example) => (
@@ -72,10 +72,10 @@ export const TaxonomySummaryPanel = ({ analysis }: TaxonomySummaryPanelProps) =>
                       </span>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-700">{item.summary}</p>
-                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Why it matters</p>
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Why it matters</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{item.whyItMatters}</p>
                     <div className="mt-3">
-                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">Driving findings</p>
+                      <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Driving findings</p>
                       {item.examples.length ? (
                         <ul className="mt-2 space-y-1 text-sm text-slate-700">
                           {item.examples.map((example) => (

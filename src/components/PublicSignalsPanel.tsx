@@ -1,5 +1,6 @@
 import { Radar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusAlert } from "@/components/ui/panel-primitives";
 import { PublicSignalsInfo } from "@/types/analysis";
 
 interface PublicSignalsPanelProps {
@@ -48,16 +49,14 @@ export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) =
           </a>
         </div>
 
-        {publicSignals.strengths.map((strength) => (
-          <div key={strength} className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            {strength}
-          </div>
-        ))}
-        {publicSignals.issues.map((issue) => (
-          <div key={issue} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {issue}
-          </div>
-        ))}
+        <div className="space-y-2">
+          {publicSignals.strengths.map((strength) => (
+            <StatusAlert key={strength} variant="success">{strength}</StatusAlert>
+          ))}
+          {publicSignals.issues.map((issue) => (
+            <StatusAlert key={issue} variant="warning">{issue}</StatusAlert>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

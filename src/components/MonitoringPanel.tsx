@@ -1,5 +1,6 @@
 import { BellRing } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusAlert } from "@/components/ui/panel-primitives";
 import { AnalysisResult, HistoryDiff } from "@/types/analysis";
 import { getMonitoringAlerts } from "@/lib/priorities";
 
@@ -8,9 +9,9 @@ interface MonitoringPanelProps {
   diff: HistoryDiff | null;
 }
 
-const styles = {
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  info: "border-sky-200 bg-sky-50 text-sky-900",
+const variantMap = {
+  warning: "warning",
+  info: "info",
 } as const;
 
 export const MonitoringPanel = ({ analysis, diff }: MonitoringPanelProps) => {
@@ -30,10 +31,14 @@ export const MonitoringPanel = ({ analysis, diff }: MonitoringPanelProps) => {
       </CardHeader>
       <CardContent className="space-y-3">
         {alerts.map((alert) => (
-          <div key={`${alert.title}-${alert.detail}`} className={`rounded-2xl border px-4 py-4 text-sm ${styles[alert.severity]}`}>
+          <StatusAlert
+            key={`${alert.title}-${alert.detail}`}
+            variant={variantMap[alert.severity]}
+            className="py-4"
+          >
             <div className="font-semibold">{alert.title}</div>
             <p className="mt-2 opacity-90">{alert.detail}</p>
-          </div>
+          </StatusAlert>
         ))}
       </CardContent>
     </Card>

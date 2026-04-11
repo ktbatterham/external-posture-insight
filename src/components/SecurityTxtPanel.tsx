@@ -1,6 +1,7 @@
 import { FileSearch, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
 import { SecurityTxtInfo } from "@/types/analysis";
 
 interface SecurityTxtPanelProps {
@@ -37,51 +38,45 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Contact</p>
-            <div className="mt-2 space-y-1 text-sm text-slate-700">
-              {securityTxt.contact.length ? securityTxt.contact.map((item) => <p key={item}>{item}</p>) : <p>Not listed</p>}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Expires</p>
-            <p className="mt-2 text-sm text-slate-700">{securityTxt.expires ?? "Not listed"}</p>
-          </div>
+          <StatBox
+            label="Contact"
+            value={
+              <div className="space-y-1 text-sm text-slate-700">
+                {securityTxt.contact.length ? securityTxt.contact.map((item) => <p key={item}>{item}</p>) : <p>Not listed</p>}
+              </div>
+            }
+          />
+          <StatBox
+            label="Expires"
+            value={<p className="text-sm text-slate-700">{securityTxt.expires ?? "Not listed"}</p>}
+          />
         </div>
 
         {securityTxt.policy.length > 0 && (
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Policy</p>
-            <div className="mt-2 space-y-1 text-sm text-slate-700">
-              {securityTxt.policy.map((item) => <p key={item}>{item}</p>)}
-            </div>
-          </div>
+          <StatBox
+            label="Policy"
+            value={
+              <div className="space-y-1 text-sm text-slate-700">
+                {securityTxt.policy.map((item) => <p key={item}>{item}</p>)}
+              </div>
+            }
+          />
         )}
 
         <div className="space-y-2">
           {securityTxt.issues.map((issue) => (
-            <div
+            <StatusAlert
               key={issue}
-              className={`flex gap-3 rounded-2xl px-4 py-3 text-sm ${
-                securityTxt.status === "present"
-                  ? "border border-amber-200 bg-amber-50 text-amber-900"
-                  : "border border-rose-200 bg-rose-50 text-rose-900"
-              }`}
+              variant={securityTxt.status === "present" ? "warning" : "critical"}
+              icon={<ShieldAlert />}
             >
-              {securityTxt.status === "present" ? (
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              ) : (
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              )}
-              <span>{issue}</span>
-            </div>
+              {issue}
+            </StatusAlert>
           ))}
-
           {securityTxt.status === "present" && securityTxt.issues.length === 0 && (
-            <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Valid security.txt discovered with contact information.</span>
-            </div>
+            <StatusAlert variant="success" icon={<ShieldCheck />}>
+              Valid security.txt discovered with contact information.
+            </StatusAlert>
           )}
         </div>
       </CardContent>

@@ -1,6 +1,7 @@
 import { GitCompareArrows, Route } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatBox } from "@/components/ui/panel-primitives";
 import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { CrawlSummary } from "@/types/analysis";
 
@@ -33,25 +34,21 @@ export const CrawlPanel = ({ crawl }: CrawlPanelProps) => {
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Strongest page</p>
-            <p className="mt-2 text-lg font-semibold text-slate-950">{crawl.strongestPage ?? "Unknown"}</p>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Weakest page</p>
-            <p className="mt-2 text-lg font-semibold text-slate-950">{crawl.weakestPage ?? "Unknown"}</p>
-          </div>
+          <StatBox label="Strongest page" value={<p className="text-lg font-semibold">{crawl.strongestPage ?? "Unknown"}</p>} />
+          <StatBox label="Weakest page" value={<p className="text-lg font-semibold">{crawl.weakestPage ?? "Unknown"}</p>} />
         </div>
 
         {crawl.discoverySources.length > 0 && (
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Discovery sources</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {crawl.discoverySources.map((source) => (
-                <Badge key={source} variant="outline">{source}</Badge>
-              ))}
-            </div>
-          </div>
+          <StatBox
+            label="Discovery sources"
+            value={
+              <div className="flex flex-wrap gap-2">
+                {crawl.discoverySources.map((source) => (
+                  <Badge key={source} variant="outline">{source}</Badge>
+                ))}
+              </div>
+            }
+          />
         )}
 
         {crawl.inconsistentHeaders.length > 0 && (

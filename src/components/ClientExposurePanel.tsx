@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusAlert } from "@/components/ui/panel-primitives";
 import { HtmlSecurityInfo } from "@/types/analysis";
 import { Cpu, ShieldAlert } from "lucide-react";
 
@@ -42,10 +43,9 @@ export const ClientExposurePanel = ({ htmlSecurity }: ClientExposurePanelProps) 
         ))}
 
         {htmlSecurity.clientExposureSignals.some((signal) => signal.severity === "warning") ? (
-          <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Environment-like naming or unexpectedly explicit client configuration deserves a quick review before deeper testing.</span>
-          </div>
+          <StatusAlert variant="warning" icon={<ShieldAlert />}>
+            Environment-like naming or unexpectedly explicit client configuration deserves a quick review before deeper testing.
+          </StatusAlert>
         ) : null}
       </CardContent>
     </Card>
