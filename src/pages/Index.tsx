@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from "react";
-import { Activity, Clock3, Download, Link2, Server } from "lucide-react";
+import { Clock3, Download } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
 import { CertificateAnalysis } from "@/components/CertificateAnalysis";
@@ -61,9 +61,6 @@ interface MonitoredTarget {
   addedAt: string;
   lastScannedAt: string | null;
 }
-
-const METRIC_CARD_CLASS =
-  "rounded-[1.75rem] border border-white/60 bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur";
 
 const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
   [scan, ...current.filter((item) => item.url !== scan.url)].slice(0, 6);
@@ -143,13 +140,13 @@ const ReportSectionHeader = ({
 }: {
   eyebrow: string;
   title: string;
-  description: string;
+  description?: string;
 }) => (
   <div className="max-w-3xl space-y-3">
     <p className={sectionTitleClass}>{eyebrow}</p>
     <div className="space-y-2">
       <h2 className="text-3xl font-black tracking-tight text-slate-950">{title}</h2>
-      <p className="text-sm leading-7 text-slate-600">{description}</p>
+      {description ? <p className="text-sm leading-7 text-slate-600">{description}</p> : null}
     </div>
   </div>
 );
@@ -564,7 +561,7 @@ const Index = () => {
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-3 xl:grid-cols-[0.7fr_0.7fr_0.7fr_1.55fr]">
+                  <div className="mt-5 grid gap-3 xl:grid-cols-[0.58fr_0.58fr_0.58fr_1.55fr]">
                     <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Overall posture</p>
                       <p className="mt-3 text-2xl font-black capitalize text-slate-950">
@@ -626,33 +623,17 @@ const Index = () => {
                   </div>
 
                   <div className="mt-5 border-t border-white/80 pt-5">
-                    <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">What stands out</p>
-                      <div className="mt-4 grid gap-3 xl:grid-cols-3">
-                        {analysisData.executiveSummary.takeaways.map((takeaway, index) => (
-                          <div key={takeaway} className="flex gap-3 rounded-2xl bg-white px-4 py-4 text-sm text-slate-700 shadow-sm ring-1 ring-slate-100">
-                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-                              {index + 1}
-                            </div>
-                            <p className="leading-6">{takeaway}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 border-t border-white/80 pt-5">
-                    <div className="flex flex-wrap gap-3">
-                      <Button variant="outline" className="rounded-2xl" onClick={exportPdf}>
+                    <div className="mx-auto grid max-w-4xl gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <Button variant="outline" className="w-full justify-center rounded-2xl" onClick={exportPdf}>
                         Export PDF
                       </Button>
-                      <Button variant="outline" className="rounded-2xl" onClick={exportMarkdown}>
+                      <Button variant="outline" className="w-full justify-center rounded-2xl" onClick={exportMarkdown}>
                         Export Markdown
                       </Button>
-                      <Button variant="outline" className="rounded-2xl" onClick={exportHtml}>
+                      <Button variant="outline" className="w-full justify-center rounded-2xl" onClick={exportHtml}>
                         Export HTML
                       </Button>
-                      <Button variant="outline" className="rounded-2xl" onClick={exportReport}>
+                      <Button variant="outline" className="w-full justify-center rounded-2xl" onClick={exportReport}>
                         <Download className="mr-2 h-4 w-4" />
                         Export JSON
                       </Button>
@@ -662,12 +643,7 @@ const Index = () => {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <p className={sectionTitleClass}>Posture summary</p>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                    Start with the directional breakdown across the major posture areas before moving into specific findings and taxonomy detail.
-                  </p>
-                </div>
+                <p className={sectionTitleClass}>Posture summary</p>
                 <PostureSummaryPanel analysis={analysisData} />
               </div>
 
@@ -681,18 +657,12 @@ const Index = () => {
               <ReportSectionHeader
                 eyebrow="Risks"
                 title="What matters most"
-                description="This layer brings the scanner’s main story together: the strongest findings, category posture, taxonomy themes, and practical remediation."
               />
 
               <FindingsPanel issues={analysisData.issues} strengths={analysisData.strengths} />
 
               <div className="space-y-4">
-                <div>
-                  <p className={sectionTitleClass}>Risk themes</p>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                    OWASP and MITRE patterns work better as their own interpretation layer rather than competing for width with the posture breakdown.
-                  </p>
-                </div>
+                <p className={sectionTitleClass}>Risk themes</p>
                 <TaxonomySummaryPanel analysis={analysisData} />
               </div>
 
@@ -703,16 +673,10 @@ const Index = () => {
               <ReportSectionHeader
                 eyebrow="Trust"
                 title="Domain, identity, and public trust posture"
-                description="These sections explain whether the organisation’s public-facing trust signals, identity surface, and edge posture reinforce or weaken the overall assessment."
               />
 
               <div className="space-y-4">
-                <div>
-                  <p className={sectionTitleClass}>Domain & email foundation</p>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                    DNS, mail-authentication, and related trust controls tend to be denser than the rest of this layer, so they sit here as their own reference block.
-                  </p>
-                </div>
+                <p className={sectionTitleClass}>Domain & email foundation</p>
                 <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
               </div>
 
@@ -732,7 +696,6 @@ const Index = () => {
               <ReportSectionHeader
                 eyebrow="Client Surface"
                 title="What the application reveals about itself"
-                description="This layer groups passive page inspection, client-side exposure, ecosystem tooling, and data-collection behavior so the application surface reads as one story instead of several competing panels."
               />
 
               <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
@@ -753,7 +716,6 @@ const Index = () => {
               <ReportSectionHeader
                 eyebrow="Exposure"
                 title="Public endpoints and browser-facing attack surface"
-                description="These checks focus on low-noise endpoint exposure, cross-origin behavior, and machine-readable surfaces that could widen the public attack surface."
               />
 
               <ExposurePanel exposure={analysisData.exposure} />
@@ -768,47 +730,7 @@ const Index = () => {
               <ReportSectionHeader
                 eyebrow="Evidence"
                 title="Supporting detail and raw evidence"
-                description="This final layer keeps the operational detail available without forcing it to compete with the primary assessment above."
               />
-
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className={METRIC_CARD_CLASS}>
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                    <Activity className="h-4 w-4" />
-                    Response time
-                  </div>
-                  <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.responseTimeMs}ms</div>
-                </div>
-                <div className={METRIC_CARD_CLASS}>
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                    <Link2 className="h-4 w-4" />
-                    Final URL
-                  </div>
-                  <div className="mt-3 truncate text-lg font-bold text-slate-950">{analysisData.finalUrl}</div>
-                </div>
-                <div className={METRIC_CARD_CLASS}>
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                    <Server className="h-4 w-4" />
-                    HTTP status
-                  </div>
-                  <div className="mt-3 text-3xl font-black text-slate-950">{analysisData.statusCode}</div>
-                  <p className="mt-2 text-sm font-medium text-slate-500">
-                    {getHttpStatusDetails(analysisData.statusCode).label}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    {getHttpStatusDetails(analysisData.statusCode).meaning}
-                  </p>
-                </div>
-                <div className={METRIC_CARD_CLASS}>
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-                    <Clock3 className="h-4 w-4" />
-                    Scanned
-                  </div>
-                  <div className="mt-3 text-lg font-bold text-slate-950">
-                    {new Date(analysisData.scannedAt).toLocaleString()}
-                  </div>
-                </div>
-              </div>
 
               <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
                 <div className="space-y-8">

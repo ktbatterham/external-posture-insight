@@ -27,39 +27,32 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
           <StatBox variant="info" label="Info" value={<p className="text-3xl font-black">{severityCounts.info}</p>} />
         </div>
 
-        <StatBox
-          label="Category scores"
-          value={
-            <>
-              <p className="text-sm leading-6 text-slate-600">
-                These category scores are directional breakdowns of the posture by area. They help explain where risk is concentrated, but they are not intended to add up to or exactly match the single overall score.
-              </p>
-              <div className="mt-3 grid gap-2">
-                {areaScores.map((area) => (
-                  <div key={area.key} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{area.label}</span>
-                      <span className="font-semibold">{area.score}/100</span>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-slate-100">
-                      <div
-                        className={`h-2 rounded-full ${
-                          area.status === "strong"
-                            ? "bg-emerald-500"
-                            : area.status === "watch"
-                              ? "bg-amber-500"
-                              : "bg-rose-500"
-                        }`}
-                        style={{ width: `${area.score}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">{area.notes.join(" · ")}</p>
-                  </div>
-                ))}
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Category scores</p>
+          <div className="mt-3 grid gap-2">
+            {areaScores.map((area) => (
+              <div key={area.key} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{area.label}</span>
+                  <span className="font-semibold">{area.score}/100</span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-slate-100">
+                  <div
+                    className={`h-2 rounded-full ${
+                      area.status === "strong"
+                        ? "bg-emerald-500"
+                        : area.status === "watch"
+                          ? "bg-amber-500"
+                          : "bg-rose-500"
+                    }`}
+                    style={{ width: `${area.score}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{area.notes.join(" · ")}</p>
               </div>
-            </>
-          }
-        />
+            ))}
+          </div>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           <StatBox
