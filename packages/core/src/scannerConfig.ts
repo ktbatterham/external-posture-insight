@@ -28,3 +28,25 @@ export const OIDC_DISCOVERY_TIMEOUT_MS = 4_000;
 // Redirect following stays shallow to reduce SSRF risk and keep scans close to
 // normal browser behavior.
 export const REDIRECT_LIMIT = 5;
+
+export const CRAWL_CANDIDATES = [
+  { label: "Homepage", path: "/" },
+  { label: "Login", path: "/login" },
+  { label: "App", path: "/app" },
+  { label: "Dashboard", path: "/dashboard" },
+  { label: "Admin", path: "/admin" },
+  { label: "API root", path: "/api" },
+];
+
+export const EXPOSURE_PROBES = [
+  { label: "Robots", path: "/robots.txt" },
+  { label: "Sitemap", path: "/sitemap.xml" },
+  { label: "Git metadata", path: "/.git/HEAD" },
+  { label: "Environment file", path: "/.env" },
+];
+
+export const API_SURFACE_PROBES = [
+  { label: "API root", path: "/api" },
+  { label: "GraphQL", path: "/graphql" },
+  { label: "Versioned API", path: "/api/v1" },
+];

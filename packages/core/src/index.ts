@@ -5,6 +5,11 @@ import { parseSetCookie } from "./cookie-analysis.js";
 import { fetchCtDiscovery } from "./ctDiscovery.js";
 import { analyzeDomainSecurity } from "./domain-security.js";
 import {
+  API_SURFACE_PROBES,
+  CRAWL_CANDIDATES,
+  EXPOSURE_PROBES,
+} from "./scannerConfig.js";
+import {
   analyzeHeaders,
   buildLibraryRiskIssues,
   buildRawHeaders,
@@ -51,28 +56,6 @@ import { detectTechnologies } from "./technology-detection.js";
 import { headerValue, unique } from "./utils.js";
 import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type { AnalysisResult, AnalyzeTargetOptions, HtmlSecurityInfo } from "./types.js";
-
-const CRAWL_CANDIDATES = [
-  { label: "Homepage", path: "/" },
-  { label: "Login", path: "/login" },
-  { label: "App", path: "/app" },
-  { label: "Dashboard", path: "/dashboard" },
-  { label: "Admin", path: "/admin" },
-  { label: "API root", path: "/api" },
-];
-
-const EXPOSURE_PROBES = [
-  { label: "Robots", path: "/robots.txt" },
-  { label: "Sitemap", path: "/sitemap.xml" },
-  { label: "Git metadata", path: "/.git/HEAD" },
-  { label: "Environment file", path: "/.env" },
-];
-
-const API_SURFACE_PROBES = [
-  { label: "API root", path: "/api" },
-  { label: "GraphQL", path: "/graphql" },
-  { label: "Versioned API", path: "/api/v1" },
-];
 
 function normalizeUrl(input) {
   let candidate = input.trim();
@@ -880,4 +863,9 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
 export const analyzeTarget = analyzeUrl;
 export { formatErrorMessage };
 export { buildHistoryDiff, buildHistoryDiffFromSnapshots, snapshotFromAnalysis } from "./historyDiff.js";
+export {
+  assertPublicRequestTarget,
+  isLocalHostname,
+  isPrivateAddress,
+} from "./network-validation.js";
 export type { AnalysisResult, AnalyzeTargetOptions, HistoryDiff, HistorySnapshot, HtmlSecurityInfo } from "./types";

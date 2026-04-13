@@ -4,7 +4,12 @@ import dns from "node:dns/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
-import { analyzeUrl, formatErrorMessage } from "../packages/core/dist/index.js";
+import {
+  analyzeUrl,
+  formatErrorMessage,
+  isPrivateAddress,
+  isLocalHostname,
+} from "../packages/core/dist/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,44 +54,8 @@ function getClientIp(request) {
   return remoteAddress.startsWith("::ffff:") ? remoteAddress.slice(7) : remoteAddress;
 }
 
-function isPrivateIpv4(ip) {
-  const octets = ip.split(".").map((part) => Number(part));
-  if (octets.length !== 4 || octets.some((value) => Number.isNaN(value))) {
-    return true;
-  }
-
-  return (
-    octets[0] === 10 ||
-    octets[0] === 127 ||
-    (octets[0] === 169 && octets[1] === 254) ||
-    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
-    (octets[0] === 192 && octets[1] === 168) ||
-    (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) ||
-    octets[0] === 0
-  );
-}
-
-function isPrivateIpv6(ip) {
-  const normalized = ip.toLowerCase();
-  return (
-    normalized === "::1" ||
-    normalized === "::" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:") ||
-    normalized.startsWith("fec0:")
-  );
-}
-
 function isPublicIp(ip) {
-  const family = net.isIP(ip);
-  if (family === 4) {
-    return !isPrivateIpv4(ip);
-  }
-  if (family === 6) {
-    return !isPrivateIpv6(ip);
-  }
-  return false;
+  return net.isIP(ip) !== 0 && !isPrivateAddress(ip);
 }
 
 async function assertPublicHttpUrl(rawTarget) {
@@ -106,7 +75,7 @@ async function assertPublicHttpUrl(rawTarget) {
   }
 
   const hostname = targetUrl.hostname.toLowerCase();
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
+  if (isLocalHostname(hostname)) {
     throw new Error("Localhost and private network targets are not allowed.");
   }
 

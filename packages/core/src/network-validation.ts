@@ -26,7 +26,8 @@ export function isPrivateIpv6(value: string): boolean {
     normalized === "::" ||
     normalized.startsWith("fc") ||
     normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:")
+    normalized.startsWith("fe80:") ||
+    normalized.startsWith("fec0:")
   );
 }
 
