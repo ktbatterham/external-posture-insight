@@ -15,7 +15,7 @@ This app consumes that core package locally from the workspace during developmen
 
 ## Release status
 
-- First reusable package release: `@ktbatterham/external-posture-core@0.1.0`
+- Latest published core package: `@ktbatterham/external-posture-core@0.6.0`
 - Latest npm tag: `latest`
 - Clean-install smoke test completed from a fresh npm project
 
@@ -37,6 +37,9 @@ This app consumes that core package locally from the workspace during developmen
 - AI surface and third-party trust analysis
 - OWASP/MITRE-aligned finding labels
 - Low-noise exposure checks for a tiny set of high-signal paths
+- CLI batch scanning and saved-report comparison workflows
+- CI policy gating via CLI (`--fail-on` and `--fail-on-regression`)
+- SARIF export for CI and security tooling ingestion
 - JSON, Markdown, and HTML report export
 - Recent scan history in the browser
 
