@@ -5,6 +5,7 @@ import { analyzeUrl, buildHistoryDiffFromSnapshots, formatErrorMessage, snapshot
 import type { AnalysisResult, HistoryDiff, ScanIssue } from "./types.js";
 
 type OutputFormat = "json" | "markdown" | "summary" | "sarif";
+type FailOnSeverity = Exclude<ScanIssue["severity"], "good">;
 type ParsedArgs =
   | { command: "help" }
   | {
@@ -13,6 +14,8 @@ type ParsedArgs =
       format: OutputFormat;
       outputPath: string | null;
       baselinePath: string | null;
+      failOnSeverity: FailOnSeverity | null;
+      failOnRegression: boolean;
     }
   | {
       command: "compare";
@@ -20,13 +23,15 @@ type ParsedArgs =
       baselinePath: string;
       format: OutputFormat;
       outputPath: string | null;
+      failOnSeverity: FailOnSeverity | null;
+      failOnRegression: boolean;
     };
 
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target...> [--format json|markdown|summary|sarif] [--baseline <report.json>] [--output <file>]
-  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif] [--output <file>]
+  external-posture-insight scan <target...> [--format json|markdown|summary|sarif] [--baseline <report.json>] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
+  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
   external-posture-insight --help
 
 Examples:
@@ -36,8 +41,10 @@ Examples:
   npx @ktbatterham/external-posture-core scan example.com --format sarif --output findings.sarif
   npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
+  npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json --fail-on-regression
+  npx @ktbatterham/external-posture-core scan example.com github.com --fail-on warning
   npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json
-  npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --format sarif
+  npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --format sarif --fail-on critical
 `;
 
 const parseArgs = (argv: string[]): ParsedArgs => {
@@ -56,6 +63,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
   let outputPath: string | null = null;
   let baselinePath: string | null = null;
   let currentPath: string | null = null;
+  let failOnSeverity: FailOnSeverity | null = null;
+  let failOnRegression = false;
   const positionals: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -95,6 +104,21 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       return { command: "help" as const };
     }
 
+    if (arg === "--fail-on") {
+      const value = args[index + 1];
+      if (!value || !["info", "warning", "critical"].includes(value)) {
+        throw new Error("Invalid --fail-on value. Use info, warning, or critical.");
+      }
+      failOnSeverity = value as FailOnSeverity;
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--fail-on-regression") {
+      failOnRegression = true;
+      continue;
+    }
+
     if (arg.startsWith("--")) {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -109,6 +133,9 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     if (positionals.length > 1 && baselinePath) {
       throw new Error("Baseline comparison is only supported for a single target scan. Use the compare command for saved reports.");
     }
+    if (failOnRegression && !baselinePath) {
+      throw new Error("Regression policy mode requires --baseline for scan. Use compare for saved reports.");
+    }
 
     return {
       command: "scan",
@@ -116,6 +143,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       format,
       outputPath,
       baselinePath,
+      failOnSeverity,
+      failOnRegression,
     };
   }
 
@@ -130,6 +159,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     baselinePath,
     format,
     outputPath,
+    failOnSeverity,
+    failOnRegression,
   };
 };
 
@@ -193,14 +224,38 @@ const formatSummary = (analysis: AnalysisResult, diff: HistoryDiff | null = null
     ...(diff ? ["", formatDiffSummary(diff)] : []),
   ].join("\n");
 
-const formatBatchSummary = (analyses: AnalysisResult[]) =>
-  [
-    "Batch results:",
+const formatBatchSummary = (analyses: AnalysisResult[]) => {
+  const averageScore = analyses.length
+    ? Math.round(analyses.reduce((total, analysis) => total + analysis.score, 0) / analyses.length)
+    : 0;
+  const gradeCounts = analyses.reduce<Record<string, number>>((counts, analysis) => {
+    counts[analysis.grade] = (counts[analysis.grade] ?? 0) + 1;
+    return counts;
+  }, {});
+  const gradeSummary = Object.entries(gradeCounts)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([grade, count]) => `${grade}:${count}`)
+    .join(", ");
+  const weakest = [...analyses].sort((left, right) => left.score - right.score).slice(0, 3);
+
+  return [
+    `Batch results (${analyses.length} targets):`,
+    `Average score: ${averageScore}/100`,
+    `Grade distribution: ${gradeSummary || "None"}`,
+    ...(weakest.length
+      ? [
+          "Weakest targets:",
+          ...weakest.map((analysis) => `- ${analysis.host}: ${analysis.score}/100 (${analysis.grade})`),
+        ]
+      : []),
+    "",
+    "Per-target results:",
     ...analyses.map(
       (analysis) =>
         `- ${analysis.host}: ${analysis.score}/100 (${analysis.grade}) | status ${analysis.statusCode} | ${analysis.finalUrl}`,
     ),
   ].join("\n");
+};
 
 const formatMarkdown = (analysis: AnalysisResult, diff: HistoryDiff | null = null) =>
   [
@@ -253,9 +308,24 @@ const formatMarkdown = (analysis: AnalysisResult, diff: HistoryDiff | null = nul
       : []),
   ].join("\n");
 
-const formatBatchMarkdown = (analyses: AnalysisResult[]) =>
-  [
+const formatBatchMarkdown = (analyses: AnalysisResult[]) => {
+  const averageScore = analyses.length
+    ? Math.round(analyses.reduce((total, analysis) => total + analysis.score, 0) / analyses.length)
+    : 0;
+  const strongest = [...analyses].sort((left, right) => right.score - left.score).slice(0, 3);
+  const weakest = [...analyses].sort((left, right) => left.score - right.score).slice(0, 3);
+
+  return [
     "# External Posture Insight Batch Scan",
+    "",
+    `- Targets scanned: ${analyses.length}`,
+    `- Average score: ${averageScore}/100`,
+    ...(strongest.length
+      ? [`- Strongest: ${strongest.map((analysis) => `${analysis.host} (${analysis.score})`).join(", ")}`]
+      : []),
+    ...(weakest.length
+      ? [`- Weakest: ${weakest.map((analysis) => `${analysis.host} (${analysis.score})`).join(", ")}`]
+      : []),
     "",
     "| Target | Score | Grade | Status | Final URL |",
     "| --- | ---: | :---: | ---: | --- |",
@@ -264,6 +334,63 @@ const formatBatchMarkdown = (analyses: AnalysisResult[]) =>
         `| ${analysis.host} | ${analysis.score}/100 | ${analysis.grade} | ${analysis.statusCode} | ${analysis.finalUrl} |`,
     ),
   ].join("\n");
+};
+
+const severityRank: Record<FailOnSeverity, number> = {
+  info: 1,
+  warning: 2,
+  critical: 3,
+};
+
+const hasIssuesAtOrAboveThreshold = (analyses: AnalysisResult[], threshold: FailOnSeverity) => {
+  const minimumRank = severityRank[threshold];
+  return analyses.some((analysis) =>
+    analysis.issues.some((issue) => severityRank[issue.severity] >= minimumRank),
+  );
+};
+
+const statusClass = (statusCode: number) => {
+  if (statusCode >= 500) {
+    return 4;
+  }
+  if (statusCode >= 400) {
+    return 3;
+  }
+  if (statusCode >= 300) {
+    return 2;
+  }
+  if (statusCode >= 200) {
+    return 1;
+  }
+  return 2;
+};
+
+const isRegression = (diff: HistoryDiff) => {
+  const scoreRegressed = (diff.scoreDelta ?? 0) < 0;
+  const newIssuesDetected = diff.newIssues.length > 0;
+  const statusWorsened = diff.statusCodeDelta
+    ? statusClass(diff.statusCodeDelta.to) > statusClass(diff.statusCodeDelta.from)
+    : false;
+  return scoreRegressed || newIssuesDetected || statusWorsened;
+};
+
+const formatPolicyFailureMessages = (
+  analyses: AnalysisResult[],
+  options: {
+    failOnSeverity: FailOnSeverity | null;
+    failOnRegression: boolean;
+    diff: HistoryDiff | null;
+  },
+) => {
+  const messages: string[] = [];
+  if (options.failOnSeverity && hasIssuesAtOrAboveThreshold(analyses, options.failOnSeverity)) {
+    messages.push(`Policy failed: findings at or above "${options.failOnSeverity}" were detected.`);
+  }
+  if (options.failOnRegression && options.diff && isRegression(options.diff)) {
+    messages.push("Policy failed: baseline comparison detected a regression.");
+  }
+  return messages;
+};
 
 const toSarifLevel = (severity: ScanIssue["severity"]) => {
   if (severity === "critical") {
@@ -452,6 +579,7 @@ const main = async () => {
     }
 
     let output: string;
+    let policyMessages: string[] = [];
 
     if (parsed.command === "scan") {
       const analyses: AnalysisResult[] = [];
@@ -466,14 +594,28 @@ const main = async () => {
           ? buildHistoryDiffFromSnapshots(snapshotFromAnalysis(analysis), snapshotFromAnalysis(baselineAnalysis))
           : null;
         output = renderSingleOutput(analysis, parsed.format, diff);
+        policyMessages = formatPolicyFailureMessages(analyses, {
+          failOnSeverity: parsed.failOnSeverity,
+          failOnRegression: parsed.failOnRegression,
+          diff,
+        });
       } else {
         output = renderBatchOutput(analyses, parsed.format);
+        policyMessages = formatPolicyFailureMessages(analyses, {
+          failOnSeverity: parsed.failOnSeverity,
+          failOnRegression: false,
+          diff: null,
+        });
       }
 
       if (parsed.outputPath) {
         await writeFile(parsed.outputPath, output, "utf8");
       } else {
         process.stdout.write(output);
+      }
+      if (policyMessages.length) {
+        process.stderr.write(`${policyMessages.join("\n")}\n`);
+        process.exitCode = 1;
       }
       return;
     }
@@ -485,11 +627,20 @@ const main = async () => {
       snapshotFromAnalysis(baselineAnalysis),
     );
     output = renderComparisonOutput(currentAnalysis, baselineAnalysis, diff, parsed.format);
+    policyMessages = formatPolicyFailureMessages([currentAnalysis], {
+      failOnSeverity: parsed.failOnSeverity,
+      failOnRegression: parsed.failOnRegression,
+      diff,
+    });
 
     if (parsed.outputPath) {
       await writeFile(parsed.outputPath, output, "utf8");
     } else {
       process.stdout.write(output);
+    }
+    if (policyMessages.length) {
+      process.stderr.write(`${policyMessages.join("\n")}\n`);
+      process.exitCode = 1;
     }
   } catch (error) {
     process.stderr.write(`${formatErrorMessage(error)}\n`);

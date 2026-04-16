@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+### Added
+- CLI policy gating with `--fail-on info|warning|critical` for CI exit-code control.
+- CLI regression policy mode with `--fail-on-regression` for baseline/compare workflows.
+- Richer batch scan summaries in summary/Markdown output with aggregate score and strongest/weakest targets.
+
+### Changed
+- Updated Vite toolchain compatibility to keep installs stable with current plugin peer dependencies.
+- Hardened TLS certificate issuer/subject normalization for stricter TypeScript handling.
+- Expanded CLI tests and help-surface assertions for policy mode usage.
+
 ## [0.5.0] - 2026-04-16
 
 ### Added

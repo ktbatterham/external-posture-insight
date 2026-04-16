@@ -157,6 +157,112 @@ test("CLI compare command writes SARIF for newly introduced findings only", asyn
   assert.match(output.runs[0].results[0].message.text, /New compared with baseline/);
 });
 
+test("CLI compare command fails policy when severity threshold is met", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
+  const baselinePath = join(tempDir, "baseline.json");
+  const currentPath = join(tempDir, "current.json");
+
+  const baseline = {
+    inputUrl: "https://example.com",
+    finalUrl: "https://example.com",
+    host: "example.com",
+    scannedAt: "2026-04-16T08:00:00.000Z",
+    score: 80,
+    grade: "B",
+    statusCode: 200,
+    responseTimeMs: 120,
+    certificate: { daysRemaining: 30 },
+    thirdPartyTrust: { providers: [] },
+    aiSurface: { vendors: [] },
+    identityProvider: { provider: null },
+    wafFingerprint: { providers: [] },
+    ctDiscovery: { prioritizedHosts: [] },
+    headers: [],
+    issues: [],
+  };
+
+  const current = {
+    ...baseline,
+    issues: [
+      {
+        severity: "critical",
+        area: "certificate",
+        title: "Expired certificate",
+        detail: "Expired",
+        confidence: "high",
+        source: "observed",
+        owasp: ["A02 Cryptographic Failures"],
+        mitre: ["Initial Access"],
+      },
+    ],
+  };
+
+  await writeFile(baselinePath, JSON.stringify(baseline), "utf8");
+  await writeFile(currentPath, JSON.stringify(current), "utf8");
+
+  await assert.rejects(
+    execFile(process.execPath, [cliPath, "compare", currentPath, baselinePath, "--fail-on", "critical"]),
+    (error) => {
+      assert.match(error.stderr, /Policy failed: findings at or above "critical" were detected\./);
+      return true;
+    },
+  );
+});
+
+test("CLI compare command fails policy when regression mode detects regression", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
+  const baselinePath = join(tempDir, "baseline.json");
+  const currentPath = join(tempDir, "current.json");
+
+  const baseline = {
+    inputUrl: "https://example.com",
+    finalUrl: "https://example.com",
+    host: "example.com",
+    scannedAt: "2026-04-16T08:00:00.000Z",
+    score: 90,
+    grade: "A",
+    statusCode: 200,
+    responseTimeMs: 120,
+    certificate: { daysRemaining: 30 },
+    thirdPartyTrust: { providers: [] },
+    aiSurface: { vendors: [] },
+    identityProvider: { provider: null },
+    wafFingerprint: { providers: [] },
+    ctDiscovery: { prioritizedHosts: [] },
+    headers: [],
+    issues: [],
+  };
+
+  const current = {
+    ...baseline,
+    score: 82,
+    grade: "B",
+    issues: [
+      {
+        severity: "warning",
+        area: "headers",
+        title: "Missing HSTS",
+        detail: "Missing",
+        confidence: "high",
+        source: "observed",
+        owasp: ["A05 Security Misconfiguration"],
+        mitre: ["Defense Evasion"],
+      },
+    ],
+  };
+
+  await writeFile(baselinePath, JSON.stringify(baseline), "utf8");
+  await writeFile(currentPath, JSON.stringify(current), "utf8");
+
+  await assert.rejects(
+    execFile(process.execPath, [cliPath, "compare", currentPath, baselinePath, "--fail-on-regression"]),
+    (error) => {
+      assert.match(error.stderr, /Policy failed: baseline comparison detected a regression\./);
+      return true;
+    },
+  );
+});
+
 test("CLI rejects malformed baseline JSON with a clean error", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
   const baselinePath = join(tempDir, "baseline.json");
@@ -181,6 +287,17 @@ test("CLI rejects multi-target scans with a baseline file", async () => {
         error.stderr,
         /Baseline comparison is only supported for a single target scan\./,
       );
+      assert.match(error.stderr, /Use --help for CLI usage\./);
+      return true;
+    },
+  );
+});
+
+test("CLI rejects regression policy in scan mode without baseline", async () => {
+  await assert.rejects(
+    execFile(process.execPath, [cliPath, "scan", "example.com", "--fail-on-regression"]),
+    (error) => {
+      assert.match(error.stderr, /Regression policy mode requires --baseline for scan\./);
       assert.match(error.stderr, /Use --help for CLI usage\./);
       return true;
     },

@@ -2,6 +2,17 @@ import tls from "node:tls";
 import { TLS_HANDSHAKE_TIMEOUT_MS } from "./scannerConfig.js";
 import type { CertificateResult } from "./types.js";
 
+const firstStringValue = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "string");
+    return typeof first === "string" ? first : null;
+  }
+  return null;
+};
+
 export const OBSERVATIONAL_TLS_OPTIONS = {
   rejectUnauthorized: false,
 };
@@ -62,8 +73,8 @@ export const scanTls = (targetUrl: URL): Promise<CertificateResult> => {
         available: true,
         valid: Boolean(socket.authorized),
         authorized: Boolean(socket.authorized),
-        issuer: certificate?.issuer?.O || certificate?.issuer?.CN || null,
-        subject: certificate?.subject?.CN || null,
+        issuer: firstStringValue(certificate?.issuer?.O) ?? firstStringValue(certificate?.issuer?.CN),
+        subject: firstStringValue(certificate?.subject?.CN),
         validFrom,
         validTo,
         daysRemaining,

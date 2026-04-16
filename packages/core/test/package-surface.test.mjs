@@ -25,5 +25,7 @@ test("package surface includes a working CLI help entrypoint", async () => {
   assert.match(stdout, /scan <target\.\.\.>/);
   assert.match(stdout, /--baseline/);
   assert.match(stdout, /json\|markdown\|summary\|sarif/);
+  assert.match(stdout, /--fail-on info\|warning\|critical/);
+  assert.match(stdout, /--fail-on-regression/);
   assert.match(stdout, /compare <current-report\.json> <baseline-report\.json>/);
 });

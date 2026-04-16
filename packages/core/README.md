@@ -70,6 +70,17 @@ npx @ktbatterham/external-posture-core scan example.com --format markdown
 npx @ktbatterham/external-posture-core scan example.com --format sarif
 ```
 
+CI policy modes:
+
+```bash
+npx @ktbatterham/external-posture-core scan example.com github.com --fail-on warning
+npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json --fail-on-regression
+npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --fail-on critical --fail-on-regression
+```
+
+- `--fail-on` sets exit code `1` when findings at or above the selected severity are present.
+- `--fail-on-regression` sets exit code `1` when the baseline comparison detects a regression (score drop, new issues, or worse HTTP status class).
+
 Write results to a file:
 
 ```bash
