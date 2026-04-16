@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-16
+
+### Added
+- CLI batch scanning via `scan <target...>` with summary, Markdown table, and JSON output support.
+- CLI report-to-report comparison via `compare <current-report.json> <baseline-report.json>`.
+- CLI SARIF output for both scans and comparisons, including compare mode output focused on newly introduced findings.
+- Core CLI test coverage for comparison workflows, JSON/SARIF output, malformed baseline handling, and invalid baseline usage in multi-target scans.
+
+### Changed
+- Expanded CLI help and package README examples/documentation to cover batch scans, direct comparisons, and SARIF output.
+- Improved CLI argument parsing to support command-oriented workflows while keeping baseline comparisons scoped to single-target scans.
+
 ## [0.4.0] - 2026-04-09
 
 ### Added

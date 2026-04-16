@@ -2,9 +2,9 @@ import { writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import { analyzeUrl, buildHistoryDiffFromSnapshots, formatErrorMessage, snapshotFromAnalysis } from "./index.js";
-import type { AnalysisResult, HistoryDiff } from "./types.js";
+import type { AnalysisResult, HistoryDiff, ScanIssue } from "./types.js";
 
-type OutputFormat = "json" | "markdown" | "summary";
+type OutputFormat = "json" | "markdown" | "summary" | "sarif";
 type ParsedArgs =
   | { command: "help" }
   | {
@@ -25,17 +25,19 @@ type ParsedArgs =
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target...> [--format json|markdown|summary] [--baseline <report.json>] [--output <file>]
-  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary] [--output <file>]
+  external-posture-insight scan <target...> [--format json|markdown|summary|sarif] [--baseline <report.json>] [--output <file>]
+  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif] [--output <file>]
   external-posture-insight --help
 
 Examples:
   npx @ktbatterham/external-posture-core scan example.com
   npx @ktbatterham/external-posture-core scan example.com github.com bbc.co.uk
   npx @ktbatterham/external-posture-core scan https://example.com --format markdown
+  npx @ktbatterham/external-posture-core scan example.com --format sarif --output findings.sarif
   npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
   npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json
+  npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --format sarif
 `;
 
 const parseArgs = (argv: string[]): ParsedArgs => {
@@ -61,8 +63,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
     if (arg === "--format") {
       const value = args[index + 1];
-      if (!value || !["json", "markdown", "summary"].includes(value)) {
-        throw new Error("Invalid --format value. Use json, markdown, or summary.");
+      if (!value || !["json", "markdown", "summary", "sarif"].includes(value)) {
+        throw new Error("Invalid --format value. Use json, markdown, summary, or sarif.");
       }
       format = value as OutputFormat;
       index += 1;
@@ -263,9 +265,128 @@ const formatBatchMarkdown = (analyses: AnalysisResult[]) =>
     ),
   ].join("\n");
 
+const toSarifLevel = (severity: ScanIssue["severity"]) => {
+  if (severity === "critical") {
+    return "error";
+  }
+  if (severity === "warning") {
+    return "warning";
+  }
+  return "note";
+};
+
+const toRuleId = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "external-posture-finding";
+
+const buildSarifLog = (
+  analyses: AnalysisResult[],
+  options: {
+    baselineByHost?: Map<string, AnalysisResult>;
+    newIssueOnly?: boolean;
+  } = {},
+) => {
+  const rules = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      shortDescription: { text: string };
+      fullDescription: { text: string };
+      help: { text: string };
+      properties: { tags: string[] };
+    }
+  >();
+  const results: Array<Record<string, unknown>> = [];
+
+  for (const analysis of analyses) {
+    const baseline = options.baselineByHost?.get(analysis.host) ?? null;
+    const newIssueTitles = options.newIssueOnly && baseline
+      ? new Set(
+          buildHistoryDiffFromSnapshots(
+            snapshotFromAnalysis(analysis),
+            snapshotFromAnalysis(baseline),
+          ).newIssues,
+        )
+      : null;
+
+    for (const issue of analysis.issues) {
+      if (newIssueTitles && !newIssueTitles.has(issue.title)) {
+        continue;
+      }
+
+      const ruleId = toRuleId(issue.title);
+      if (!rules.has(ruleId)) {
+        rules.set(ruleId, {
+          id: ruleId,
+          name: issue.title,
+          shortDescription: { text: issue.title },
+          fullDescription: { text: issue.detail },
+          help: { text: issue.detail },
+          properties: {
+            tags: [...issue.owasp, ...issue.mitre, issue.area, issue.source, issue.confidence],
+          },
+        });
+      }
+
+      const message = baseline && newIssueTitles
+        ? `${issue.detail} New compared with baseline ${baseline.finalUrl}.`
+        : issue.detail;
+
+      results.push({
+        ruleId,
+        level: toSarifLevel(issue.severity),
+        message: { text: message },
+        locations: [
+          {
+            physicalLocation: {
+              artifactLocation: { uri: analysis.finalUrl },
+            },
+          },
+        ],
+        properties: {
+          host: analysis.host,
+          scannedAt: analysis.scannedAt,
+          score: analysis.score,
+          grade: analysis.grade,
+          statusCode: analysis.statusCode,
+          severity: issue.severity,
+          area: issue.area,
+          confidence: issue.confidence,
+          source: issue.source,
+          owasp: issue.owasp,
+          mitre: issue.mitre,
+        },
+      });
+    }
+  }
+
+  return {
+    version: "2.1.0",
+    $schema: "https://json.schemastore.org/sarif-2.1.0.json",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "External Posture Insight",
+            informationUri: "https://www.npmjs.com/package/@ktbatterham/external-posture-core",
+            rules: [...rules.values()],
+          },
+        },
+        results,
+      },
+    ],
+  };
+};
+
 const renderSingleOutput = (analysis: AnalysisResult, format: OutputFormat, diff: HistoryDiff | null = null) => {
   if (format === "json") {
     return `${JSON.stringify(diff ? { analysis, diff } : analysis, null, 2)}\n`;
+  }
+  if (format === "sarif") {
+    return `${JSON.stringify(buildSarifLog([analysis]), null, 2)}\n`;
   }
   if (format === "markdown") {
     return `${formatMarkdown(analysis, diff)}\n`;
@@ -276,6 +397,9 @@ const renderSingleOutput = (analysis: AnalysisResult, format: OutputFormat, diff
 const renderBatchOutput = (analyses: AnalysisResult[], format: OutputFormat) => {
   if (format === "json") {
     return `${JSON.stringify({ analyses }, null, 2)}\n`;
+  }
+  if (format === "sarif") {
+    return `${JSON.stringify(buildSarifLog(analyses), null, 2)}\n`;
   }
   if (format === "markdown") {
     return `${formatBatchMarkdown(analyses)}\n`;
@@ -291,6 +415,16 @@ const renderComparisonOutput = (
 ) => {
   if (format === "json") {
     return `${JSON.stringify({ current, baseline, diff }, null, 2)}\n`;
+  }
+  if (format === "sarif") {
+    return `${JSON.stringify(
+      buildSarifLog([current], {
+        baselineByHost: new Map([[current.host, baseline]]),
+        newIssueOnly: true,
+      }),
+      null,
+      2,
+    )}\n`;
   }
   if (format === "markdown") {
     return `${[

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-16
+
+### Added
+
+- Added `@ktbatterham/external-posture-core@0.5.0` release prep with a stronger CLI workflow.
+- Added CLI batch scan support for scanning multiple targets in one run.
+- Added direct CLI comparison mode for saved report vs baseline report analysis.
+- Added SARIF output mode for scan and compare flows to support CI-oriented security workflows.
+- Added expanded core CLI tests for compare behavior, SARIF output, and baseline input validation errors.
+
+### Changed
+
+- Updated core package documentation and CLI help examples to reflect batch, compare, and SARIF usage.
+- Tightened CLI argument handling so baseline comparisons are explicitly constrained to single-target scans.
+
+### Verified
+
+- `npm run build`
+- `npm run test:core`
+- `npm run lint`
+
 ## 2026-04-09
 
 ### Added

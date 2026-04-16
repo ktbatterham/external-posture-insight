@@ -91,6 +91,72 @@ test("CLI compare command writes structured JSON output", async () => {
   assert.equal(output.diff.previousScore, 90);
 });
 
+test("CLI compare command writes SARIF for newly introduced findings only", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
+  const baselinePath = join(tempDir, "baseline.json");
+  const currentPath = join(tempDir, "current.json");
+  const outputPath = join(tempDir, "compare.sarif");
+
+  const sharedIssue = {
+    severity: "warning",
+    area: "headers",
+    title: "Missing HSTS",
+    detail: "Strict-Transport-Security header is missing.",
+    confidence: "high",
+    source: "observed",
+    owasp: ["A05 Security Misconfiguration"],
+    mitre: ["Defense Evasion"],
+  };
+  const newIssue = {
+    severity: "critical",
+    area: "certificate",
+    title: "Expired certificate",
+    detail: "The observed TLS certificate is expired.",
+    confidence: "high",
+    source: "observed",
+    owasp: ["A02 Cryptographic Failures"],
+    mitre: ["Initial Access"],
+  };
+
+  const baseline = {
+    inputUrl: "https://example.com",
+    finalUrl: "https://example.com",
+    host: "example.com",
+    scannedAt: "2026-04-16T08:00:00.000Z",
+    score: 70,
+    grade: "C",
+    statusCode: 200,
+    responseTimeMs: 120,
+    certificate: { daysRemaining: 30 },
+    thirdPartyTrust: { providers: [] },
+    aiSurface: { vendors: [] },
+    identityProvider: { provider: null },
+    wafFingerprint: { providers: [] },
+    ctDiscovery: { prioritizedHosts: [] },
+    headers: [],
+    issues: [sharedIssue],
+  };
+
+  const current = {
+    ...baseline,
+    score: 52,
+    grade: "D",
+    scannedAt: "2026-04-16T09:00:00.000Z",
+    issues: [sharedIssue, newIssue],
+  };
+
+  await writeFile(baselinePath, JSON.stringify(baseline), "utf8");
+  await writeFile(currentPath, JSON.stringify(current), "utf8");
+
+  await execFile(process.execPath, [cliPath, "compare", currentPath, baselinePath, "--format", "sarif", "--output", outputPath]);
+  const output = JSON.parse(await readFile(outputPath, "utf8"));
+
+  assert.equal(output.version, "2.1.0");
+  assert.equal(output.runs[0].results.length, 1);
+  assert.equal(output.runs[0].results[0].ruleId, "expired-certificate");
+  assert.match(output.runs[0].results[0].message.text, /New compared with baseline/);
+});
+
 test("CLI rejects malformed baseline JSON with a clean error", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
   const baselinePath = join(tempDir, "baseline.json");
