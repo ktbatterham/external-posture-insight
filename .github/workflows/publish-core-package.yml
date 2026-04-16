@@ -32,6 +32,13 @@ jobs:
           npm run build:core
           npm run test:core
 
+      - name: NPM identity check
+        run: |
+          npm whoami
+          npm view @ktbatterham/external-posture-core version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish core package
         run: npm publish ./packages/core --access public --provenance
         env:
