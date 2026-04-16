@@ -55,6 +55,12 @@ The package now includes a pipe-friendly CLI:
 npx @ktbatterham/external-posture-core scan example.com
 ```
 
+Scan multiple targets in one run:
+
+```bash
+npx @ktbatterham/external-posture-core scan example.com github.com bbc.co.uk
+```
+
 Available output formats:
 
 ```bash
@@ -73,6 +79,38 @@ Compare against a previously saved JSON report:
 
 ```bash
 npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
+```
+
+Compare two saved reports directly:
+
+```bash
+npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json
+```
+
+Batch scans return:
+
+- summary: one line per target
+- markdown: a compact comparison table
+- json:
+
+```json
+{
+  "analyses": [{ "...": "scan result" }]
+}
+```
+
+Direct report comparison returns:
+
+- summary: score, status, and change summary
+- markdown: a compact comparison report
+- json:
+
+```json
+{
+  "current": { "...": "latest saved report" },
+  "baseline": { "...": "older saved report" },
+  "diff": { "...": "structured change summary" }
+}
 ```
 
 Show usage:

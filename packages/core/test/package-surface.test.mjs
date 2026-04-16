@@ -22,6 +22,7 @@ test("package surface includes a working CLI help entrypoint", async () => {
   const { stdout } = await execFile(process.execPath, [new URL("../dist/cli.js", import.meta.url).pathname, "--help"]);
 
   assert.match(stdout, /External Posture Insight CLI/);
-  assert.match(stdout, /scan <target>/);
+  assert.match(stdout, /scan <target\.\.\.>/);
   assert.match(stdout, /--baseline/);
+  assert.match(stdout, /compare <current-report\.json> <baseline-report\.json>/);
 });

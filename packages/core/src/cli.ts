@@ -5,21 +5,40 @@ import { analyzeUrl, buildHistoryDiffFromSnapshots, formatErrorMessage, snapshot
 import type { AnalysisResult, HistoryDiff } from "./types.js";
 
 type OutputFormat = "json" | "markdown" | "summary";
+type ParsedArgs =
+  | { command: "help" }
+  | {
+      command: "scan";
+      targets: string[];
+      format: OutputFormat;
+      outputPath: string | null;
+      baselinePath: string | null;
+    }
+  | {
+      command: "compare";
+      currentPath: string;
+      baselinePath: string;
+      format: OutputFormat;
+      outputPath: string | null;
+    };
 
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target> [--format json|markdown|summary] [--baseline <report.json>] [--output <file>]
+  external-posture-insight scan <target...> [--format json|markdown|summary] [--baseline <report.json>] [--output <file>]
+  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary] [--output <file>]
   external-posture-insight --help
 
 Examples:
   npx @ktbatterham/external-posture-core scan example.com
+  npx @ktbatterham/external-posture-core scan example.com github.com bbc.co.uk
   npx @ktbatterham/external-posture-core scan https://example.com --format markdown
   npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
+  npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json
 `;
 
-const parseArgs = (argv: string[]) => {
+const parseArgs = (argv: string[]): ParsedArgs => {
   const args = [...argv];
   const command = args.shift();
 
@@ -27,21 +46,19 @@ const parseArgs = (argv: string[]) => {
     return { command: "help" as const };
   }
 
-  if (command !== "scan") {
+  if (!["scan", "compare"].includes(command)) {
     throw new Error(`Unknown command: ${command}`);
-  }
-
-  const target = args.shift();
-  if (!target) {
-    throw new Error("Missing target. Usage: external-posture-insight scan <target>");
   }
 
   let format: OutputFormat = "summary";
   let outputPath: string | null = null;
   let baselinePath: string | null = null;
+  let currentPath: string | null = null;
+  const positionals: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
+
     if (arg === "--format") {
       const value = args[index + 1];
       if (!value || !["json", "markdown", "summary"].includes(value)) {
@@ -76,15 +93,41 @@ const parseArgs = (argv: string[]) => {
       return { command: "help" as const };
     }
 
-    throw new Error(`Unknown argument: ${arg}`);
+    if (arg.startsWith("--")) {
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+
+    positionals.push(arg);
+  }
+
+  if (command === "scan") {
+    if (!positionals.length) {
+      throw new Error("Missing target. Usage: external-posture-insight scan <target...>");
+    }
+    if (positionals.length > 1 && baselinePath) {
+      throw new Error("Baseline comparison is only supported for a single target scan. Use the compare command for saved reports.");
+    }
+
+    return {
+      command: "scan",
+      targets: positionals,
+      format,
+      outputPath,
+      baselinePath,
+    };
+  }
+
+  [currentPath, baselinePath] = positionals;
+  if (!currentPath || !baselinePath) {
+    throw new Error("Missing report paths. Usage: external-posture-insight compare <current-report.json> <baseline-report.json>");
   }
 
   return {
-    command: "scan" as const,
-    target,
+    command: "compare",
+    currentPath,
+    baselinePath,
     format,
     outputPath,
-    baselinePath,
   };
 };
 
@@ -124,6 +167,16 @@ const formatDiffSummary = (diff: HistoryDiff | null) => {
   ].join("\n");
 };
 
+const formatComparisonSummary = (current: AnalysisResult, baseline: AnalysisResult, diff: HistoryDiff) =>
+  [
+    `Current: ${current.finalUrl}`,
+    `Baseline: ${baseline.finalUrl}`,
+    `Score change: ${baseline.score}/100 (${baseline.grade}) -> ${current.score}/100 (${current.grade})`,
+    `Status change: ${baseline.statusCode} -> ${current.statusCode}`,
+    "",
+    formatDiffSummary(diff),
+  ].join("\n");
+
 const formatSummary = (analysis: AnalysisResult, diff: HistoryDiff | null = null) =>
   [
     `Target: ${analysis.inputUrl}`,
@@ -136,6 +189,15 @@ const formatSummary = (analysis: AnalysisResult, diff: HistoryDiff | null = null
     `WAF/Edge: ${analysis.wafFingerprint.providers.length ? analysis.wafFingerprint.providers.map((provider) => provider.name).join(", ") : "None conclusively identified"}`,
     `CT coverage: ${analysis.ctDiscovery.coverageSummary}`,
     ...(diff ? ["", formatDiffSummary(diff)] : []),
+  ].join("\n");
+
+const formatBatchSummary = (analyses: AnalysisResult[]) =>
+  [
+    "Batch results:",
+    ...analyses.map(
+      (analysis) =>
+        `- ${analysis.host}: ${analysis.score}/100 (${analysis.grade}) | status ${analysis.statusCode} | ${analysis.finalUrl}`,
+    ),
   ].join("\n");
 
 const formatMarkdown = (analysis: AnalysisResult, diff: HistoryDiff | null = null) =>
@@ -189,7 +251,19 @@ const formatMarkdown = (analysis: AnalysisResult, diff: HistoryDiff | null = nul
       : []),
   ].join("\n");
 
-const renderOutput = (analysis: AnalysisResult, format: OutputFormat, diff: HistoryDiff | null = null) => {
+const formatBatchMarkdown = (analyses: AnalysisResult[]) =>
+  [
+    "# External Posture Insight Batch Scan",
+    "",
+    "| Target | Score | Grade | Status | Final URL |",
+    "| --- | ---: | :---: | ---: | --- |",
+    ...analyses.map(
+      (analysis) =>
+        `| ${analysis.host} | ${analysis.score}/100 | ${analysis.grade} | ${analysis.statusCode} | ${analysis.finalUrl} |`,
+    ),
+  ].join("\n");
+
+const renderSingleOutput = (analysis: AnalysisResult, format: OutputFormat, diff: HistoryDiff | null = null) => {
   if (format === "json") {
     return `${JSON.stringify(diff ? { analysis, diff } : analysis, null, 2)}\n`;
   }
@@ -197,6 +271,42 @@ const renderOutput = (analysis: AnalysisResult, format: OutputFormat, diff: Hist
     return `${formatMarkdown(analysis, diff)}\n`;
   }
   return `${formatSummary(analysis, diff)}\n`;
+};
+
+const renderBatchOutput = (analyses: AnalysisResult[], format: OutputFormat) => {
+  if (format === "json") {
+    return `${JSON.stringify({ analyses }, null, 2)}\n`;
+  }
+  if (format === "markdown") {
+    return `${formatBatchMarkdown(analyses)}\n`;
+  }
+  return `${formatBatchSummary(analyses)}\n`;
+};
+
+const renderComparisonOutput = (
+  current: AnalysisResult,
+  baseline: AnalysisResult,
+  diff: HistoryDiff,
+  format: OutputFormat,
+) => {
+  if (format === "json") {
+    return `${JSON.stringify({ current, baseline, diff }, null, 2)}\n`;
+  }
+  if (format === "markdown") {
+    return `${[
+      `# External Posture Insight Comparison: ${current.host}`,
+      "",
+      `- Current: ${current.finalUrl}`,
+      `- Baseline: ${baseline.finalUrl}`,
+      `- Score change: ${baseline.score}/100 (${baseline.grade}) -> ${current.score}/100 (${current.grade})`,
+      `- Status change: ${baseline.statusCode} -> ${current.statusCode}`,
+      "",
+      "## Changes Since Baseline",
+      "",
+      ...(diff.summary.length ? diff.summary.map((item) => `- ${item}`) : ["- No material posture changes summarized."]),
+    ].join("\n")}\n`;
+  }
+  return `${formatComparisonSummary(current, baseline, diff)}\n`;
 };
 
 const main = async () => {
@@ -207,12 +317,40 @@ const main = async () => {
       return;
     }
 
-    const analysis = await analyzeUrl(parsed.target);
-    const baselineAnalysis = parsed.baselinePath ? await parseBaselineAnalysis(parsed.baselinePath) : null;
-    const diff = baselineAnalysis
-      ? buildHistoryDiffFromSnapshots(snapshotFromAnalysis(analysis), snapshotFromAnalysis(baselineAnalysis))
-      : null;
-    const output = renderOutput(analysis, parsed.format, diff);
+    let output: string;
+
+    if (parsed.command === "scan") {
+      const analyses: AnalysisResult[] = [];
+      for (const target of parsed.targets) {
+        analyses.push(await analyzeUrl(target));
+      }
+
+      if (analyses.length === 1) {
+        const [analysis] = analyses;
+        const baselineAnalysis = parsed.baselinePath ? await parseBaselineAnalysis(parsed.baselinePath) : null;
+        const diff = baselineAnalysis
+          ? buildHistoryDiffFromSnapshots(snapshotFromAnalysis(analysis), snapshotFromAnalysis(baselineAnalysis))
+          : null;
+        output = renderSingleOutput(analysis, parsed.format, diff);
+      } else {
+        output = renderBatchOutput(analyses, parsed.format);
+      }
+
+      if (parsed.outputPath) {
+        await writeFile(parsed.outputPath, output, "utf8");
+      } else {
+        process.stdout.write(output);
+      }
+      return;
+    }
+
+    const currentAnalysis = await parseBaselineAnalysis(parsed.currentPath);
+    const baselineAnalysis = await parseBaselineAnalysis(parsed.baselinePath);
+    const diff = buildHistoryDiffFromSnapshots(
+      snapshotFromAnalysis(currentAnalysis),
+      snapshotFromAnalysis(baselineAnalysis),
+    );
+    output = renderComparisonOutput(currentAnalysis, baselineAnalysis, diff, parsed.format);
 
     if (parsed.outputPath) {
       await writeFile(parsed.outputPath, output, "utf8");
