@@ -1,5 +1,4 @@
 import { URL } from "node:url";
-import * as cheerio from "cheerio";
 import { scanTls } from "./certificate.js";
 import { parseSetCookie } from "./cookie-analysis.js";
 import { fetchCtDiscovery } from "./ctDiscovery.js";
@@ -17,22 +16,11 @@ import {
   classifyIssueTaxonomy,
   SECURITY_HEADERS,
 } from "./header-analysis.js";
-import {
-  analyzeAiSurface,
-  analyzeThirdPartyTrust,
-  buildExecutiveSummary,
-  detectHtmlTechnologies,
-  mergeTechnologies,
-} from "./htmlInsights.js";
+import { analyzeThirdPartyTrust, buildExecutiveSummary, mergeTechnologies } from "./htmlInsights.js";
+import { analyzeHtmlDocument as analyzeHtmlDocumentFromModule, analyzeHtmlSecurity, detectAssessmentLimitation, fetchHtmlDocument } from "./html-page-analysis.js";
 import {
   classifyHtmlApiFallback,
-  collectClientExposureSignals,
-  collectSameSiteHosts,
-  collectPassiveLeakSignals,
-  extractHtmlTitle,
-  getHtmlTitle,
   isAccessDeniedHtml,
-  normalizeHtmlSignature,
 } from "./html-extraction.js";
 import { analyzeIdentityProvider } from "./identityProvider.js";
 import {
@@ -41,7 +29,7 @@ import {
   analyzeExposure,
   fetchPublicSignals,
 } from "./surfaceEnrichment.js";
-import { collectLibraryFingerprints, fetchLibraryRiskSignals } from "./libraryRisk.js";
+import { fetchLibraryRiskSignals } from "./libraryRisk.js";
 import {
   fetchWithRedirects,
   requestJson,
@@ -107,263 +95,8 @@ function formatErrorMessage(error) {
 
   return "Unable to analyze URL.";
 }
-
-
-async function fetchHtmlDocument(finalUrl) {
-  const response = await requestText(finalUrl);
-  const contentType = headerValue(response.headers, "content-type") || "";
-  if (!contentType.toLowerCase().includes("text/html")) {
-    return null;
-  }
-
-  const html = response.body;
-  return {
-    html,
-    pageTitle: getHtmlTitle(html),
-    signature: normalizeHtmlSignature(html),
-  };
-}
-
-function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pageTitle: string | null } | null): HtmlSecurityInfo {
-  try {
-    if (!document) {
-      return {
-        fetched: false,
-        pageUrl: finalUrl.toString(),
-        pageTitle: null,
-        metaGenerator: null,
-        forms: [],
-        sameSiteHosts: [],
-        externalScriptDomains: [],
-        externalStylesheetDomains: [],
-        insecureResourceUrls: [],
-        inlineScriptCount: 0,
-        inlineStyleCount: 0,
-        missingSriScriptUrls: [],
-        firstPartyPaths: [],
-        passiveLeakSignals: [],
-        clientExposureSignals: [],
-        libraryFingerprints: [],
-        libraryRiskSignals: [],
-        detectedTechnologies: [],
-        aiSurface: {
-          detected: false,
-          assistantVisible: false,
-          aiPageSignals: [],
-          vendors: [],
-          discoveredPaths: [],
-          disclosures: [],
-          privacySignals: [],
-          governanceSignals: [],
-          issues: ["Primary response was not HTML, so AI surface inspection was skipped."],
-          strengths: [],
-        },
-        issues: ["Primary response was not HTML, so page content inspection was skipped."],
-        strengths: [],
-      };
-    }
-
-    const html = document.html;
-    const issues = [];
-    const strengths = [];
-    const $ = cheerio.load(html);
-    const pageTitle = document.pageTitle || $("title").first().text().trim() || null;
-    const metaGenerator = $('meta[name="generator"]').attr("content") || null;
-
-    const forms = $("form")
-      .toArray()
-      .map((form) => {
-        const element = $(form);
-        const action = element.attr("action") || null;
-        const method = (element.attr("method") || "GET").toUpperCase();
-        const resolvedAction = action ? new URL(action, finalUrl).toString() : finalUrl.toString();
-        return {
-          action,
-          method,
-          insecureSubmission: resolvedAction.startsWith("http://"),
-          hasPasswordField: element.find('input[type="password"]').length > 0,
-        };
-      });
-
-    const scriptElements = $("script").toArray();
-    const externalScriptUrls = scriptElements
-      .map((script) => $(script).attr("src"))
-      .filter(Boolean)
-      .map((src) => new URL(src as string, finalUrl).toString());
-    const externalStylesheetUrls = $('link[rel~="stylesheet"]')
-      .toArray()
-      .map((link) => $(link).attr("href"))
-      .filter(Boolean)
-      .map((href) => new URL(href as string, finalUrl).toString());
-    const sameSiteHosts = collectSameSiteHosts(finalUrl, [
-      ...$("a[href]")
-        .toArray()
-        .map((anchor) => $(anchor).attr("href")),
-      ...scriptElements.map((script) => $(script).attr("src")),
-      ...$('link[rel~="stylesheet"]').toArray().map((link) => $(link).attr("href")),
-      ...forms.map((form) => form.action),
-    ]);
-    const firstPartyPaths = rankDiscoveredPaths([
-      ...$("a[href]")
-        .toArray()
-        .map((anchor) => normalizeDiscoveredPath($(anchor).attr("href"), finalUrl)),
-      ...forms.map((form) => normalizeDiscoveredPath(form.action, finalUrl)),
-    ]);
-    const insecureResourceUrls = unique(
-      [...externalScriptUrls, ...externalStylesheetUrls].filter((url) => url.startsWith("http://")),
-    );
-    const externalScriptDomains = unique(
-      externalScriptUrls
-        .map((url) => new URL(url).hostname)
-        .filter((hostname) => hostname !== finalUrl.hostname),
-    );
-    const externalStylesheetDomains = unique(
-      externalStylesheetUrls
-        .map((url) => new URL(url).hostname)
-        .filter((hostname) => hostname !== finalUrl.hostname),
-    );
-    const inlineScriptCount = scriptElements.filter((script) => !$(script).attr("src")).length;
-    const inlineStyleCount = $("style").length;
-    const missingSriScriptUrls = scriptElements
-      .map((script) => {
-        const element = $(script);
-        const src = element.attr("src");
-        if (!src) {
-          return null;
-        }
-        const resolved = new URL(src, finalUrl);
-        if (resolved.hostname === finalUrl.hostname || element.attr("integrity")) {
-          return null;
-        }
-        return resolved.toString();
-      })
-      .filter(Boolean);
-    const passiveLeakSignals = collectPassiveLeakSignals(
-      html,
-      finalUrl,
-      metaGenerator || null,
-      externalScriptUrls,
-      externalStylesheetUrls,
-    );
-    const clientExposureSignals = collectClientExposureSignals(html, finalUrl);
-
-    if (forms.some((form) => form.hasPasswordField)) {
-      strengths.push("Login-like form elements are present for passive inspection.");
-    }
-    if (sameSiteHosts.length) {
-      strengths.push(
-        `Page content referenced ${sameSiteHosts.length} same-site host${sameSiteHosts.length === 1 ? "" : "s"} for passive discovery.`,
-      );
-    }
-    if (forms.some((form) => form.insecureSubmission)) {
-      issues.push("At least one form appears to submit over HTTP.");
-    }
-    if (insecureResourceUrls.length) {
-      issues.push("The page references insecure HTTP resources.");
-    }
-    if (inlineScriptCount > 0) {
-      issues.push(`Inline scripts detected (${inlineScriptCount}).`);
-    }
-    if (inlineStyleCount > 0) {
-      issues.push(`Inline style blocks detected (${inlineStyleCount}).`);
-    }
-    if (missingSriScriptUrls.length) {
-      issues.push("Some third-party scripts are missing Subresource Integrity attributes.");
-    }
-    for (const signal of passiveLeakSignals) {
-      if (signal.severity === "warning") {
-        issues.push(signal.title);
-      }
-    }
-    for (const signal of clientExposureSignals) {
-      if (signal.severity === "warning") {
-        issues.push(signal.title);
-      }
-    }
-    if (firstPartyPaths.length) {
-      strengths.push(`Discovered ${firstPartyPaths.length} same-origin navigation paths for low-noise follow-up scans.`);
-    }
-    if (passiveLeakSignals.length) {
-      strengths.push(`Passive pre-check identified ${passiveLeakSignals.length} leak or fingerprinting signal${passiveLeakSignals.length === 1 ? "" : "s"} worth review.`);
-    }
-    if (clientExposureSignals.length) {
-      strengths.push(`Client-side markup exposed ${clientExposureSignals.length} API or configuration signal${clientExposureSignals.length === 1 ? "" : "s"} for review.`);
-    }
-    if (!issues.length) {
-      strengths.push("No obvious passive HTML transport/content risks detected on the fetched page.");
-    }
-
-    return {
-      fetched: true,
-      pageUrl: finalUrl.toString(),
-      pageTitle,
-      metaGenerator: metaGenerator || null,
-      forms,
-      sameSiteHosts,
-      externalScriptDomains,
-      externalStylesheetDomains,
-      insecureResourceUrls,
-      inlineScriptCount,
-      inlineStyleCount,
-      missingSriScriptUrls,
-      firstPartyPaths,
-      passiveLeakSignals,
-      clientExposureSignals,
-      libraryFingerprints: collectLibraryFingerprints(externalScriptUrls),
-      libraryRiskSignals: [],
-      detectedTechnologies: detectHtmlTechnologies(
-        html,
-        finalUrl,
-        metaGenerator || null,
-        externalScriptUrls,
-        externalStylesheetUrls,
-      ),
-      aiSurface: analyzeAiSurface(html, externalScriptUrls, firstPartyPaths),
-      issues,
-      strengths,
-    };
-  } catch (error) {
-    return {
-      fetched: false,
-      pageUrl: finalUrl.toString(),
-      pageTitle: null,
-      metaGenerator: null,
-      forms: [],
-      sameSiteHosts: [],
-      externalScriptDomains: [],
-      externalStylesheetDomains: [],
-      insecureResourceUrls: [],
-      inlineScriptCount: 0,
-      inlineStyleCount: 0,
-      missingSriScriptUrls: [],
-      firstPartyPaths: [],
-      passiveLeakSignals: [],
-      clientExposureSignals: [],
-      libraryFingerprints: [],
-      libraryRiskSignals: [],
-      detectedTechnologies: [],
-      aiSurface: {
-        detected: false,
-        assistantVisible: false,
-        aiPageSignals: [],
-        vendors: [],
-        discoveredPaths: [],
-        disclosures: [],
-        privacySignals: [],
-        governanceSignals: [],
-        issues: [error instanceof Error ? error.message : "AI surface inspection failed."],
-        strengths: [],
-      },
-      issues: [error instanceof Error ? error.message : "HTML inspection failed."],
-      strengths: [],
-    };
-  }
-}
-
 export function analyzeHtmlDocument(input: string | URL, html: string): HtmlSecurityInfo {
-  const finalUrl = typeof input === "string" ? new URL(input) : input;
-  const pageTitle = extractHtmlTitle(html);
-  return analyzeHtmlSecurity(finalUrl, { html, pageTitle });
+  return analyzeHtmlDocumentFromModule(input, html);
 }
 
 function parseRobotsSitemaps(body: string): string[] {
@@ -707,46 +440,6 @@ async function crawlRelatedPages(rootResult, discovery) {
     weakestPage,
     inconsistentHeaders,
     discoverySources: discovery.sources,
-  };
-}
-
-function detectAssessmentLimitation(
-  statusCode: number,
-  headers: Record<string, string>,
-  html: string | null,
-) {
-  if (statusCode === 401) {
-    return {
-      limited: true,
-      kind: "auth_required" as const,
-      title: "Assessment limited by an authenticated response",
-      detail: "The target required authentication before serving the normal page, so this result reflects a restricted response rather than the full application surface.",
-    };
-  }
-
-  if (statusCode === 429) {
-    return {
-      limited: true,
-      kind: "rate_limited" as const,
-      title: "Assessment limited by rate limiting",
-      detail: "The target rate-limited the scanner, so this result reflects a throttled response rather than a normal page render.",
-    };
-  }
-
-  if (statusCode === 403 && html && isAccessDeniedHtml(headers, html)) {
-    return {
-      limited: true,
-      kind: "blocked_edge_response" as const,
-      title: "Assessment limited by a blocked edge response",
-      detail: "The target returned a generic blocked or protection-layer response, so missing headers on this page may not reflect the normal site posture.",
-    };
-  }
-
-  return {
-    limited: false,
-    kind: null,
-    title: null,
-    detail: null,
   };
 }
 
