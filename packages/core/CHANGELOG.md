@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-16
+
 ### Added
 - CLI policy gating with `--fail-on info|warning|critical` for CI exit-code control.
 - CLI regression policy mode with `--fail-on-regression` for baseline/compare workflows.

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-04-16 (v0.6.0)
+
+### Added
+
+- Added CLI policy gates with `--fail-on info|warning|critical` and `--fail-on-regression` for CI exit-code workflows.
+- Added richer batch scan summary/Markdown output with aggregate score plus strongest and weakest targets.
+- Added CLI test coverage for policy failures and regression gating behavior.
+
+### Changed
+
+- Updated workspace dependency alignment to keep `npm ci` stable (`vite@^7.3.2`, `@vitejs/plugin-react-swc@^4.3.0`, `lovable-tagger@^1.1.13`).
+- Hardened certificate issuer/subject normalization under stricter TypeScript typing.
+
+### Verified
+
+- `npm ci`
+- `npm run build`
+- `npm run test:core`
+- `npm run lint`
+
 ## 2026-04-16
 
 ### Added
