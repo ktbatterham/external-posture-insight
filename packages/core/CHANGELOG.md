@@ -12,6 +12,7 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 - CLI policy gating with `--fail-on info|warning|critical` for CI exit-code control.
 - CLI regression policy mode with `--fail-on-regression` for baseline/compare workflows.
 - Compact `ci-json` CLI output for scan/compare automation pipelines.
+- CLI score-threshold gating with `--fail-if-score-below <0-100>`.
 - Richer batch scan summaries in summary/Markdown output with aggregate score and strongest/weakest targets.
 
 ### Changed

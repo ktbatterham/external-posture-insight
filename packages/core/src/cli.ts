@@ -16,6 +16,7 @@ type ParsedArgs =
       baselinePath: string | null;
       failOnSeverity: FailOnSeverity | null;
       failOnRegression: boolean;
+      failIfScoreBelow: number | null;
     }
   | {
       command: "compare";
@@ -25,13 +26,14 @@ type ParsedArgs =
       outputPath: string | null;
       failOnSeverity: FailOnSeverity | null;
       failOnRegression: boolean;
+      failIfScoreBelow: number | null;
     };
 
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
-  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
+  external-posture-insight scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   external-posture-insight --help
 
 Examples:
@@ -44,6 +46,7 @@ Examples:
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json --fail-on-regression
   npx @ktbatterham/external-posture-core scan example.com github.com --fail-on warning
+  npx @ktbatterham/external-posture-core scan example.com github.com --fail-if-score-below 75
   npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json
   npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --format sarif --fail-on critical
 `;
@@ -66,6 +69,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
   let currentPath: string | null = null;
   let failOnSeverity: FailOnSeverity | null = null;
   let failOnRegression = false;
+  let failIfScoreBelow: number | null = null;
   const positionals: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -120,6 +124,17 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       continue;
     }
 
+    if (arg === "--fail-if-score-below") {
+      const value = args[index + 1];
+      const threshold = value ? Number(value) : Number.NaN;
+      if (!value || !Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
+        throw new Error("Invalid --fail-if-score-below value. Use a number between 0 and 100.");
+      }
+      failIfScoreBelow = threshold;
+      index += 1;
+      continue;
+    }
+
     if (arg.startsWith("--")) {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -146,6 +161,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       baselinePath,
       failOnSeverity,
       failOnRegression,
+      failIfScoreBelow,
     };
   }
 
@@ -162,6 +178,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     outputPath,
     failOnSeverity,
     failOnRegression,
+    failIfScoreBelow,
   };
 };
 
@@ -380,12 +397,21 @@ const formatPolicyFailureMessages = (
   options: {
     failOnSeverity: FailOnSeverity | null;
     failOnRegression: boolean;
+    failIfScoreBelow: number | null;
     diff: HistoryDiff | null;
   },
 ) => {
   const messages: string[] = [];
   if (options.failOnSeverity && hasIssuesAtOrAboveThreshold(analyses, options.failOnSeverity)) {
     messages.push(`Policy failed: findings at or above "${options.failOnSeverity}" were detected.`);
+  }
+  if (options.failIfScoreBelow !== null) {
+    const belowThreshold = analyses.filter((analysis) => analysis.score < options.failIfScoreBelow!);
+    if (belowThreshold.length) {
+      messages.push(
+        `Policy failed: score fell below ${options.failIfScoreBelow} for ${belowThreshold.map((analysis) => `${analysis.host} (${analysis.score})`).join(", ")}.`,
+      );
+    }
   }
   if (options.failOnRegression && options.diff && isRegression(options.diff)) {
     messages.push("Policy failed: baseline comparison detected a regression.");
@@ -407,12 +433,14 @@ const buildPolicySummary = (
   options: {
     failOnSeverity: FailOnSeverity | null;
     failOnRegression: boolean;
+    failIfScoreBelow: number | null;
   },
 ) => ({
   passed: policyMessages.length === 0,
   failures: policyMessages,
   failOnSeverity: options.failOnSeverity,
   failOnRegression: options.failOnRegression,
+  failIfScoreBelow: options.failIfScoreBelow,
 });
 
 const toSarifLevel = (severity: ScanIssue["severity"]) => {
@@ -619,6 +647,7 @@ const main = async () => {
         policyMessages = formatPolicyFailureMessages(analyses, {
           failOnSeverity: parsed.failOnSeverity,
           failOnRegression: parsed.failOnRegression,
+          failIfScoreBelow: parsed.failIfScoreBelow,
           diff,
         });
         if (parsed.format === "ci-json") {
@@ -638,6 +667,7 @@ const main = async () => {
               policy: buildPolicySummary(policyMessages, {
                 failOnSeverity: parsed.failOnSeverity,
                 failOnRegression: parsed.failOnRegression,
+                failIfScoreBelow: parsed.failIfScoreBelow,
               }),
             },
             null,
@@ -650,6 +680,7 @@ const main = async () => {
         policyMessages = formatPolicyFailureMessages(analyses, {
           failOnSeverity: parsed.failOnSeverity,
           failOnRegression: false,
+          failIfScoreBelow: parsed.failIfScoreBelow,
           diff: null,
         });
         if (parsed.format === "ci-json") {
@@ -668,6 +699,7 @@ const main = async () => {
               policy: buildPolicySummary(policyMessages, {
                 failOnSeverity: parsed.failOnSeverity,
                 failOnRegression: false,
+                failIfScoreBelow: parsed.failIfScoreBelow,
               }),
             },
             null,
@@ -699,6 +731,7 @@ const main = async () => {
     policyMessages = formatPolicyFailureMessages([currentAnalysis], {
       failOnSeverity: parsed.failOnSeverity,
       failOnRegression: parsed.failOnRegression,
+      failIfScoreBelow: parsed.failIfScoreBelow,
       diff,
     });
     if (parsed.format === "ci-json") {
@@ -725,6 +758,7 @@ const main = async () => {
           policy: buildPolicySummary(policyMessages, {
             failOnSeverity: parsed.failOnSeverity,
             failOnRegression: parsed.failOnRegression,
+            failIfScoreBelow: parsed.failIfScoreBelow,
           }),
         },
         null,

@@ -285,6 +285,60 @@ test("CLI compare command fails policy when severity threshold is met", async ()
   );
 });
 
+test("CLI compare command fails policy when score threshold is violated", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
+  const baselinePath = join(tempDir, "baseline.json");
+  const currentPath = join(tempDir, "current.json");
+
+  const baseline = {
+    inputUrl: "https://example.com",
+    finalUrl: "https://example.com",
+    host: "example.com",
+    scannedAt: "2026-04-16T08:00:00.000Z",
+    score: 90,
+    grade: "A",
+    statusCode: 200,
+    responseTimeMs: 120,
+    certificate: { daysRemaining: 30 },
+    thirdPartyTrust: { providers: [] },
+    aiSurface: { vendors: [] },
+    identityProvider: { provider: null },
+    wafFingerprint: { providers: [] },
+    ctDiscovery: { prioritizedHosts: [] },
+    headers: [],
+    issues: [],
+  };
+
+  const current = {
+    ...baseline,
+    score: 68,
+    grade: "D",
+  };
+
+  await writeFile(baselinePath, JSON.stringify(baseline), "utf8");
+  await writeFile(currentPath, JSON.stringify(current), "utf8");
+
+  await assert.rejects(
+    execFile(process.execPath, [
+      cliPath,
+      "compare",
+      currentPath,
+      baselinePath,
+      "--format",
+      "ci-json",
+      "--fail-if-score-below",
+      "70",
+    ]),
+    (error) => {
+      assert.match(error.stderr, /Policy failed: score fell below 70/);
+      const output = JSON.parse(error.stdout);
+      assert.equal(output.policy.passed, false);
+      assert.equal(output.policy.failIfScoreBelow, 70);
+      return true;
+    },
+  );
+});
+
 test("CLI compare command fails policy when regression mode detects regression", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
   const baselinePath = join(tempDir, "baseline.json");
@@ -375,6 +429,16 @@ test("CLI rejects regression policy in scan mode without baseline", async () => 
     (error) => {
       assert.match(error.stderr, /Regression policy mode requires --baseline for scan\./);
       assert.match(error.stderr, /Use --help for CLI usage\./);
+      return true;
+    },
+  );
+});
+
+test("CLI rejects invalid score threshold values", async () => {
+  await assert.rejects(
+    execFile(process.execPath, [cliPath, "scan", "example.com", "--fail-if-score-below", "101"]),
+    (error) => {
+      assert.match(error.stderr, /Invalid --fail-if-score-below value\. Use a number between 0 and 100\./);
       return true;
     },
   );

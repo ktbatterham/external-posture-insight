@@ -76,11 +76,13 @@ CI policy modes:
 ```bash
 npx @ktbatterham/external-posture-core scan example.com github.com --fail-on warning
 npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json --fail-on-regression
+npx @ktbatterham/external-posture-core scan example.com github.com --fail-if-score-below 75
 npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --fail-on critical --fail-on-regression
 ```
 
 - `--fail-on` sets exit code `1` when findings at or above the selected severity are present.
 - `--fail-on-regression` sets exit code `1` when the baseline comparison detects a regression (score drop, new issues, or worse HTTP status class).
+- `--fail-if-score-below` sets exit code `1` when any scanned target score is below the given threshold.
 
 Write results to a file:
 
