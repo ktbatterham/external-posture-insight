@@ -4,7 +4,7 @@ import process from "node:process";
 import { analyzeUrl, buildHistoryDiffFromSnapshots, formatErrorMessage, snapshotFromAnalysis } from "./index.js";
 import type { AnalysisResult, HistoryDiff, ScanIssue } from "./types.js";
 
-type OutputFormat = "json" | "markdown" | "summary" | "sarif";
+type OutputFormat = "json" | "markdown" | "summary" | "sarif" | "ci-json";
 type FailOnSeverity = Exclude<ScanIssue["severity"], "good">;
 type ParsedArgs =
   | { command: "help" }
@@ -30,8 +30,8 @@ type ParsedArgs =
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target...> [--format json|markdown|summary|sarif] [--baseline <report.json>] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
-  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
+  external-posture-insight scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
+  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression]
   external-posture-insight --help
 
 Examples:
@@ -39,6 +39,7 @@ Examples:
   npx @ktbatterham/external-posture-core scan example.com github.com bbc.co.uk
   npx @ktbatterham/external-posture-core scan https://example.com --format markdown
   npx @ktbatterham/external-posture-core scan example.com --format sarif --output findings.sarif
+  npx @ktbatterham/external-posture-core scan example.com --format ci-json --output ci.json
   npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json --fail-on-regression
@@ -72,8 +73,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
     if (arg === "--format") {
       const value = args[index + 1];
-      if (!value || !["json", "markdown", "summary", "sarif"].includes(value)) {
-        throw new Error("Invalid --format value. Use json, markdown, summary, or sarif.");
+      if (!value || !["json", "markdown", "summary", "sarif", "ci-json"].includes(value)) {
+        throw new Error("Invalid --format value. Use json, markdown, summary, sarif, or ci-json.");
       }
       format = value as OutputFormat;
       index += 1;
@@ -392,6 +393,28 @@ const formatPolicyFailureMessages = (
   return messages;
 };
 
+const summarizeIssueSeverities = (analysis: AnalysisResult) =>
+  analysis.issues.reduce<Record<FailOnSeverity, number>>(
+    (counts, issue) => {
+      counts[issue.severity] += 1;
+      return counts;
+    },
+    { info: 0, warning: 0, critical: 0 },
+  );
+
+const buildPolicySummary = (
+  policyMessages: string[],
+  options: {
+    failOnSeverity: FailOnSeverity | null;
+    failOnRegression: boolean;
+  },
+) => ({
+  passed: policyMessages.length === 0,
+  failures: policyMessages,
+  failOnSeverity: options.failOnSeverity,
+  failOnRegression: options.failOnRegression,
+});
+
 const toSarifLevel = (severity: ScanIssue["severity"]) => {
   if (severity === "critical") {
     return "error";
@@ -593,19 +616,66 @@ const main = async () => {
         const diff = baselineAnalysis
           ? buildHistoryDiffFromSnapshots(snapshotFromAnalysis(analysis), snapshotFromAnalysis(baselineAnalysis))
           : null;
-        output = renderSingleOutput(analysis, parsed.format, diff);
         policyMessages = formatPolicyFailureMessages(analyses, {
           failOnSeverity: parsed.failOnSeverity,
           failOnRegression: parsed.failOnRegression,
           diff,
         });
+        if (parsed.format === "ci-json") {
+          output = `${JSON.stringify(
+            {
+              mode: "scan",
+              targetCount: 1,
+              analysis: {
+                host: analysis.host,
+                finalUrl: analysis.finalUrl,
+                score: analysis.score,
+                grade: analysis.grade,
+                statusCode: analysis.statusCode,
+                issueCounts: summarizeIssueSeverities(analysis),
+              },
+              diff,
+              policy: buildPolicySummary(policyMessages, {
+                failOnSeverity: parsed.failOnSeverity,
+                failOnRegression: parsed.failOnRegression,
+              }),
+            },
+            null,
+            2,
+          )}\n`;
+        } else {
+          output = renderSingleOutput(analysis, parsed.format, diff);
+        }
       } else {
-        output = renderBatchOutput(analyses, parsed.format);
         policyMessages = formatPolicyFailureMessages(analyses, {
           failOnSeverity: parsed.failOnSeverity,
           failOnRegression: false,
           diff: null,
         });
+        if (parsed.format === "ci-json") {
+          output = `${JSON.stringify(
+            {
+              mode: "scan",
+              targetCount: analyses.length,
+              analyses: analyses.map((analysis) => ({
+                host: analysis.host,
+                finalUrl: analysis.finalUrl,
+                score: analysis.score,
+                grade: analysis.grade,
+                statusCode: analysis.statusCode,
+                issueCounts: summarizeIssueSeverities(analysis),
+              })),
+              policy: buildPolicySummary(policyMessages, {
+                failOnSeverity: parsed.failOnSeverity,
+                failOnRegression: false,
+              }),
+            },
+            null,
+            2,
+          )}\n`;
+        } else {
+          output = renderBatchOutput(analyses, parsed.format);
+        }
       }
 
       if (parsed.outputPath) {
@@ -626,12 +696,43 @@ const main = async () => {
       snapshotFromAnalysis(currentAnalysis),
       snapshotFromAnalysis(baselineAnalysis),
     );
-    output = renderComparisonOutput(currentAnalysis, baselineAnalysis, diff, parsed.format);
     policyMessages = formatPolicyFailureMessages([currentAnalysis], {
       failOnSeverity: parsed.failOnSeverity,
       failOnRegression: parsed.failOnRegression,
       diff,
     });
+    if (parsed.format === "ci-json") {
+      output = `${JSON.stringify(
+        {
+          mode: "compare",
+          current: {
+            host: currentAnalysis.host,
+            finalUrl: currentAnalysis.finalUrl,
+            score: currentAnalysis.score,
+            grade: currentAnalysis.grade,
+            statusCode: currentAnalysis.statusCode,
+            issueCounts: summarizeIssueSeverities(currentAnalysis),
+          },
+          baseline: {
+            host: baselineAnalysis.host,
+            finalUrl: baselineAnalysis.finalUrl,
+            score: baselineAnalysis.score,
+            grade: baselineAnalysis.grade,
+            statusCode: baselineAnalysis.statusCode,
+            issueCounts: summarizeIssueSeverities(baselineAnalysis),
+          },
+          diff,
+          policy: buildPolicySummary(policyMessages, {
+            failOnSeverity: parsed.failOnSeverity,
+            failOnRegression: parsed.failOnRegression,
+          }),
+        },
+        null,
+        2,
+      )}\n`;
+    } else {
+      output = renderComparisonOutput(currentAnalysis, baselineAnalysis, diff, parsed.format);
+    }
 
     if (parsed.outputPath) {
       await writeFile(parsed.outputPath, output, "utf8");

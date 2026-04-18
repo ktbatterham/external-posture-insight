@@ -91,6 +91,71 @@ test("CLI compare command writes structured JSON output", async () => {
   assert.equal(output.diff.previousScore, 90);
 });
 
+test("CLI compare command writes ci-json output with policy summary", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
+  const baselinePath = join(tempDir, "baseline.json");
+  const currentPath = join(tempDir, "current.json");
+  const outputPath = join(tempDir, "compare-ci.json");
+
+  const baseline = {
+    inputUrl: "https://example.com",
+    finalUrl: "https://example.com",
+    host: "example.com",
+    scannedAt: "2026-04-16T08:00:00.000Z",
+    score: 90,
+    grade: "A",
+    statusCode: 200,
+    responseTimeMs: 120,
+    certificate: { daysRemaining: 30 },
+    thirdPartyTrust: { providers: [] },
+    aiSurface: { vendors: [] },
+    identityProvider: { provider: null },
+    wafFingerprint: { providers: [] },
+    ctDiscovery: { prioritizedHosts: [] },
+    headers: [],
+    issues: [],
+  };
+
+  const current = {
+    ...baseline,
+    score: 80,
+    grade: "B",
+    issues: [
+      {
+        severity: "warning",
+        area: "headers",
+        title: "Missing HSTS",
+        detail: "Missing",
+        confidence: "high",
+        source: "observed",
+        owasp: ["A05 Security Misconfiguration"],
+        mitre: ["Defense Evasion"],
+      },
+    ],
+  };
+
+  await writeFile(baselinePath, JSON.stringify(baseline), "utf8");
+  await writeFile(currentPath, JSON.stringify(current), "utf8");
+
+  await execFile(process.execPath, [
+    cliPath,
+    "compare",
+    currentPath,
+    baselinePath,
+    "--format",
+    "ci-json",
+    "--output",
+    outputPath,
+  ]);
+  const output = JSON.parse(await readFile(outputPath, "utf8"));
+
+  assert.equal(output.mode, "compare");
+  assert.equal(output.current.grade, "B");
+  assert.equal(output.diff.scoreDelta, -10);
+  assert.equal(output.policy.passed, true);
+  assert.deepEqual(output.current.issueCounts, { info: 0, warning: 1, critical: 0 });
+});
+
 test("CLI compare command writes SARIF for newly introduced findings only", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "epi-cli-"));
   const baselinePath = join(tempDir, "baseline.json");
@@ -201,9 +266,20 @@ test("CLI compare command fails policy when severity threshold is met", async ()
   await writeFile(currentPath, JSON.stringify(current), "utf8");
 
   await assert.rejects(
-    execFile(process.execPath, [cliPath, "compare", currentPath, baselinePath, "--fail-on", "critical"]),
+    execFile(process.execPath, [
+      cliPath,
+      "compare",
+      currentPath,
+      baselinePath,
+      "--format",
+      "ci-json",
+      "--fail-on",
+      "critical",
+    ]),
     (error) => {
       assert.match(error.stderr, /Policy failed: findings at or above "critical" were detected\./);
+      const output = JSON.parse(error.stdout);
+      assert.equal(output.policy.passed, false);
       return true;
     },
   );

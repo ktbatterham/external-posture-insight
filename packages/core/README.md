@@ -68,6 +68,7 @@ npx @ktbatterham/external-posture-core scan example.com --format summary
 npx @ktbatterham/external-posture-core scan example.com --format json
 npx @ktbatterham/external-posture-core scan example.com --format markdown
 npx @ktbatterham/external-posture-core scan example.com --format sarif
+npx @ktbatterham/external-posture-core scan example.com --format ci-json
 ```
 
 CI policy modes:
@@ -105,6 +106,7 @@ Batch scans return:
 - summary: one line per target
 - markdown: a compact comparison table
 - sarif: one SARIF log containing findings across all scanned targets
+- ci-json: compact machine-readable output with policy pass/fail status
 - json:
 
 ```json
@@ -118,6 +120,7 @@ Direct report comparison returns:
 - summary: score, status, and change summary
 - markdown: a compact comparison report
 - sarif: only findings that are newly introduced in the current report versus the baseline
+- ci-json: compact machine-readable output with policy pass/fail status and diff details
 - json:
 
 ```json
