@@ -8,14 +8,18 @@ interface IdentityProviderPanelProps {
 }
 
 export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPanelProps) => {
-  const strengthItems = identityProvider.strengths.length
+  const reviewItems = identityProvider.issues;
+  const strengthItems = [
+    ...(identityProvider.strengths.length
     ? identityProvider.strengths
-    : ["No strong identity-provider signals were confirmed from passive evidence."];
-  const reviewItems = identityProvider.issues.length
-    ? identityProvider.issues
-    : identityProvider.detected
-      ? ["Some identity-related signals were observed, but no specific OAuth/OIDC review issue was confirmed from passive evidence alone."]
-      : ["No passive OAuth review issues were identified."];
+    : ["No strong identity-provider signals were confirmed from passive evidence."]),
+    ...(reviewItems.length === 0 && identityProvider.detected
+      ? ["No specific OAuth/OIDC review issues were confirmed from passive evidence alone."]
+      : []),
+    ...(reviewItems.length === 0 && !identityProvider.detected
+      ? ["No passive OAuth review issues were identified."]
+      : []),
+  ];
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -122,7 +126,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className={`grid gap-3 ${reviewItems.length ? "xl:grid-cols-2" : ""}`}>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Strengths</p>
             <ul className="mt-3 space-y-2 text-sm text-emerald-900">
@@ -134,17 +138,19 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Review points</p>
-            <ul className="mt-3 space-y-2 text-sm text-amber-900">
-              {reviewItems.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {reviewItems.length ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Review points</p>
+              <ul className="mt-3 space-y-2 text-sm text-amber-900">
+                {reviewItems.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </CardContent>
     </Card>

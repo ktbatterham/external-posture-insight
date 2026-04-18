@@ -9,22 +9,22 @@ type StatBoxVariant = "default" | "critical" | "warning" | "info";
 
 const statBoxVariants: Record<StatBoxVariant, { container: string; label: string; value: string }> = {
   default: {
-    container: "bg-slate-50",
+    container: "border-slate-200/90 bg-white/90",
     label: "text-slate-500",
     value: "text-slate-950",
   },
   critical: {
-    container: "bg-rose-50",
+    container: "border-rose-200/90 bg-white/90",
     label: "text-rose-700",
     value: "text-rose-900",
   },
   warning: {
-    container: "bg-amber-50",
+    container: "border-amber-200/90 bg-white/90",
     label: "text-amber-700",
     value: "text-amber-900",
   },
   info: {
-    container: "bg-sky-50",
+    container: "border-sky-200/90 bg-white/90",
     label: "text-sky-700",
     value: "text-sky-900",
   },
@@ -41,7 +41,13 @@ interface StatBoxProps {
 export const StatBox = ({ label, value, note, variant = "default", className }: StatBoxProps) => {
   const v = statBoxVariants[variant];
   return (
-    <div className={cn("rounded-2xl p-4", v.container, className)}>
+    <div
+      className={cn(
+        "rounded-2xl border p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.3),0_1px_0_rgba(255,255,255,0.65)_inset]",
+        v.container,
+        className,
+      )}
+    >
       <p className={cn("text-xs uppercase tracking-[0.18em]", v.label)}>{label}</p>
       <div className={cn("mt-2", v.value)}>{value}</div>
       {note && <div className="mt-1">{note}</div>}

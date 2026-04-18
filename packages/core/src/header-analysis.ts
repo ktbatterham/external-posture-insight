@@ -124,17 +124,26 @@ export const classifyIssueTaxonomy = (issue: ScanIssue): ScanIssue => {
   const text = `${issue.area} ${issue.title} ${issue.detail}`.toLowerCase();
   const owasp: ScanIssue["owasp"] = [];
   const mitre: ScanIssue["mitre"] = [];
+  const isCookieIssue = issue.area === "cookies" || text.includes("cookie");
+  const isHttpSurfaceDiscovery = text.includes("publicly reachable")
+    || text.includes("exposed")
+    || text.includes("fingerprint")
+    || text.includes("banner")
+    || text.includes("redirect chain")
+    || text.includes("version")
+    || text.includes("header");
+
   if (text.includes("outdated component") || text.includes("known advis") || text.includes("osv") || text.includes("vulnerab") || text.includes("library ")) owasp.push("A06 Vulnerable and Outdated Components");
-  if (issue.area === "transport" || issue.area === "certificate" || text.includes("https") || text.includes("tls") || text.includes("certificate") || text.includes("hsts") || text.includes("secure flag")) owasp.push("A02 Cryptographic Failures");
+  if (issue.area === "transport" || issue.area === "certificate" || text.includes("https") || text.includes("tls") || text.includes("certificate") || text.includes("hsts")) owasp.push("A02 Cryptographic Failures");
   if (issue.area === "headers" || text.includes("missing") || text.includes("csp") || text.includes("referrer-policy") || text.includes("permissions-policy") || text.includes("cors") || text.includes("samesite") || text.includes("httponly") || text.includes("secure flag")) owasp.push("A05 Security Misconfiguration");
   if (text.includes("unsafe-inline") || text.includes("unsafe-eval") || text.includes("xss") || text.includes("inline script")) owasp.push("A03 Injection");
   if (text.includes("publicly reachable") || text.includes("exposed") || text.includes("authorization") || text.includes("access-controlled")) owasp.push("A01 Broken Access Control");
-  if (issue.area === "cookies" || text.includes("cookie")) owasp.push("A07 Identification and Authentication Failures");
+  if (isCookieIssue) owasp.push("A07 Identification and Authentication Failures");
   if (text.includes("publicly reachable") || text.includes("exposed") || text.includes("site is not using https") || text.includes("redirect chain")) mitre.push("Initial Access");
-  if (text.includes("missing") || text.includes("version") || text.includes("certificate") || text.includes("cors") || text.includes("header")) mitre.push("Reconnaissance");
-  if (text.includes("cookie") || text.includes("password")) mitre.push("Credential Access");
+  if (isHttpSurfaceDiscovery || text.includes("certificate") || text.includes("cors")) mitre.push("Reconnaissance");
+  if (isCookieIssue || text.includes("password") || text.includes("token") || text.includes("session")) mitre.push("Credential Access");
   if (text.includes("referrer") || text.includes("inline script") || text.includes("sri")) mitre.push("Collection");
-  if (text.includes("httponly") || text.includes("samesite") || text.includes("secure flag")) mitre.push("Defense Evasion");
+  if (text.includes("bypass") || text.includes("evasion") || text.includes("obfuscat")) mitre.push("Defense Evasion");
   return { ...issue, owasp: unique(owasp), mitre: unique(mitre) };
 };
 

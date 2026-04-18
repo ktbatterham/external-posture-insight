@@ -68,3 +68,22 @@ test("buildRemediation emits snippets for missing headers", () => {
   assert.equal(remediation.length > 0, true);
   assert.match(remediation[0].snippet, /X-Content-Type-Options/);
 });
+
+test("classifyIssueTaxonomy keeps cookie hardening tags focused", () => {
+  const normalized = classifyIssueTaxonomy({
+    severity: "warning",
+    area: "cookies",
+    title: "Cookie JSESSIONID needs attention",
+    detail: "Missing HttpOnly flag",
+    confidence: "high",
+    source: "observed",
+    owasp: [],
+    mitre: [],
+  });
+
+  assert.equal(normalized.owasp.includes("A07 Identification and Authentication Failures"), true);
+  assert.equal(normalized.owasp.includes("A05 Security Misconfiguration"), true);
+  assert.equal(normalized.mitre.includes("Credential Access"), true);
+  assert.equal(normalized.mitre.includes("Reconnaissance"), false);
+  assert.equal(normalized.mitre.includes("Defense Evasion"), false);
+});

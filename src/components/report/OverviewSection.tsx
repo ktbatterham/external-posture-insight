@@ -9,21 +9,24 @@ import { sectionTitleClass } from "./ReportSectionHeader";
 
 const trafficLightStyles = {
   strong: {
-    ring: "border-emerald-200 bg-emerald-50",
+    ring: "border-emerald-300/80",
     pill: "bg-emerald-600",
     text: "text-emerald-900",
   },
   watch: {
-    ring: "border-amber-200 bg-amber-50",
+    ring: "border-amber-300/80",
     pill: "bg-amber-500",
     text: "text-amber-900",
   },
   weak: {
-    ring: "border-rose-200 bg-rose-50",
+    ring: "border-rose-300/80",
     pill: "bg-rose-600",
     text: "text-rose-900",
   },
 } as const;
+
+const panelRaisedTileClass =
+  "rounded-[1.5rem] border border-amber-200/60 bg-amber-50/90 px-5 py-5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.35),0_1px_0_rgba(255,255,255,0.65)_inset]";
 
 interface OverviewSectionProps {
   analysisData: AnalysisResult;
@@ -69,14 +72,14 @@ export const OverviewSection = ({
             <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">{analysisData.host}</p>
             <p className="mt-2 break-all text-sm text-slate-500">{analysisData.finalUrl}</p>
           </div>
-          <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
+          <div className={panelRaisedTileClass}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Scan timestamp</p>
             <p className="mt-3 text-sm font-semibold text-slate-950">
               {new Date(analysisData.scannedAt).toLocaleString()}
             </p>
           </div>
 
-          <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
+          <div className={panelRaisedTileClass}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Analyst read</p>
             <p className="mt-3 text-base leading-8 text-slate-700">
               {analysisData.executiveSummary.overview}
@@ -85,22 +88,22 @@ export const OverviewSection = ({
         </div>
 
         <div className="mt-5 grid gap-3 xl:grid-cols-[0.58fr_0.58fr_0.58fr_1.55fr]">
-          <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
+          <div className={panelRaisedTileClass}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Overall posture</p>
             <p className="mt-3 text-2xl font-black capitalize text-slate-950">
               {analysisData.executiveSummary.posture}
             </p>
           </div>
-          <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
+          <div className={panelRaisedTileClass}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">HTTP status</p>
             <p className="mt-3 text-3xl font-black text-slate-950">{analysisData.statusCode}</p>
             <p className="mt-2 text-sm text-slate-500">{getHttpStatusDetails(analysisData.statusCode).label}</p>
           </div>
-          <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
+          <div className={panelRaisedTileClass}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Response time</p>
             <p className="mt-3 text-3xl font-black text-slate-950">{analysisData.responseTimeMs}ms</p>
           </div>
-          <div className="rounded-[1.5rem] bg-white/80 px-5 py-5 shadow-sm">
+          <div className={panelRaisedTileClass}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Main visible risk</p>
             <p className="mt-3 text-base font-semibold leading-7 text-slate-950">
               {analysisData.executiveSummary.mainRisk}
@@ -110,24 +113,24 @@ export const OverviewSection = ({
 
         <div className="mt-5 border-t border-white/80 pt-5">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/80 px-4 py-4 shadow-sm">
+            <div className="rounded-[1.5rem] border border-amber-200/60 bg-amber-50/90 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.35),0_1px_0_rgba(255,255,255,0.65)_inset]">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-900">Healthcheck</p>
                 <span className="inline-flex h-3 w-3 rounded-full bg-amber-500" aria-hidden="true" />
               </div>
               <div className="mt-4 flex items-end gap-2">
                 <span className="text-3xl font-black text-amber-700">{analysisData.grade}</span>
+                <span className="pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  overall grade
+                </span>
               </div>
-              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                overall grade
-              </p>
             </div>
             {areaScores.map((area) => {
               const style = trafficLightStyles[area.status];
               return (
                 <div
                   key={area.key}
-                  className={`rounded-[1.5rem] border border-white/80 bg-white/80 px-4 py-4 shadow-sm ${style.ring}`}
+                  className={`rounded-[1.5rem] border border-amber-200/60 bg-amber-50/90 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.35),0_1px_0_rgba(255,255,255,0.65)_inset] ${style.ring}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-900">{area.label}</p>

@@ -7,14 +7,18 @@ interface WafFingerprintPanelProps {
 }
 
 export const WafFingerprintPanel = ({ wafFingerprint }: WafFingerprintPanelProps) => {
-  const strengthItems = wafFingerprint.strengths.length
+  const reviewItems = wafFingerprint.issues;
+  const strengthItems = [
+    ...(wafFingerprint.strengths.length
     ? wafFingerprint.strengths
-    : ["No positive WAF or edge-protection evidence was confirmed from passive signals."];
-  const reviewItems = wafFingerprint.issues.length
-    ? wafFingerprint.issues
-    : wafFingerprint.detected
+    : ["No positive WAF or edge-protection evidence was confirmed from passive signals."]),
+    ...(reviewItems.length === 0 && wafFingerprint.detected
       ? ["No WAF-specific review issues were identified from the passive evidence collected."]
-      : ["Passive evidence was limited, so absence of a branded match does not prove no WAF or edge control is present."];
+      : []),
+    ...(reviewItems.length === 0 && !wafFingerprint.detected
+      ? ["Passive evidence was limited, so absence of a branded match does not prove no WAF or edge control is present."]
+      : []),
+  ];
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -68,7 +72,7 @@ export const WafFingerprintPanel = ({ wafFingerprint }: WafFingerprintPanelProps
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className={`grid gap-3 ${reviewItems.length ? "xl:grid-cols-2" : ""}`}>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Strengths</p>
             <ul className="mt-3 space-y-2 text-sm text-emerald-900">
@@ -80,17 +84,19 @@ export const WafFingerprintPanel = ({ wafFingerprint }: WafFingerprintPanelProps
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Review points</p>
-            <ul className="mt-3 space-y-2 text-sm text-amber-900">
-              {reviewItems.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {reviewItems.length ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Review points</p>
+              <ul className="mt-3 space-y-2 text-sm text-amber-900">
+                {reviewItems.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </CardContent>
     </Card>

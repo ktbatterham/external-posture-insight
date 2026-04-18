@@ -27,11 +27,14 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
           <StatBox variant="info" label="Info" value={<p className="text-3xl font-black">{severityCounts.info}</p>} />
         </div>
 
-        <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.3),0_1px_0_rgba(255,255,255,0.65)_inset]">
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Category scores</p>
           <div className="mt-3 grid gap-2">
             {areaScores.map((area) => (
-              <div key={area.key} className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
+              <div
+                key={area.key}
+                className="rounded-xl border border-slate-200/70 bg-white/90 px-3 py-3 text-sm text-slate-700 shadow-[0_8px_16px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.65)_inset]"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-medium">{area.label}</span>
                   <span className="font-semibold">{area.score}/100</span>
