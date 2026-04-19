@@ -28,6 +28,31 @@ const trafficLightStyles = {
 const panelRaisedTileClass =
   "rounded-[1.5rem] border border-amber-200/60 bg-amber-50/90 px-5 py-5 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.35),0_1px_0_rgba(255,255,255,0.65)_inset]";
 
+const healthcheckStyles = {
+  strong: {
+    tile: "border-emerald-300/70 bg-emerald-50/85",
+    dot: "bg-emerald-600",
+    grade: "text-emerald-700",
+  },
+  watch: {
+    tile: "border-amber-300/70 bg-amber-50/85",
+    dot: "bg-amber-500",
+    grade: "text-amber-700",
+  },
+  weak: {
+    tile: "border-rose-300/70 bg-rose-50/85",
+    dot: "bg-rose-600",
+    grade: "text-rose-700",
+  },
+} as const;
+
+const healthcheckStatusForGrade = (grade: string): keyof typeof healthcheckStyles => {
+  const normalized = grade.trim().toUpperCase();
+  if (normalized === "A" || normalized === "B") return "strong";
+  if (normalized === "C") return "watch";
+  return "weak";
+};
+
 interface OverviewSectionProps {
   analysisData: AnalysisResult;
   historyDiff: HistoryDiff | null;
@@ -51,8 +76,11 @@ export const OverviewSection = ({
   exportMarkdown,
   exportHtml,
   exportReport,
-}: OverviewSectionProps) => (
-  <div id="overview" className="space-y-6">
+}: OverviewSectionProps) => {
+  const healthcheckStyle = healthcheckStyles[healthcheckStatusForGrade(analysisData.grade)];
+
+  return (
+    <div id="overview" className="space-y-6">
     {analysisData.assessmentLimitation.limited ? (
       <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-5 py-4 text-amber-950">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
@@ -113,13 +141,13 @@ export const OverviewSection = ({
 
         <div className="mt-5 border-t border-white/80 pt-5">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[1.5rem] border border-amber-200/60 bg-amber-50/90 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.35),0_1px_0_rgba(255,255,255,0.65)_inset]">
+            <div className={`rounded-[1.5rem] border px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.35),0_1px_0_rgba(255,255,255,0.65)_inset] ${healthcheckStyle.tile}`}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-900">Healthcheck</p>
-                <span className="inline-flex h-3 w-3 rounded-full bg-amber-500" aria-hidden="true" />
+                <span className={`inline-flex h-3 w-3 rounded-full ${healthcheckStyle.dot}`} aria-hidden="true" />
               </div>
               <div className="mt-4 flex items-end gap-2">
-                <span className="text-3xl font-black text-amber-700">{analysisData.grade}</span>
+                <span className={`text-3xl font-black ${healthcheckStyle.grade}`}>{analysisData.grade}</span>
                 <span className="pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   overall grade
                 </span>
@@ -178,4 +206,5 @@ export const OverviewSection = ({
       <MonitoringPanel analysis={analysisData} diff={historyDiff} />
     </div>
   </div>
-);
+  );
+};

@@ -202,6 +202,15 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/analyze") {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      response.writeHead(405, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Allow": "GET, HEAD",
+      });
+      response.end(JSON.stringify({ error: "Method not allowed. Use GET or HEAD." }));
+      return;
+    }
+
     const clientIp = getClientIp(request) || "unknown";
     if (apiKey && getPresentedApiKey(request) !== apiKey) {
       log("warn", "api_key_rejected", {

@@ -21,10 +21,26 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatBox variant="critical" label="Critical" value={<p className="text-3xl font-black">{severityCounts.critical}</p>} />
-          <StatBox variant="warning" label="Warnings" value={<p className="text-3xl font-black">{severityCounts.warning}</p>} />
-          <StatBox variant="info" label="Info" value={<p className="text-3xl font-black">{severityCounts.info}</p>} />
+          <StatBox
+            variant="warning"
+            label="Core Warnings"
+            value={<p className="text-3xl font-black">{severityCounts.coreWarnings}</p>}
+            note={<p className="text-xs text-slate-500">From normalized scanner findings.</p>}
+          />
+          <StatBox
+            variant="warning"
+            label="Context Warnings"
+            value={<p className="text-3xl font-black">{severityCounts.contextWarnings}</p>}
+            note={<p className="text-xs text-slate-500">From domain/content/trust panels.</p>}
+          />
+          <StatBox
+            variant="info"
+            label="Info Signals"
+            value={<p className="text-3xl font-black">{severityCounts.info}</p>}
+            note={<p className="text-xs text-slate-500">Core info + interesting exposure probes.</p>}
+          />
         </div>
 
         <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.3),0_1px_0_rgba(255,255,255,0.65)_inset]">

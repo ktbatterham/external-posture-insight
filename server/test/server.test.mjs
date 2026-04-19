@@ -140,6 +140,24 @@ test("analyze endpoint returns a sanitized error for invalid targets", async () 
   }
 });
 
+test("analyze endpoint rejects unsupported methods", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await fetch(
+      `${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://example.com")}`,
+      { method: "POST" },
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get("allow"), "GET, HEAD");
+    assert.match(payload.error, /Method not allowed/i);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("rate limiting ignores spoofed forwarded headers unless trust proxy is enabled", async () => {
   const server = await startServer();
 

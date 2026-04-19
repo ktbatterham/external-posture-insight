@@ -133,20 +133,27 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
 };
 
 export const getUnifiedIssueSummary = (analysis: AnalysisResult) => {
+  const critical = analysis.issues.filter((issue) => issue.severity === "critical").length;
+  const coreWarnings = analysis.issues.filter((issue) => issue.severity === "warning").length;
+  const contextWarnings =
+    analysis.domainSecurity.issues.length +
+    analysis.htmlSecurity.issues.length +
+    analysis.corsSecurity.issues.length +
+    analysis.apiSurface.issues.length +
+    analysis.securityTxt.issues.length +
+    analysis.publicSignals.issues.length +
+    analysis.thirdPartyTrust.issues.length +
+    analysis.aiSurface.issues.length;
+  const coreInfo = analysis.issues.filter((issue) => issue.severity === "info").length;
+  const contextInfo = analysis.exposure.probes.filter((probe) => probe.finding === "interesting").length;
+
   return {
-    critical: analysis.issues.filter((issue) => issue.severity === "critical").length,
-    warning:
-      analysis.issues.filter((issue) => issue.severity === "warning").length +
-      analysis.domainSecurity.issues.length +
-      analysis.htmlSecurity.issues.length +
-      analysis.corsSecurity.issues.length +
-      analysis.apiSurface.issues.length +
-      analysis.securityTxt.issues.length +
-      analysis.publicSignals.issues.length +
-      analysis.thirdPartyTrust.issues.length +
-      analysis.aiSurface.issues.length,
-    info:
-      analysis.issues.filter((issue) => issue.severity === "info").length +
-      analysis.exposure.probes.filter((probe) => probe.finding === "interesting").length,
+    critical,
+    warning: coreWarnings + contextWarnings,
+    info: coreInfo + contextInfo,
+    coreWarnings,
+    contextWarnings,
+    coreInfo,
+    contextInfo,
   };
 };
