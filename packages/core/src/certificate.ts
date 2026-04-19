@@ -13,8 +13,12 @@ const firstStringValue = (value: unknown): string | null => {
   return null;
 };
 
+const allowInsecureTls = process.env.EXTERNAL_POSTURE_ALLOW_INSECURE_TLS === "1";
+
 export const OBSERVATIONAL_TLS_OPTIONS = {
-  rejectUnauthorized: false,
+  // Keep certificate verification on by default.
+  // Set EXTERNAL_POSTURE_ALLOW_INSECURE_TLS=1 only for controlled observational runs.
+  rejectUnauthorized: !allowInsecureTls,
 };
 
 export const scanTls = (targetUrl: URL): Promise<CertificateResult> => {
@@ -65,6 +69,9 @@ export const scanTls = (targetUrl: URL): Promise<CertificateResult> => {
             ? socket.authorizationError
             : "Certificate is not trusted.",
         );
+      }
+      if (allowInsecureTls) {
+        issues.push("Insecure TLS observation mode is enabled via EXTERNAL_POSTURE_ALLOW_INSECURE_TLS.");
       }
       if (daysRemaining !== null && daysRemaining <= 14) issues.push("Certificate expires very soon.");
       if (protocol && /tlsv1(\.0|\.1)?$/i.test(protocol)) issues.push("TLS protocol is outdated.");
