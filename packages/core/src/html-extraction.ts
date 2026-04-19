@@ -3,10 +3,37 @@ import { getSiteDomain, headerValue, unique } from "./utils.js";
 
 type ResponseHeaders = Record<string, string | string[] | undefined>;
 
+const stripTagBlocks = (input: string, tagName: string): string => {
+  const openToken = `<${tagName}`;
+  const closeToken = `</${tagName}>`;
+  const lower = input.toLowerCase();
+  let cursor = 0;
+  let output = "";
+
+  while (cursor < input.length) {
+    const openIndex = lower.indexOf(openToken, cursor);
+    if (openIndex === -1) {
+      output += input.slice(cursor);
+      break;
+    }
+
+    output += input.slice(cursor, openIndex);
+    const closeIndex = lower.indexOf(closeToken, openIndex + openToken.length);
+    if (closeIndex === -1) {
+      break;
+    }
+    cursor = closeIndex + closeToken.length;
+    output += " ";
+  }
+
+  return output;
+};
+
 export function normalizeHtmlSignature(body: string): string {
-  return body
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+  const withoutScriptBlocks = stripTagBlocks(body, "script");
+  const withoutStyleBlocks = stripTagBlocks(withoutScriptBlocks, "style");
+
+  return withoutStyleBlocks
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim()
