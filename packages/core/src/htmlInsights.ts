@@ -9,6 +9,33 @@ import type {
 } from "./types.js";
 import { getSiteDomain, unique } from "./utils.js";
 
+interface ParsedResource {
+  hostname: string | null;
+  pathname: string;
+}
+
+const parseResource = (value: string, baseUrl: URL): ParsedResource => {
+  try {
+    const parsed = new URL(value, baseUrl);
+    return {
+      hostname: parsed.hostname.toLowerCase(),
+      pathname: parsed.pathname.toLowerCase(),
+    };
+  } catch {
+    return {
+      hostname: null,
+      pathname: value.toLowerCase(),
+    };
+  }
+};
+
+const hostMatches = (hostname: string | null, domain: string): boolean => {
+  if (!hostname) {
+    return false;
+  }
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+};
+
 const addDetectedTechnology = (
   target: TechnologyResult[],
   seen: Set<string>,
@@ -44,7 +71,10 @@ export const detectHtmlTechnologies = (
   const technologies: TechnologyResult[] = [];
   const seen = new Set<string>();
   const htmlLower = html.toLowerCase();
-  const allUrls = [...externalScriptUrls, ...externalStylesheetUrls].map((url) => url.toLowerCase());
+  const resources = [...externalScriptUrls, ...externalStylesheetUrls].map((url) => parseResource(url, finalUrl));
+  const allPaths = resources.map((resource) => resource.pathname);
+  const hasDomain = (domain: string) => resources.some((resource) => hostMatches(resource.hostname, domain));
+  const hasPath = (needle: string) => allPaths.some((path) => path.includes(needle));
   const generator = metaGenerator?.toLowerCase() || "";
 
   if (generator.includes("wordpress") || htmlLower.includes("/wp-content/") || htmlLower.includes("/wp-includes/")) {
@@ -59,13 +89,13 @@ export const detectHtmlTechnologies = (
   if (generator.includes("ghost")) {
     addDetectedTechnology(technologies, seen, "Ghost", "frontend", "Detected from meta generator");
   }
-  if (generator.includes("webflow") || allUrls.some((url) => url.includes("webflow"))) {
+  if (generator.includes("webflow") || hasDomain("webflow.com")) {
     addDetectedTechnology(technologies, seen, "Webflow", "hosting", "Detected from Webflow assets or generator");
   }
-  if (generator.includes("wix") || allUrls.some((url) => url.includes("wixstatic.com"))) {
+  if (generator.includes("wix") || hasDomain("wixstatic.com")) {
     addDetectedTechnology(technologies, seen, "Wix", "hosting", "Detected from Wix assets or generator");
   }
-  if (allUrls.some((url) => url.includes("static1.squarespace.com")) || generator.includes("squarespace")) {
+  if (hasDomain("static1.squarespace.com") || generator.includes("squarespace")) {
     addDetectedTechnology(technologies, seen, "Squarespace", "hosting", "Detected from Squarespace assets or generator");
   }
   if (htmlLower.includes("/_next/") || htmlLower.includes("__next_data__")) {
@@ -74,46 +104,46 @@ export const detectHtmlTechnologies = (
   if (htmlLower.includes("/_nuxt/") || htmlLower.includes("__nuxt")) {
     addDetectedTechnology(technologies, seen, "Nuxt", "frontend", "Detected from Nuxt page assets");
   }
-  if (allUrls.some((url) => url.includes("cdn.shopify.com")) || htmlLower.includes("shopify.theme")) {
+  if (hasDomain("cdn.shopify.com") || htmlLower.includes("shopify.theme")) {
     addDetectedTechnology(technologies, seen, "Shopify", "hosting", "Detected from Shopify assets");
   }
-  if (allUrls.some((url) => url.includes("code.jquery.com")) || htmlLower.includes("jquery")) {
+  if (hasDomain("code.jquery.com") || htmlLower.includes("jquery")) {
     addDetectedTechnology(technologies, seen, "jQuery", "frontend", "Detected from jQuery asset references");
   }
-  if (allUrls.some((url) => url.includes("googletagmanager.com"))) {
+  if (hasDomain("googletagmanager.com")) {
     addDetectedTechnology(technologies, seen, "Google Tag Manager", "network", "Detected from third-party script domains");
   }
-  if (allUrls.some((url) => url.includes("google-analytics.com") || url.includes("gtag/js"))) {
+  if (hasDomain("google-analytics.com") || hasPath("gtag/js")) {
     addDetectedTechnology(technologies, seen, "Google Analytics", "network", "Detected from analytics asset references");
   }
-  if (allUrls.some((url) => url.includes("app.usercentrics.eu"))) {
+  if (hasDomain("app.usercentrics.eu")) {
     addDetectedTechnology(technologies, seen, "Usercentrics", "security", "Detected from consent-management script");
   }
-  if (allUrls.some((url) => url.includes("consent.cookiebot.com"))) {
+  if (hasDomain("consent.cookiebot.com")) {
     addDetectedTechnology(technologies, seen, "Cookiebot", "security", "Detected from consent-management script");
   }
-  if (allUrls.some((url) => url.includes("js.hs-scripts.com"))) {
+  if (hasDomain("js.hs-scripts.com")) {
     addDetectedTechnology(technologies, seen, "HubSpot", "network", "Detected from HubSpot script references");
   }
-  if (allUrls.some((url) => url.includes("adobedtm.com") || url.includes("adobedc.net"))) {
+  if (hasDomain("adobedtm.com") || hasDomain("adobedc.net")) {
     addDetectedTechnology(technologies, seen, "Adobe Experience Cloud", "network", "Detected from Adobe tag or delivery assets");
   }
-  if (allUrls.some((url) => url.includes("contentsquare") || url.includes("decibelinsight"))) {
+  if (hasDomain("contentsquare.com") || hasDomain("decibelinsight.net")) {
     addDetectedTechnology(technologies, seen, "Contentsquare / Decibel", "network", "Detected from session analytics assets");
   }
-  if (allUrls.some((url) => url.includes("imperva") || url.includes("incapsula"))) {
+  if (hasDomain("imperva.com") || hasDomain("incapsula.com")) {
     addDetectedTechnology(technologies, seen, "Imperva", "security", "Detected from Imperva / Incapsula assets");
   }
-  if (allUrls.some((url) => url.includes("onetrust"))) {
+  if (hasDomain("onetrust.com") || hasDomain("cookielaw.org")) {
     addDetectedTechnology(technologies, seen, "OneTrust", "security", "Detected from OneTrust consent assets");
   }
-  if (allUrls.some((url) => url.includes("braintree"))) {
+  if (hasDomain("braintreegateway.com")) {
     addDetectedTechnology(technologies, seen, "Braintree", "security", "Detected from payments-related assets");
   }
-  if (allUrls.some((url) => url.includes("sentry.io"))) {
+  if (hasDomain("sentry.io")) {
     addDetectedTechnology(technologies, seen, "Sentry", "security", "Detected from client monitoring assets");
   }
-  if (allUrls.some((url) => url.includes("cloudfront.net"))) {
+  if (hasDomain("cloudfront.net")) {
     addDetectedTechnology(technologies, seen, "Amazon CloudFront", "network", "Detected from asset hosting domain");
   }
   if (finalUrl.hostname.endsWith(".pages.dev")) {
@@ -172,9 +202,16 @@ export const analyzeAiSurface = (
     }
   }
 
-  const assistantVisible =
-    /chat with (ai|our ai)|ask ai|ai assistant|virtual assistant|talk to our assistant|assistant for/i.test(htmlLower) ||
-    /aria-label=["'][^"']*(chat with ai|ai assistant|ask ai|virtual assistant)[^"']*["']/i.test(html);
+  const assistantPhrases = [
+    "chat with ai",
+    "chat with our ai",
+    "ask ai",
+    "ai assistant",
+    "virtual assistant",
+    "talk to our assistant",
+    "assistant for",
+  ];
+  const assistantVisible = assistantPhrases.some((phrase) => htmlLower.includes(phrase));
 
   const aiPageSignals = firstPartyPaths.filter((path) => /\/(ai|assistant|copilot|chat|ask-ai|automation)(\/|$)/i.test(path));
   const disclosures: string[] = [];
