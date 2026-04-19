@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-04-19
+
+### Changed
+- Refreshed direct and transitive dependencies via Dependabot group update, including `react-router-dom` and multiple security-relevant parser/glob stack updates (`js-yaml`, `picomatch`, `brace-expansion`, `minimatch`, `glob`, `flatted`).
+- Verified package build and test flows continue to pass after lockfile refresh.
+
 ## [0.6.0] - 2026-04-16
 
 ### Added
