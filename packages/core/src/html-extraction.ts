@@ -15,8 +15,23 @@ export function normalizeHtmlSignature(body: string): string {
 }
 
 export function getHtmlTitle(body: string): string | null {
-  const match = body.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return match ? match[1].replace(/\s+/g, " ").trim() : null;
+  const lower = body.toLowerCase();
+  const openIndex = lower.indexOf("<title");
+  if (openIndex === -1) {
+    return null;
+  }
+
+  const openTagEnd = lower.indexOf(">", openIndex);
+  if (openTagEnd === -1) {
+    return null;
+  }
+
+  const closeIndex = lower.indexOf("</title>", openTagEnd + 1);
+  if (closeIndex === -1 || closeIndex <= openTagEnd) {
+    return null;
+  }
+
+  return body.slice(openTagEnd + 1, closeIndex).replace(/\s+/g, " ").trim();
 }
 
 export function extractHtmlTitle(body: string): string | null {
@@ -26,15 +41,6 @@ export function extractHtmlTitle(body: string): string | null {
 
 export function summarizeEvidence<T>(values: Array<T | null | undefined | false>, limit = SUMMARY_EVIDENCE_LIMIT): T[] {
   return unique(values).slice(0, limit);
-}
-
-export function extractRedactedMatch(
-  pattern: RegExp,
-  html: string,
-  transform: (value: string) => string = (value) => value,
-): string | null {
-  const match = html.match(pattern);
-  return match ? transform(match[0]) : null;
 }
 
 export function redactToken(value: string, visible = 8): string {
@@ -52,8 +58,9 @@ export function collectPassiveLeakSignals(
   externalStylesheetUrls: string[],
 ) {
   const signals = [];
+  const boundedHtml = html.slice(0, HTML_SIGNATURE_LIMIT * 100);
   const sourceMapReferences = summarizeEvidence([
-    ...[...html.matchAll(/sourceMappingURL\s*=\s*([^\s"'<>]+)/gi)].map((match) => match[1]),
+    ...[...boundedHtml.matchAll(/sourceMappingURL\s*=\s*([^\s"'<>]+)/gi)].map((match) => match[1]),
     ...externalScriptUrls.filter((url) => /\.map(?:$|[?#])/i.test(url)),
     ...externalStylesheetUrls.filter((url) => /\.map(?:$|[?#])/i.test(url)),
   ]).map((value) => {
@@ -75,14 +82,14 @@ export function collectPassiveLeakSignals(
   }
 
   const configMarkers = summarizeEvidence([
-    /__NEXT_DATA__/.test(html) ? "__NEXT_DATA__" : null,
-    /__NUXT__/.test(html) ? "__NUXT__" : null,
-    /window\.__INITIAL_STATE__/.test(html) ? "window.__INITIAL_STATE__" : null,
-    /window\.__PRELOADED_STATE__/.test(html) ? "window.__PRELOADED_STATE__" : null,
-    /window\.__APOLLO_STATE__/.test(html) ? "window.__APOLLO_STATE__" : null,
-    /window\.__ENV\b/.test(html) ? "window.__ENV" : null,
-    /drupalSettings/.test(html) ? "drupalSettings" : null,
-    /window\.__remixContext/.test(html) ? "window.__remixContext" : null,
+    /__NEXT_DATA__/.test(boundedHtml) ? "__NEXT_DATA__" : null,
+    /__NUXT__/.test(boundedHtml) ? "__NUXT__" : null,
+    /window\.__INITIAL_STATE__/.test(boundedHtml) ? "window.__INITIAL_STATE__" : null,
+    /window\.__PRELOADED_STATE__/.test(boundedHtml) ? "window.__PRELOADED_STATE__" : null,
+    /window\.__APOLLO_STATE__/.test(boundedHtml) ? "window.__APOLLO_STATE__" : null,
+    /window\.__ENV\b/.test(boundedHtml) ? "window.__ENV" : null,
+    /drupalSettings/.test(boundedHtml) ? "drupalSettings" : null,
+    /window\.__remixContext/.test(boundedHtml) ? "window.__remixContext" : null,
   ]);
 
   if (configMarkers.length) {
@@ -95,12 +102,17 @@ export function collectPassiveLeakSignals(
     });
   }
 
+  const stripeKeyMatch = boundedHtml.match(/pk_(?:live|test)_[A-Za-z0-9]{16,}/);
+  const gcpApiKeyMatch = boundedHtml.match(/AIza[0-9A-Za-z_-]{20,}/);
+  const publicKeyMatch = boundedHtml.match(/pk\.[A-Za-z0-9_-]{20,}/);
+  const sentryDsnMatch = boundedHtml.match(/https:\/\/[A-Za-z0-9_-]+@[A-Za-z0-9.-]+\.ingest\.sentry\.io\/\d+/);
+
   const publicTokenEvidence = summarizeEvidence([
-    extractRedactedMatch(/pk_(live|test)_[A-Za-z0-9]{16,}/, html, redactToken),
-    extractRedactedMatch(/AIza[0-9A-Za-z\\-_]{20,}/, html, redactToken),
-    extractRedactedMatch(/pk\.[A-Za-z0-9\\-_]{20,}/, html, redactToken),
-    extractRedactedMatch(/https:\/\/[A-Za-z0-9_-]+@[A-Za-z0-9.-]+\.ingest\.sentry\.io\/\d+/, html, redactToken),
-    /apiKey["']?\s*:\s*["'][^"']{16,}["']/.test(html) && /projectId["']?\s*:\s*["'][^"']+["']/.test(html)
+    stripeKeyMatch ? redactToken(stripeKeyMatch[0]) : null,
+    gcpApiKeyMatch ? redactToken(gcpApiKeyMatch[0]) : null,
+    publicKeyMatch ? redactToken(publicKeyMatch[0]) : null,
+    sentryDsnMatch ? redactToken(sentryDsnMatch[0]) : null,
+    /apiKey["']?\s*:\s*["'][^"']{16,}["']/.test(boundedHtml) && /projectId["']?\s*:\s*["'][^"']+["']/.test(boundedHtml)
       ? "Firebase-style client config"
       : null,
   ]);
@@ -115,10 +127,12 @@ export function collectPassiveLeakSignals(
     });
   }
 
+  const wpVersionMatch = boundedHtml.match(/\/wp-(?:content|includes)\/[^"' ]+\?ver=\d[\w.-]*/i);
+  const cmsMetaVersionMatch = boundedHtml.match(/content\s*=\s*["'][^"']*(wordpress|drupal|joomla|ghost)[^"']*\d[^"']*["']/i);
   const versionEvidence = summarizeEvidence([
-    metaGenerator && /\\d/.test(metaGenerator) ? metaGenerator : null,
-    extractRedactedMatch(/\/wp-(?:content|includes)\/[^"' ]+\?ver=\d[\w.-]*/i, html),
-    extractRedactedMatch(/content\s*=\s*["'][^"']*(wordpress|drupal|joomla|ghost)[^"']*\d[^"']*["']/i, html),
+    metaGenerator && /\d/.test(metaGenerator) ? metaGenerator : null,
+    wpVersionMatch ? wpVersionMatch[0] : null,
+    cmsMetaVersionMatch ? cmsMetaVersionMatch[0] : null,
   ]);
 
   if (versionEvidence.length) {
@@ -140,11 +154,15 @@ export function collectClientExposureSignals(html: string, finalUrl: URL) {
     /\/assets?\//i.test(value) ||
     /\.(?:css|js|mjs|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot)(?:[?#]|$)/i.test(value);
 
-  const rawEndpoints = summarizeEvidence([
-    ...[...html.matchAll(/https?:\/\/[^"'`\s<>()]*(?:\/(?:api|graphql|trpc|socket\.io|rpc)[^"'`\s<>()]*)/gi)].map((match) => match[0]),
-    ...[...html.matchAll(/["'`](\/(?:api|graphql|trpc|socket\.io|_next\/data)[^"'`<>\s]*)["'`]/gi)].map((match) => match[1]),
-    ...[...html.matchAll(/["'`](\/[a-z0-9/_-]*(?:graphql|api|trpc)[^"'`<>\s]*)["'`]/gi)].map((match) => match[1]),
-  ], CLIENT_EXPOSURE_EVIDENCE_LIMIT).map((value) => {
+  const endpointKeywords = ["/api", "/graphql", "/trpc", "/socket.io", "/rpc", "/_next/data"];
+  const rawCandidates = html
+    .slice(0, HTML_SIGNATURE_LIMIT * 100)
+    .split(/[\s"'`<>]+/)
+    .filter(Boolean)
+    .filter((token) => token.startsWith("/") || token.startsWith("http://") || token.startsWith("https://"))
+    .filter((token) => endpointKeywords.some((keyword) => token.toLowerCase().includes(keyword)));
+
+  const rawEndpoints = summarizeEvidence(rawCandidates, CLIENT_EXPOSURE_EVIDENCE_LIMIT).map((value) => {
     try {
       return new URL(value, finalUrl).toString();
     } catch {
