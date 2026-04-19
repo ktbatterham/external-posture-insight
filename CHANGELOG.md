@@ -10,7 +10,7 @@
 
 ### Changed
 
-- Updated workspace dependency alignment to keep `npm ci` stable (`vite@^7.3.2`, `@vitejs/plugin-react-swc@^4.3.0`, `lovable-tagger@^1.1.13`).
+- Updated workspace dependency alignment to keep `npm ci` stable (`vite@^8.0.8`, `@vitejs/plugin-react-swc@^4.3.0`) and removed the legacy `lovable-tagger` integration.
 - Hardened certificate issuer/subject normalization under stricter TypeScript typing.
 
 ### Verified
