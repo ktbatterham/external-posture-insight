@@ -1,4 +1,5 @@
 import { AnalysisResult, HistoryDiff } from "@/types/analysis";
+import { getAreaScores } from "@/lib/posture";
 
 export interface PrioritizedAction {
   title: string;
@@ -22,6 +23,12 @@ const severityOrder: Record<PrioritizedAction["severity"], number> = {
 export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[] => {
   const actions: PrioritizedAction[] = [];
   const seen = new Set<string>();
+  const areaScores = getAreaScores(analysis);
+  const domainAreaScore = areaScores.find((area) => area.key === "domain")?.score ?? 100;
+  const domainTrustIssueCount =
+    analysis.domainSecurity.issues.length +
+    analysis.securityTxt.issues.length +
+    analysis.publicSignals.issues.length;
 
   const addAction = (action: PrioritizedAction) => {
     const key = `${action.title}:${action.area}`;
@@ -50,6 +57,15 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "A stronger CSP will reduce script injection and unsafe resource loading risk.",
       severity: "critical",
       area: "Headers",
+    });
+  }
+
+  if (domainAreaScore <= 70 && domainTrustIssueCount >= 3) {
+    addAction({
+      title: "Raise domain and trust baseline controls",
+      detail: `Domain and trust posture is currently weaker than target (${domainTrustIssueCount} findings across DNS/email, security.txt, and public trust signals).`,
+      severity: "warning",
+      area: "Domain & Trust",
     });
   }
 
@@ -102,7 +118,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     addAction({
       title: "Publish a security.txt file",
       detail: "A valid security.txt gives researchers and partners a clear disclosure route.",
-      severity: "info",
+      severity: domainAreaScore <= 70 ? "warning" : "info",
       area: "Disclosure",
     });
   }
@@ -120,7 +136,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     addAction({
       title: "Add MTA-STS if email matters for this domain",
       detail: "MTA-STS improves SMTP transport integrity for domains that receive mail.",
-      severity: "info",
+      severity: domainAreaScore <= 70 ? "warning" : "info",
       area: "Domain",
     });
   }

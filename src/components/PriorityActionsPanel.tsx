@@ -22,7 +22,7 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
   }
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" />
