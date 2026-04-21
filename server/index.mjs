@@ -23,6 +23,7 @@ const allowUnauthenticated = process.env.ALLOW_UNAUTHENTICATED === "true";
 const trustProxy = process.env.TRUST_PROXY === "true";
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
+const RATE_LIMIT_MAX_BUCKETS = 20000;
 const rateLimitBuckets = new Map();
 
 const log = (level, event, details = {}) => {
@@ -42,7 +43,7 @@ const log = (level, event, details = {}) => {
 };
 
 function getClientIp(request) {
-  if (trustProxy) {
+  if (trustProxy && shouldTrustForwardedHeaders(request)) {
     const forwarded = request.headers["x-forwarded-for"];
     const candidate = Array.isArray(forwarded) ? forwarded[0] : forwarded;
     if (typeof candidate === "string" && candidate.trim()) {
@@ -52,6 +53,24 @@ function getClientIp(request) {
 
   const remoteAddress = request.socket.remoteAddress || "";
   return remoteAddress.startsWith("::ffff:") ? remoteAddress.slice(7) : remoteAddress;
+}
+
+function shouldTrustForwardedHeaders(request) {
+  const remoteAddress = request.socket.remoteAddress || "";
+  const normalized = remoteAddress.startsWith("::ffff:") ? remoteAddress.slice(7) : remoteAddress;
+  if (!normalized) {
+    return false;
+  }
+
+  if (isLocalHostname(normalized)) {
+    return true;
+  }
+
+  if (net.isIP(normalized)) {
+    return !isPublicIp(normalized);
+  }
+
+  return false;
 }
 
 function isPublicIp(ip) {
@@ -104,6 +123,15 @@ function getPresentedApiKey(request) {
 
 function rateLimitExceeded(clientIp) {
   const now = Date.now();
+  if (!rateLimitBuckets.has(clientIp) && rateLimitBuckets.size >= RATE_LIMIT_MAX_BUCKETS) {
+    sweepRateLimitBuckets();
+    if (!rateLimitBuckets.has(clientIp) && rateLimitBuckets.size >= RATE_LIMIT_MAX_BUCKETS) {
+      const oldestClient = rateLimitBuckets.keys().next().value;
+      if (oldestClient) {
+        rateLimitBuckets.delete(oldestClient);
+      }
+    }
+  }
   const current = rateLimitBuckets.get(clientIp) || [];
   const recent = current.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
   recent.push(now);
@@ -224,6 +252,7 @@ function serveStatic(requestPath, method, response) {
 }
 
 const server = http.createServer(async (request, response) => {
+  const rawRequestPath = (request.url || "/").split("?")[0] || "/";
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host}`);
 
   if (requestUrl.pathname === "/api/health") {
@@ -287,7 +316,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" || request.method === "HEAD") {
-    serveStatic(requestUrl.pathname, request.method, response);
+    serveStatic(rawRequestPath, request.method, response);
     return;
   }
 
