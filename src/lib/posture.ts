@@ -17,8 +17,15 @@ const statusForScore = (score: number): AreaScore["status"] => {
 };
 
 export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
-  const missingHeaderCount = analysis.headers.filter((header) => header.status === "missing").length;
-  const warningHeaderCount = analysis.headers.filter((header) => header.status === "warning").length;
+  const cspHeaderFindings = analysis.headers.filter(
+    (header) => header.key === "content-security-policy" && header.status !== "present",
+  );
+  const edgeHeaderFindings = analysis.headers.filter(
+    (header) => header.key !== "content-security-policy" && header.status !== "present",
+  );
+  const missingHeaderCount = edgeHeaderFindings.filter((header) => header.status === "missing").length;
+  const warningHeaderCount = edgeHeaderFindings.filter((header) => header.status === "warning").length;
+  const cspHeaderIssueCount = cspHeaderFindings.length;
   const cookieIssueCount = analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0);
   const exposureInterestingCount = analysis.exposure.probes.filter((probe) => probe.finding !== "safe").length;
   const apiRespondedCount = analysis.apiSurface.probes.filter((probe) => probe.classification !== "absent").length;
@@ -32,6 +39,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
     redirectPenalty;
 
   const contentPenalty =
+    cspHeaderIssueCount * 10 +
     analysis.htmlSecurity.issues.length * 8 +
     cookieIssueCount * 4;
 
@@ -73,6 +81,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       score: clamp(100 - contentPenalty),
       status: statusForScore(clamp(100 - contentPenalty)),
       notes: [
+        `${cspHeaderIssueCount} CSP header findings`,
         `${analysis.htmlSecurity.issues.length} page-content findings`,
         `${cookieIssueCount} cookie findings`,
       ],

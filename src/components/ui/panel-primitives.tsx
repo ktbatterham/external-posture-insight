@@ -9,22 +9,22 @@ type StatBoxVariant = "default" | "critical" | "warning" | "info";
 
 const statBoxVariants: Record<StatBoxVariant, { container: string; label: string; value: string }> = {
   default: {
-    container: "border-slate-200/90 bg-white/90",
+    container: "border-slate-200/80 bg-slate-50/85",
     label: "text-slate-500",
     value: "text-slate-950",
   },
   critical: {
-    container: "border-rose-200/90 bg-white/90",
+    container: "border-rose-200/80 bg-rose-50/85",
     label: "text-rose-700",
     value: "text-rose-900",
   },
   warning: {
-    container: "border-amber-200/90 bg-white/90",
+    container: "border-amber-200/80 bg-amber-50/85",
     label: "text-amber-700",
     value: "text-amber-900",
   },
   info: {
-    container: "border-sky-200/90 bg-white/90",
+    container: "border-sky-200/80 bg-sky-50/85",
     label: "text-sky-700",
     value: "text-sky-900",
   },
@@ -43,7 +43,7 @@ export const StatBox = ({ label, value, note, variant = "default", className }: 
   return (
     <div
       className={cn(
-        "rounded-2xl border p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.3),0_1px_0_rgba(255,255,255,0.65)_inset]",
+        "rounded-2xl border p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.3),0_1px_0_rgba(255,255,255,0.55)_inset]",
         v.container,
         className,
       )}
@@ -63,10 +63,10 @@ export const StatBox = ({ label, value, note, variant = "default", className }: 
 type StatusAlertVariant = "success" | "warning" | "critical" | "info";
 
 const statusAlertVariants: Record<StatusAlertVariant, string> = {
-  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  critical: "border-rose-200 bg-rose-50 text-rose-900",
-  info: "border-sky-200 bg-sky-50 text-sky-900",
+  success: "border-emerald-200/80 bg-emerald-50/85 text-emerald-900",
+  warning: "border-amber-200/80 bg-amber-50/85 text-amber-900",
+  critical: "border-rose-200/80 bg-rose-50/85 text-rose-900",
+  info: "border-sky-200/80 bg-sky-50/85 text-sky-900",
 };
 
 interface StatusAlertProps {
@@ -79,7 +79,7 @@ interface StatusAlertProps {
 export const StatusAlert = ({ variant, icon, children, className }: StatusAlertProps) => (
   <div
     className={cn(
-      "rounded-2xl border px-4 py-3 text-sm",
+      "rounded-2xl border px-4 py-3 text-sm shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.5)_inset]",
       icon ? "flex gap-3" : "",
       statusAlertVariants[variant],
       className,

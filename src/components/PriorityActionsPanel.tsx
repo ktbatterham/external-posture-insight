@@ -22,7 +22,7 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
   }
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListTodo className="h-5 w-5" />
@@ -43,6 +43,11 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
               <span className="text-xs uppercase tracking-[0.18em] opacity-75">{action.area}</span>
             </div>
             <p className="mt-2 opacity-90">{action.detail}</p>
+            {action.priorityReason ? (
+              <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] opacity-70">
+                {action.priorityReason}
+              </p>
+            ) : null}
           </StatusAlert>
         ))}
       </CardContent>

@@ -1,10 +1,15 @@
 import { AnalysisResult, HistoryDiff } from "@/types/analysis";
+import { getAreaScores } from "@/lib/posture";
+
+type PriorityAreaKey = "edge" | "content" | "domain" | "exposure" | "api" | "trust" | "ai";
 
 export interface PrioritizedAction {
   title: string;
   detail: string;
   severity: "critical" | "warning" | "info";
   area: string;
+  areaKey?: PriorityAreaKey;
+  priorityReason?: string;
 }
 
 export interface MonitoringAlert {
@@ -22,6 +27,14 @@ const severityOrder: Record<PrioritizedAction["severity"], number> = {
 export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[] => {
   const actions: PrioritizedAction[] = [];
   const seen = new Set<string>();
+  const areaScores = getAreaScores(analysis);
+  const areaScoreByKey = new Map(areaScores.map((area) => [area.key, area.score] as const));
+  const areaLabelByKey = new Map(areaScores.map((area) => [area.key, area.label] as const));
+  const domainAreaScore = areaScores.find((area) => area.key === "domain")?.score ?? 100;
+  const domainTrustIssueCount =
+    analysis.domainSecurity.issues.length +
+    analysis.securityTxt.issues.length +
+    analysis.publicSignals.issues.length;
 
   const addAction = (action: PrioritizedAction) => {
     const key = `${action.title}:${action.area}`;
@@ -41,6 +54,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "Add or harden HSTS with a long max-age, includeSubDomains, and preload readiness where appropriate.",
       severity: "critical",
       area: "Transport",
+      areaKey: "edge",
     });
   }
 
@@ -50,6 +64,17 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "A stronger CSP will reduce script injection and unsafe resource loading risk.",
       severity: "critical",
       area: "Headers",
+      areaKey: "content",
+    });
+  }
+
+  if (domainAreaScore <= 70 && domainTrustIssueCount >= 3) {
+    addAction({
+      title: "Raise domain and trust baseline controls",
+      detail: `Domain and trust posture is currently weaker than target (${domainTrustIssueCount} findings across DNS/email, security.txt, and public trust signals).`,
+      severity: "warning",
+      area: "Domain & Trust",
+      areaKey: "domain",
     });
   }
 
@@ -59,6 +84,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: `Header behavior varies across ${analysis.crawl.inconsistentHeaders.length} protections, which usually points to inconsistent middleware or CDN rules.`,
       severity: "warning",
       area: "Crawl",
+      areaKey: "edge",
     });
   }
 
@@ -68,6 +94,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "Subresource Integrity would reduce tampering risk on externally hosted scripts.",
       severity: "warning",
       area: "Content",
+      areaKey: "content",
     });
   }
 
@@ -77,6 +104,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "The fetched page exposed source-map references or public token-like values that deserve a quick review before deeper testing.",
       severity: "warning",
       area: "Content",
+      areaKey: "content",
     });
   }
 
@@ -86,6 +114,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: `The page loads ${analysis.thirdPartyTrust.highRiskProviders} higher-risk third-party integration${analysis.thirdPartyTrust.highRiskProviders === 1 ? "" : "s"} that expand data-flow and review scope.`,
       severity: analysis.thirdPartyTrust.highRiskProviders >= 3 ? "critical" : "warning",
       area: "Third Parties",
+      areaKey: "trust",
     });
   }
 
@@ -95,6 +124,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "Public AI or automation signals were detected, but the fetched page offers limited visible disclosure, privacy, or governance language.",
       severity: "warning",
       area: "AI",
+      areaKey: "ai",
     });
   }
 
@@ -102,8 +132,9 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     addAction({
       title: "Publish a security.txt file",
       detail: "A valid security.txt gives researchers and partners a clear disclosure route.",
-      severity: "info",
+      severity: domainAreaScore <= 70 ? "warning" : "info",
       area: "Disclosure",
+      areaKey: "domain",
     });
   }
 
@@ -113,6 +144,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "Stronger DMARC helps reduce spoofing and improves overall trust posture.",
       severity: "warning",
       area: "Domain",
+      areaKey: "domain",
     });
   }
 
@@ -120,8 +152,9 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     addAction({
       title: "Add MTA-STS if email matters for this domain",
       detail: "MTA-STS improves SMTP transport integrity for domains that receive mail.",
-      severity: "info",
+      severity: domainAreaScore <= 70 ? "warning" : "info",
       area: "Domain",
+      areaKey: "domain",
     });
   }
 
@@ -131,6 +164,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "A limited set of API-style endpoints looked publicly reachable and should be reviewed.",
       severity: "warning",
       area: "API",
+      areaKey: "api",
     });
   }
 
@@ -140,10 +174,29 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       detail: "Public preload data suggests the domain may be close to preload-ready.",
       severity: "info",
       area: "Public Signals",
+      areaKey: "domain",
     });
   }
 
-  return actions.sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity]).slice(0, 5);
+  return actions
+    .map((action) => {
+      const score = action.areaKey ? areaScoreByKey.get(action.areaKey) ?? 100 : 100;
+      const label = action.areaKey ? areaLabelByKey.get(action.areaKey) ?? action.area : action.area;
+      return {
+        ...action,
+        priorityReason: `Priority driver: ${label} is at ${score}/100.`,
+      };
+    })
+    .sort((left, right) => {
+      const leftScore = left.areaKey ? areaScoreByKey.get(left.areaKey) ?? 100 : 100;
+      const rightScore = right.areaKey ? areaScoreByKey.get(right.areaKey) ?? 100 : 100;
+      if (leftScore !== rightScore) return leftScore - rightScore;
+      if (severityOrder[left.severity] !== severityOrder[right.severity]) {
+        return severityOrder[left.severity] - severityOrder[right.severity];
+      }
+      return left.title.localeCompare(right.title);
+    })
+    .slice(0, 5);
 };
 
 export const getMonitoringAlerts = (analysis: AnalysisResult, diff: HistoryDiff | null): MonitoringAlert[] => {
