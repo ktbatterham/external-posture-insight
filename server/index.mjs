@@ -21,6 +21,8 @@ const isProduction = process.env.NODE_ENV === "production";
 const apiKey = process.env.API_KEY || "";
 const allowUnauthenticated = process.env.ALLOW_UNAUTHENTICATED === "true";
 const trustProxy = process.env.TRUST_PROXY === "true";
+const deploymentMode = process.env.DEPLOYMENT_MODE === "multi-instance" ? "multi-instance" : "single-instance";
+const allowInMemoryRateLimitInMultiInstance = process.env.ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE === "true";
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
 const RATE_LIMIT_MAX_BUCKETS = 20000;
@@ -256,7 +258,16 @@ const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host}`);
 
   if (requestUrl.pathname === "/api/health") {
-    sendJson(response, 200, { ok: true, now: new Date().toISOString() });
+    sendJson(response, 200, {
+      ok: true,
+      now: new Date().toISOString(),
+      deploymentMode,
+      rateLimit: {
+        backend: "in-memory",
+        maxRequests: RATE_LIMIT_MAX_REQUESTS,
+        windowMs: RATE_LIMIT_WINDOW_MS,
+      },
+    });
     return;
   }
 
@@ -340,7 +351,21 @@ if (!apiKey) {
 
 if (trustProxy) {
   log("warn", "trusted_proxy_mode", {
-    message: "TRUST_PROXY is enabled; X-Forwarded-For will be used for client IP attribution.",
+    message: "TRUST_PROXY is enabled; forwarded client IP attribution is only accepted when the direct peer is private/local.",
+  });
+}
+
+if (isProduction && deploymentMode === "multi-instance" && !allowInMemoryRateLimitInMultiInstance) {
+  log("error", "server_start_blocked", {
+    reason: "DEPLOYMENT_MODE=multi-instance requires a distributed limiter. In-memory limiter is blocked by default.",
+    overrideEnv: "ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE=true",
+  });
+  process.exit(1);
+}
+
+if (isProduction && deploymentMode === "multi-instance" && allowInMemoryRateLimitInMultiInstance) {
+  log("warn", "multi_instance_inmemory_limiter_override", {
+    message: "In-memory rate limiting override is enabled in multi-instance mode. This is not safe for sustained public traffic.",
   });
 }
 
@@ -352,5 +377,7 @@ server.listen(port, () => {
     authenticated: Boolean(apiKey),
     allowUnauthenticated,
     trustProxy,
+    deploymentMode,
+    rateLimitBackend: "in-memory",
   });
 });

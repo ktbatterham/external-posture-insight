@@ -15,7 +15,7 @@ This app consumes that core package locally from the workspace during developmen
 
 ## Release status
 
-- Latest published core package: `@ktbatterham/external-posture-core@0.6.0`
+- Latest published core package: `@ktbatterham/external-posture-core@0.6.1`
 - Latest npm tag: `latest`
 - Clean-install smoke test completed from a fresh npm project
 
@@ -72,6 +72,17 @@ npm start
 ```
 
 `npm start` serves the API and the built frontend from the same Node process.
+
+## Public deployment guardrails
+
+- In production, startup is blocked unless either `API_KEY` is set or `ALLOW_UNAUTHENTICATED=true` is explicitly set.
+- `TRUST_PROXY=true` only applies forwarded-IP attribution when the direct peer is private/local.
+- `DEPLOYMENT_MODE=multi-instance` blocks startup by default when only in-memory rate limiting is available.
+
+See:
+
+- [`docs/PUBLIC-DEPLOY-CHECKLIST.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/PUBLIC-DEPLOY-CHECKLIST.md)
+- [`docs/OWASP-MITRE-SELF-REVIEW.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/OWASP-MITRE-SELF-REVIEW.md)
 
 ## Notes
 
