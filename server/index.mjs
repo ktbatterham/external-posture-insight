@@ -155,11 +155,41 @@ function getMimeType(filePath) {
   }
 }
 
+function resolveStaticPath(baseDir, requestPath) {
+  const trimmed = requestPath.replace(/^\/+/, "");
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(trimmed);
+    } catch {
+      return trimmed;
+    }
+  })();
+  const normalizedRequest = path.normalize(decoded || "index.html");
+  if (normalizedRequest.startsWith("..") || path.isAbsolute(normalizedRequest)) {
+    return null;
+  }
+
+  const resolved = path.resolve(baseDir, normalizedRequest);
+  const baseWithSep = baseDir.endsWith(path.sep) ? baseDir : `${baseDir}${path.sep}`;
+  if (resolved !== baseDir && !resolved.startsWith(baseWithSep)) {
+    return null;
+  }
+
+  return resolved;
+}
+
 function serveStatic(requestPath, method, response) {
   const cleanPath = requestPath === "/" ? "/index.html" : requestPath;
-  const staticTarget = path.join(distDir, cleanPath);
-  const publicTarget = path.join(publicDir, cleanPath);
+  const staticTarget = resolveStaticPath(distDir, cleanPath);
+  const publicTarget = resolveStaticPath(publicDir, cleanPath);
   const fallbackTarget = path.join(distDir, "index.html");
+
+  if (!staticTarget || !publicTarget) {
+    response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Invalid request path.");
+    return;
+  }
+
   const preferredPath = fs.existsSync(staticTarget)
     ? staticTarget
     : fs.existsSync(publicTarget)
