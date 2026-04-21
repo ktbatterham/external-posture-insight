@@ -133,6 +133,20 @@ test("server blocks production startup without explicit auth or opt-in", async (
   assert.match(getStderr(), /server_start_blocked/);
 });
 
+test("server blocks production startup in multi-instance mode without distributed limiter opt-in", async () => {
+  const { child, getStderr } = createServerProcess({
+    NODE_ENV: "production",
+    PORT: "0",
+    API_KEY: "test-secret",
+    DEPLOYMENT_MODE: "multi-instance",
+    ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE: "false",
+  });
+
+  const [code] = await once(child, "exit");
+  assert.equal(code, 1);
+  assert.match(getStderr(), /DEPLOYMENT_MODE=multi-instance/i);
+});
+
 test("analyze endpoint requires API key when configured", async () => {
   const server = await startServer({
     API_KEY: "test-secret",
@@ -144,6 +158,24 @@ test("analyze endpoint requires API key when configured", async () => {
 
     assert.equal(response.status, 401);
     assert.match(payload.error, /API key/i);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("health endpoint includes deployment and rate-limit metadata", async () => {
+  const server = await startServer({
+    DEPLOYMENT_MODE: "single-instance",
+  });
+
+  try {
+    const response = await fetch(`${server.baseUrl}/api/health`);
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.deploymentMode, "single-instance");
+    assert.equal(payload.rateLimit.backend, "in-memory");
+    assert.equal(payload.rateLimit.maxRequests, 30);
   } finally {
     await server.stop();
   }
