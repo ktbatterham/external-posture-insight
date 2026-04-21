@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import http from "node:http";
 import net from "node:net";
 import test from "node:test";
 import { once } from "node:events";
@@ -28,6 +29,31 @@ const getFreePort = () =>
   });
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const requestRawPath = (baseUrl, requestPath) =>
+  new Promise((resolve, reject) => {
+    const url = new URL(baseUrl);
+    const request = http.request(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: requestPath,
+        method: "GET",
+      },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          body += chunk;
+        });
+        response.on("end", () => {
+          resolve({ statusCode: response.statusCode || 0, body });
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end();
+  });
 
 function createServerProcess(envOverrides = {}) {
   const child = spawn(process.execPath, [SERVER_ENTRY.pathname], {
@@ -202,6 +228,18 @@ test("trusted proxy mode uses forwarded headers for client attribution", async (
       );
       assert.equal(response.status, 400);
     }
+  } finally {
+    await server.stop();
+  }
+});
+
+test("static serving rejects encoded traversal paths", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await requestRawPath(server.baseUrl, "/%2e%2e/%2e%2e/package.json");
+    assert.equal(response.statusCode, 400);
+    assert.match(response.body, /invalid request path/i);
   } finally {
     await server.stop();
   }
