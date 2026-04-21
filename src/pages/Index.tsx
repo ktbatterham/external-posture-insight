@@ -36,6 +36,17 @@ interface MonitoredTarget {
   lastScannedAt: string | null;
 }
 
+interface StoredHistoryAreaScore {
+  key: string;
+  label: string;
+  score: number;
+  status: "strong" | "watch" | "weak";
+}
+
+type StoredHistorySnapshot = HistorySnapshot & {
+  areaScores?: StoredHistoryAreaScore[];
+};
+
 const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
   [scan, ...current.filter((item) => item.url !== scan.url)].slice(0, 6);
 
@@ -85,11 +96,15 @@ const toMonitoredTargetView = (target: MonitoredTarget): MonitoredTargetView => 
 };
 
 const saveHistorySnapshot = (
-  current: Record<string, HistorySnapshot[]>,
+  current: Record<string, StoredHistorySnapshot[]>,
   analysis: AnalysisResult,
+  areaScores: StoredHistoryAreaScore[],
 ) => {
   const key = analysis.host;
-  const snapshot = snapshotFromAnalysis(analysis);
+  const snapshot: StoredHistorySnapshot = {
+    ...snapshotFromAnalysis(analysis),
+    areaScores,
+  };
   const nextForHost = [snapshot, ...(current[key] || [])].slice(0, 10);
   const next = { ...current, [key]: nextForHost };
   return { next, nextForHost };
@@ -109,12 +124,12 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
-  const [history, setHistory] = useState<HistorySnapshot[]>([]);
+  const [history, setHistory] = useState<StoredHistorySnapshot[]>([]);
   const [historyDiff, setHistoryDiff] = useState<HistoryDiff | null>(null);
   const [monitoredTargets, setMonitoredTargets] = useState<MonitoredTarget[]>([]);
   const autoScanRanRef = useRef(false);
   const analyzeUrlRef = useRef<(url: string, setAsCurrent?: boolean) => Promise<AnalysisResult>>();
-  const historyByHostRef = useRef<Record<string, HistorySnapshot[]>>({});
+  const historyByHostRef = useRef<Record<string, StoredHistorySnapshot[]>>({});
   const areaScores = analysisData ? getAreaScores(analysisData) : [];
 
   useEffect(() => {
@@ -124,7 +139,7 @@ const Index = () => {
       const [storedRecentScans, storedMonitoredTargets, storedHistory] = await Promise.all([
         readBrowserStorage<RecentScan[]>(RECENT_SCANS_KEY, [], STORAGE_SCHEMA_VERSION),
         readBrowserStorage<MonitoredTarget[]>(MONITORED_TARGETS_KEY, [], STORAGE_SCHEMA_VERSION),
-        readBrowserStorage<Record<string, HistorySnapshot[]>>(HISTORY_KEY, {}, STORAGE_SCHEMA_VERSION),
+        readBrowserStorage<Record<string, StoredHistorySnapshot[]>>(HISTORY_KEY, {}, STORAGE_SCHEMA_VERSION),
       ]);
 
       if (cancelled) {
@@ -159,7 +174,7 @@ const Index = () => {
           return next;
         },
       );
-      const { next, nextForHost } = saveHistorySnapshot(historyByHostRef.current, payload);
+      const { next, nextForHost } = saveHistorySnapshot(historyByHostRef.current, payload, getAreaScores(payload));
       historyByHostRef.current = next;
       void writeBrowserStorage(HISTORY_KEY, next, STORAGE_SCHEMA_VERSION);
       if (setAsCurrent) {
@@ -465,6 +480,7 @@ const Index = () => {
             <OverviewSection
               analysisData={analysisData}
               historyDiff={historyDiff}
+              history={history}
               areaScores={areaScores}
               exportPdf={exportPdf}
               exportMarkdown={exportMarkdown}

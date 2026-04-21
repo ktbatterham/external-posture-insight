@@ -3,7 +3,7 @@ import { MonitoringPanel } from "@/components/MonitoringPanel";
 import { PostureSummaryPanel } from "@/components/PostureSummaryPanel";
 import { PriorityActionsPanel } from "@/components/PriorityActionsPanel";
 import { Button } from "@/components/ui/button";
-import { AnalysisResult, HistoryDiff } from "@/types/analysis";
+import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
 import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { sectionTitleClass } from "./ReportSectionHeader";
 
@@ -58,6 +58,14 @@ const healthcheckStatusForGrade = (grade: string): keyof typeof healthcheckStyle
 interface OverviewSectionProps {
   analysisData: AnalysisResult;
   historyDiff: HistoryDiff | null;
+  history: Array<HistorySnapshot & {
+    areaScores?: Array<{
+      key: string;
+      label: string;
+      score: number;
+      status: "strong" | "watch" | "weak";
+    }>;
+  }>;
   areaScores: Array<{
     key: string;
     label: string;
@@ -73,6 +81,7 @@ interface OverviewSectionProps {
 export const OverviewSection = ({
   analysisData,
   historyDiff,
+  history,
   areaScores,
   exportPdf,
   exportMarkdown,
@@ -203,7 +212,7 @@ export const OverviewSection = ({
 
       <div className="space-y-4">
         <PriorityActionsPanel analysis={analysisData} />
-        <MonitoringPanel analysis={analysisData} diff={historyDiff} />
+        <MonitoringPanel analysis={analysisData} diff={historyDiff} history={history} />
       </div>
     </div>
   );
