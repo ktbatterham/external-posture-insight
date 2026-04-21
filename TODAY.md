@@ -1,6 +1,6 @@
 # Today Checklist
 
-- [ ] Push latest `main` to GitHub (`04dc875`, `e1890b6`, `9b59764`)
+- [x] Push latest `main` to GitHub (`04dc875`, `e1890b6`, `9b59764`)
 - [ ] Run a 3-target manual QA pass (`ek.co`, one "good" site, one "noisy" site)
 - [ ] Verify Priority Actions ordering always reflects weakest category first
 - [ ] Verify trend sparkline behavior with 1, 2, and 7+ snapshots
