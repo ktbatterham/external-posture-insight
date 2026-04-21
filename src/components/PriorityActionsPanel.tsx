@@ -43,6 +43,11 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
               <span className="text-xs uppercase tracking-[0.18em] opacity-75">{action.area}</span>
             </div>
             <p className="mt-2 opacity-90">{action.detail}</p>
+            {action.priorityReason ? (
+              <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] opacity-70">
+                {action.priorityReason}
+              </p>
+            ) : null}
           </StatusAlert>
         ))}
       </CardContent>

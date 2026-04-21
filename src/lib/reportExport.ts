@@ -164,7 +164,10 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     "## Priority Actions",
     "",
     ...(priorityActions.length
-      ? priorityActions.map((action, index) => `- ${index + 1}. [${action.severity}] ${action.title}: ${action.detail}`)
+      ? priorityActions.flatMap((action, index) => [
+          `- ${index + 1}. [${action.severity}] ${action.title}: ${action.detail}`,
+          ...(action.priorityReason ? [`  ${action.priorityReason}`] : []),
+        ])
       : ["- No priority actions generated."]),
     "",
     "## Changes Since Last Scan",
@@ -332,7 +335,7 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     .join("");
   const priorityItems = priorityActions.length
     ? priorityActions
-        .map((action) => `<li><strong>[${escapeHtml(action.severity)}] ${escapeHtml(action.title)}</strong><br>${escapeHtml(action.detail)}</li>`)
+        .map((action) => `<li><strong>[${escapeHtml(action.severity)}] ${escapeHtml(action.title)}</strong><br>${escapeHtml(action.detail)}${action.priorityReason ? `<br><em>${escapeHtml(action.priorityReason)}</em>` : ""}</li>`)
         .join("")
     : "<li>No priority actions generated.</li>";
   const exposureItems = buildExposureLines(analysis)
