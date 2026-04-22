@@ -133,18 +133,33 @@ test("server blocks production startup without explicit auth or opt-in", async (
   assert.match(getStderr(), /server_start_blocked/);
 });
 
-test("server blocks production startup in multi-instance mode without distributed limiter opt-in", async () => {
+test("server blocks production startup in multi-instance mode without upstash backend", async () => {
   const { child, getStderr } = createServerProcess({
     NODE_ENV: "production",
     PORT: "0",
     API_KEY: "test-secret",
     DEPLOYMENT_MODE: "multi-instance",
-    ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE: "false",
+    RATE_LIMIT_BACKEND: "in-memory",
   });
 
   const [code] = await once(child, "exit");
   assert.equal(code, 1);
-  assert.match(getStderr(), /DEPLOYMENT_MODE=multi-instance/i);
+  assert.match(getStderr(), /RATE_LIMIT_BACKEND=upstash/i);
+});
+
+test("server blocks startup when upstash backend is missing credentials", async () => {
+  const { child, getStderr } = createServerProcess({
+    NODE_ENV: "production",
+    PORT: "0",
+    API_KEY: "test-secret",
+    RATE_LIMIT_BACKEND: "upstash",
+    UPSTASH_REDIS_REST_URL: "",
+    UPSTASH_REDIS_REST_TOKEN: "",
+  });
+
+  const [code] = await once(child, "exit");
+  assert.equal(code, 1);
+  assert.match(getStderr(), /UPSTASH_REDIS_REST_URL/i);
 });
 
 test("analyze endpoint requires API key when configured", async () => {
@@ -175,6 +190,7 @@ test("health endpoint includes deployment and rate-limit metadata", async () => 
     assert.equal(payload.ok, true);
     assert.equal(payload.deploymentMode, "single-instance");
     assert.equal(payload.rateLimit.backend, "in-memory");
+    assert.equal(payload.rateLimit.distributed, false);
     assert.equal(payload.rateLimit.maxRequests, 30);
   } finally {
     await server.stop();

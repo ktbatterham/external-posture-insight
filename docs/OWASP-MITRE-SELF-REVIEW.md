@@ -19,6 +19,7 @@ This document tracks how the scanner application itself is hardened before publi
 
 4. `A04 Insecure Design` / `MITRE Reconnaissance`
 - Rate limiting is applied to `/api/analyze`.
+- Distributed rate limiting via Upstash REST is available and enforced for `DEPLOYMENT_MODE=multi-instance`.
 - Client IP attribution defaults to socket peer; forwarded headers are used only when trust-proxy mode is enabled and the direct peer is private/local.
 - Rate-limit bucket count is capped to prevent unbounded in-memory growth.
 
@@ -27,11 +28,11 @@ This document tracks how the scanner application itself is hardened before publi
 
 ## Remaining Gaps Before Public Exposure
 
-1. Add persistent/distributed rate limiting for multi-instance deploys (Redis or edge-native limiter).
-2. Add structured audit logging + alerting thresholds for abuse patterns and repeated blocked targets.
-3. Add end-to-end tests for proxy deployments (real reverse-proxy topology, not only localhost tests).
-4. Add deployment guidance for TLS termination and trusted proxy configuration.
-5. Add optional API-key scoped quotas for per-tenant fairness.
+1. Add structured audit logging + alerting thresholds for abuse patterns and repeated blocked targets.
+2. Add end-to-end tests for proxy deployments (real reverse-proxy topology, not only localhost tests).
+3. Add deployment guidance for TLS termination and trusted proxy configuration.
+4. Add optional API-key scoped quotas for per-tenant fairness.
+5. Add deny/allow policy options for high-risk target classes (optional enterprise mode).
 
 ## Recommended Next Deployment Gate
 

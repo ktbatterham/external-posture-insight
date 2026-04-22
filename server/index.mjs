@@ -4,6 +4,7 @@ import dns from "node:dns/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
+import { createRateLimiter } from "./rateLimiter.mjs";
 import {
   analyzeUrl,
   formatErrorMessage,
@@ -22,10 +23,11 @@ const apiKey = process.env.API_KEY || "";
 const allowUnauthenticated = process.env.ALLOW_UNAUTHENTICATED === "true";
 const trustProxy = process.env.TRUST_PROXY === "true";
 const deploymentMode = process.env.DEPLOYMENT_MODE === "multi-instance" ? "multi-instance" : "single-instance";
-const allowInMemoryRateLimitInMultiInstance = process.env.ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE === "true";
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 30;
 const RATE_LIMIT_MAX_BUCKETS = 20000;
+const configuredRateLimitBackend = (process.env.RATE_LIMIT_BACKEND || "").trim().toLowerCase();
+const rateLimitBackend = configuredRateLimitBackend || (deploymentMode === "multi-instance" ? "upstash" : "in-memory");
 const RATE_LIMIT_WINDOW_MS = (() => {
   const raw = Number(process.env.RATE_LIMIT_WINDOW_MS || DEFAULT_RATE_LIMIT_WINDOW_MS);
   if (!Number.isFinite(raw) || raw < 1000) {
@@ -40,7 +42,8 @@ const RATE_LIMIT_MAX_REQUESTS = (() => {
   }
   return Math.floor(raw);
 })();
-const rateLimitBuckets = new Map();
+const upstashRestUrl = (process.env.UPSTASH_REDIS_REST_URL || "").trim();
+const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -137,42 +140,6 @@ function getPresentedApiKey(request) {
   return typeof candidate === "string" ? candidate : "";
 }
 
-function rateLimitExceeded(clientIp) {
-  const now = Date.now();
-  if (!rateLimitBuckets.has(clientIp) && rateLimitBuckets.size >= RATE_LIMIT_MAX_BUCKETS) {
-    sweepRateLimitBuckets();
-    if (!rateLimitBuckets.has(clientIp) && rateLimitBuckets.size >= RATE_LIMIT_MAX_BUCKETS) {
-      const oldestClient = rateLimitBuckets.keys().next().value;
-      if (oldestClient) {
-        rateLimitBuckets.delete(oldestClient);
-      }
-    }
-  }
-  const current = rateLimitBuckets.get(clientIp) || [];
-  const recent = current.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
-  recent.push(now);
-  rateLimitBuckets.set(clientIp, recent);
-  return recent.length > RATE_LIMIT_MAX_REQUESTS;
-}
-
-function retryAfterSeconds() {
-  return Math.max(1, Math.ceil(RATE_LIMIT_WINDOW_MS / 1000));
-}
-
-function sweepRateLimitBuckets() {
-  const now = Date.now();
-  for (const [clientIp, timestamps] of rateLimitBuckets.entries()) {
-    const recent = timestamps.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW_MS);
-    if (recent.length) {
-      rateLimitBuckets.set(clientIp, recent);
-    } else {
-      rateLimitBuckets.delete(clientIp);
-    }
-  }
-}
-
-setInterval(sweepRateLimitBuckets, RATE_LIMIT_WINDOW_MS).unref();
-
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -181,16 +148,26 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload));
 }
 
-function sendRateLimited(response) {
+function sendRateLimited(response, retryAfterSeconds) {
   response.writeHead(429, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "Retry-After": String(retryAfterSeconds()),
+    "Retry-After": String(retryAfterSeconds),
   });
   response.end(JSON.stringify({
     error: "Too many analysis requests from this client. Please try again later.",
   }));
 }
+
+const rateLimiter = createRateLimiter({
+  backend: rateLimitBackend,
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  maxRequests: RATE_LIMIT_MAX_REQUESTS,
+  maxBuckets: RATE_LIMIT_MAX_BUCKETS,
+  upstashUrl: upstashRestUrl,
+  upstashToken: upstashRestToken,
+  log,
+});
 
 function getMimeType(filePath) {
   const ext = path.extname(filePath);
@@ -292,7 +269,8 @@ const server = http.createServer(async (request, response) => {
       now: new Date().toISOString(),
       deploymentMode,
       rateLimit: {
-        backend: "in-memory",
+        backend: rateLimiter.backend,
+        distributed: rateLimiter.distributed,
         maxRequests: RATE_LIMIT_MAX_REQUESTS,
         windowMs: RATE_LIMIT_WINDOW_MS,
       },
@@ -322,12 +300,13 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    if (rateLimitExceeded(clientIp)) {
+    const rateLimitState = await rateLimiter.check(clientIp);
+    if (rateLimitState.limited) {
       log("warn", "rate_limit_exceeded", {
         clientIp,
         path: requestUrl.pathname,
       });
-      sendRateLimited(response);
+      sendRateLimited(response, rateLimitState.retryAfterSeconds);
       return;
     }
 
@@ -382,18 +361,18 @@ if (trustProxy) {
   });
 }
 
-if (isProduction && deploymentMode === "multi-instance" && !allowInMemoryRateLimitInMultiInstance) {
+if (isProduction && deploymentMode === "multi-instance" && rateLimiter.backend !== "upstash") {
   log("error", "server_start_blocked", {
-    reason: "DEPLOYMENT_MODE=multi-instance requires a distributed limiter. In-memory limiter is blocked by default.",
-    overrideEnv: "ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE=true",
+    reason: "DEPLOYMENT_MODE=multi-instance requires RATE_LIMIT_BACKEND=upstash.",
   });
   process.exit(1);
 }
 
-if (isProduction && deploymentMode === "multi-instance" && allowInMemoryRateLimitInMultiInstance) {
-  log("warn", "multi_instance_inmemory_limiter_override", {
-    message: "In-memory rate limiting override is enabled in multi-instance mode. This is not safe for sustained public traffic.",
+if (rateLimiter.backend === "upstash" && (!upstashRestUrl || !upstashRestToken)) {
+  log("error", "server_start_blocked", {
+    reason: "RATE_LIMIT_BACKEND=upstash requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
   });
+  process.exit(1);
 }
 
 server.listen(port, () => {
@@ -405,6 +384,7 @@ server.listen(port, () => {
     allowUnauthenticated,
     trustProxy,
     deploymentMode,
-    rateLimitBackend: "in-memory",
+    rateLimitBackend: rateLimiter.backend,
+    distributedRateLimit: rateLimiter.distributed,
   });
 });
