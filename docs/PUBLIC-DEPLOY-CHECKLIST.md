@@ -14,15 +14,16 @@ Run this checklist before exposing the server publicly.
 - Optional rate-limit tuning:
   - `RATE_LIMIT_MAX_REQUESTS` (default `30`)
   - `RATE_LIMIT_WINDOW_MS` (default `900000`, 15 minutes)
+- Set `RATE_LIMIT_BACKEND`:
+  - `in-memory` for local/single-instance use.
+  - `upstash` for distributed multi-instance deployments.
+- When `RATE_LIMIT_BACKEND=upstash`, set:
+  - `UPSTASH_REDIS_REST_URL`
+  - `UPSTASH_REDIS_REST_TOKEN`
 
 ### Multi-instance safety gate
 
-In `multi-instance`, startup is blocked by default when using in-memory rate limiting.
-
-- Temporary override (not recommended for public sustained traffic):
-  - `ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE=true`
-
-This override should only be used during transition to a distributed limiter.
+In `multi-instance`, startup is blocked unless the rate-limit backend is distributed (`RATE_LIMIT_BACKEND=upstash`) and credentials are configured.
 
 ## 2) Pre-release verification
 
