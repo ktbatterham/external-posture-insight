@@ -238,6 +238,7 @@ test("rate limiting ignores spoofed forwarded headers unless trust proxy is enab
 
     assert.ok(limitedResponse, "Expected spoofed forwarded headers to be ignored for rate limiting.");
     assert.equal(limitedResponse.status, 429);
+    assert.equal(limitedResponse.headers.get("retry-after"), "900");
   } finally {
     await server.stop();
   }
@@ -260,6 +261,26 @@ test("trusted proxy mode uses forwarded headers for client attribution", async (
       );
       assert.equal(response.status, 400);
     }
+  } finally {
+    await server.stop();
+  }
+});
+
+test("rate limiting supports environment overrides", async () => {
+  const server = await startServer({
+    RATE_LIMIT_WINDOW_MS: "2000",
+    RATE_LIMIT_MAX_REQUESTS: "2",
+  });
+
+  try {
+    const one = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://localhost-1.example.com")}`);
+    const two = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://localhost-2.example.com")}`);
+    const three = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://localhost-3.example.com")}`);
+
+    assert.equal(one.status, 400);
+    assert.equal(two.status, 400);
+    assert.equal(three.status, 429);
+    assert.equal(three.headers.get("retry-after"), "2");
   } finally {
     await server.stop();
   }
