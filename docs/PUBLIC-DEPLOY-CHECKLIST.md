@@ -11,6 +11,9 @@ Run this checklist before exposing the server publicly.
 - Set `DEPLOYMENT_MODE`:
   - `single-instance` for one server process (default).
   - `multi-instance` for scaled deployments.
+- Optional rate-limit tuning:
+  - `RATE_LIMIT_MAX_REQUESTS` (default `30`)
+  - `RATE_LIMIT_WINDOW_MS` (default `900000`, 15 minutes)
 
 ### Multi-instance safety gate
 

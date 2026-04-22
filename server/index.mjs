@@ -23,9 +23,23 @@ const allowUnauthenticated = process.env.ALLOW_UNAUTHENTICATED === "true";
 const trustProxy = process.env.TRUST_PROXY === "true";
 const deploymentMode = process.env.DEPLOYMENT_MODE === "multi-instance" ? "multi-instance" : "single-instance";
 const allowInMemoryRateLimitInMultiInstance = process.env.ALLOW_INMEMORY_RATE_LIMITER_IN_MULTI_INSTANCE === "true";
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 30;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 30;
 const RATE_LIMIT_MAX_BUCKETS = 20000;
+const RATE_LIMIT_WINDOW_MS = (() => {
+  const raw = Number(process.env.RATE_LIMIT_WINDOW_MS || DEFAULT_RATE_LIMIT_WINDOW_MS);
+  if (!Number.isFinite(raw) || raw < 1000) {
+    return DEFAULT_RATE_LIMIT_WINDOW_MS;
+  }
+  return Math.floor(raw);
+})();
+const RATE_LIMIT_MAX_REQUESTS = (() => {
+  const raw = Number(process.env.RATE_LIMIT_MAX_REQUESTS || DEFAULT_RATE_LIMIT_MAX_REQUESTS);
+  if (!Number.isFinite(raw) || raw < 1) {
+    return DEFAULT_RATE_LIMIT_MAX_REQUESTS;
+  }
+  return Math.floor(raw);
+})();
 const rateLimitBuckets = new Map();
 
 const log = (level, event, details = {}) => {
@@ -141,6 +155,10 @@ function rateLimitExceeded(clientIp) {
   return recent.length > RATE_LIMIT_MAX_REQUESTS;
 }
 
+function retryAfterSeconds() {
+  return Math.max(1, Math.ceil(RATE_LIMIT_WINDOW_MS / 1000));
+}
+
 function sweepRateLimitBuckets() {
   const now = Date.now();
   for (const [clientIp, timestamps] of rateLimitBuckets.entries()) {
@@ -161,6 +179,17 @@ function sendJson(response, statusCode, payload) {
     "Cache-Control": "no-store",
   });
   response.end(JSON.stringify(payload));
+}
+
+function sendRateLimited(response) {
+  response.writeHead(429, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Retry-After": String(retryAfterSeconds()),
+  });
+  response.end(JSON.stringify({
+    error: "Too many analysis requests from this client. Please try again later.",
+  }));
 }
 
 function getMimeType(filePath) {
@@ -298,9 +327,7 @@ const server = http.createServer(async (request, response) => {
         clientIp,
         path: requestUrl.pathname,
       });
-      sendJson(response, 429, {
-        error: "Too many analysis requests from this client. Please try again later.",
-      });
+      sendRateLimited(response);
       return;
     }
 
