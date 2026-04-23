@@ -63,7 +63,6 @@ const summary = {
   nodeEnv,
   deploymentMode,
   rateLimitBackend,
-  hasApiKey: Boolean(apiKey),
   allowUnauthenticated,
   trustProxy: env.TRUST_PROXY === "true",
   rateLimitWindowMs,
