@@ -78,6 +78,7 @@ npm start
 - In production, startup is blocked unless either `API_KEY` is set or `ALLOW_UNAUTHENTICATED=true` is explicitly set.
 - `TRUST_PROXY=true` only applies forwarded-IP attribution when the direct peer is private/local.
 - `DEPLOYMENT_MODE=multi-instance` requires a distributed limiter (`RATE_LIMIT_BACKEND=upstash` with Upstash REST credentials).
+- Run `npm run -s check:deploy` before promoting a deployment.
 
 See:
 
