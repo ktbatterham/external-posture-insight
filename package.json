@@ -20,6 +20,7 @@
     "release:core:check": "npm run build:core && npm run typecheck:core:strict && npm run test:core && npm run lint && npm run pack:core",
     "test:core": "npm run build:core && node --test packages/core/test/*.test.mjs",
     "test:server": "npm run build:core && node --test server/test/*.test.mjs",
+    "test:app:unit": "vitest run src/lib/*.test.ts",
     "preview": "vite preview",
     "start": "npm run build:core && node server/index.mjs"
   },
@@ -91,6 +92,7 @@
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.8"
+    "vite": "^8.0.8",
+    "vitest": "^4.1.5"
   }
 }
