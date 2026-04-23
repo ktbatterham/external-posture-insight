@@ -61,6 +61,7 @@ const TARGET_RATE_LIMIT_MAX_REQUESTS = (() => {
   }
   return Math.floor(raw);
 })();
+const API_KEY_FINGERPRINT_SALT = process.env.API_KEY_FINGERPRINT_SALT || "epi-api-key-fingerprint-v1";
 const ABUSE_ALERT_WINDOW_MS = (() => {
   const raw = Number(process.env.ABUSE_ALERT_WINDOW_MS || DEFAULT_ABUSE_ALERT_WINDOW_MS);
   if (!Number.isFinite(raw) || raw < 1000) {
@@ -175,7 +176,7 @@ function getPresentedApiKey(request) {
 }
 
 function tokenFingerprint(token) {
-  return crypto.createHash("sha256").update(token).digest("hex").slice(0, 12);
+  return crypto.pbkdf2Sync(token, API_KEY_FINGERPRINT_SALT, 120000, 12, "sha256").toString("hex");
 }
 
 function getRequesterScope(clientIp, presentedApiKey) {
