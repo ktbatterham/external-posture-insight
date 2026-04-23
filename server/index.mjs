@@ -3,6 +3,7 @@ import http from "node:http";
 import dns from "node:dns/promises";
 import net from "node:net";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath, URL } from "node:url";
 import { createRateLimiter } from "./rateLimiter.mjs";
 import {
@@ -25,6 +26,10 @@ const trustProxy = process.env.TRUST_PROXY === "true";
 const deploymentMode = process.env.DEPLOYMENT_MODE === "multi-instance" ? "multi-instance" : "single-instance";
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 30;
+const DEFAULT_TARGET_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const DEFAULT_TARGET_RATE_LIMIT_MAX_REQUESTS = 10;
+const DEFAULT_ABUSE_ALERT_WINDOW_MS = 10 * 60 * 1000;
+const DEFAULT_ABUSE_ALERT_THRESHOLD = 25;
 const RATE_LIMIT_MAX_BUCKETS = 20000;
 const configuredRateLimitBackend = (process.env.RATE_LIMIT_BACKEND || "").trim().toLowerCase();
 const rateLimitBackend = configuredRateLimitBackend || (deploymentMode === "multi-instance" ? "upstash" : "in-memory");
@@ -42,8 +47,38 @@ const RATE_LIMIT_MAX_REQUESTS = (() => {
   }
   return Math.floor(raw);
 })();
+const TARGET_RATE_LIMIT_WINDOW_MS = (() => {
+  const raw = Number(process.env.TARGET_RATE_LIMIT_WINDOW_MS || DEFAULT_TARGET_RATE_LIMIT_WINDOW_MS);
+  if (!Number.isFinite(raw) || raw < 1000) {
+    return DEFAULT_TARGET_RATE_LIMIT_WINDOW_MS;
+  }
+  return Math.floor(raw);
+})();
+const TARGET_RATE_LIMIT_MAX_REQUESTS = (() => {
+  const raw = Number(process.env.TARGET_RATE_LIMIT_MAX_REQUESTS || DEFAULT_TARGET_RATE_LIMIT_MAX_REQUESTS);
+  if (!Number.isFinite(raw) || raw < 1) {
+    return DEFAULT_TARGET_RATE_LIMIT_MAX_REQUESTS;
+  }
+  return Math.floor(raw);
+})();
+const API_KEY_FINGERPRINT_SALT = process.env.API_KEY_FINGERPRINT_SALT || "epi-api-key-fingerprint-v1";
+const ABUSE_ALERT_WINDOW_MS = (() => {
+  const raw = Number(process.env.ABUSE_ALERT_WINDOW_MS || DEFAULT_ABUSE_ALERT_WINDOW_MS);
+  if (!Number.isFinite(raw) || raw < 1000) {
+    return DEFAULT_ABUSE_ALERT_WINDOW_MS;
+  }
+  return Math.floor(raw);
+})();
+const ABUSE_ALERT_THRESHOLD = (() => {
+  const raw = Number(process.env.ABUSE_ALERT_THRESHOLD || DEFAULT_ABUSE_ALERT_THRESHOLD);
+  if (!Number.isFinite(raw) || raw < 1) {
+    return DEFAULT_ABUSE_ALERT_THRESHOLD;
+  }
+  return Math.floor(raw);
+})();
 const upstashRestUrl = (process.env.UPSTASH_REDIS_REST_URL || "").trim();
 const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+const abuseSignalBuckets = new Map();
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -140,6 +175,56 @@ function getPresentedApiKey(request) {
   return typeof candidate === "string" ? candidate : "";
 }
 
+function tokenFingerprint(token) {
+  return crypto.pbkdf2Sync(token, API_KEY_FINGERPRINT_SALT, 120000, 12, "sha256").toString("hex");
+}
+
+function getRequesterScope(clientIp, presentedApiKey) {
+  if (apiKey && presentedApiKey) {
+    return `api-key:${tokenFingerprint(presentedApiKey)}`;
+  }
+  return `ip:${clientIp || "unknown"}`;
+}
+
+function parseTargetHostForQuota(rawTarget) {
+  if (!rawTarget.trim()) {
+    return null;
+  }
+
+  try {
+    const normalized = /^https?:\/\//i.test(rawTarget) ? rawTarget : `https://${rawTarget}`;
+    const parsed = new URL(normalized);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return null;
+    }
+    return parsed.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function recordAbuseSignal(signalType, details = {}) {
+  const now = Date.now();
+  const current = abuseSignalBuckets.get(signalType) || [];
+  const recent = current.filter((timestamp) => now - timestamp < ABUSE_ALERT_WINDOW_MS);
+  recent.push(now);
+  abuseSignalBuckets.set(signalType, recent);
+
+  log("warn", signalType, details);
+
+  if (
+    recent.length === ABUSE_ALERT_THRESHOLD
+    || (recent.length > ABUSE_ALERT_THRESHOLD && recent.length % ABUSE_ALERT_THRESHOLD === 0)
+  ) {
+    log("error", "abuse_alert_threshold_reached", {
+      signalType,
+      count: recent.length,
+      threshold: ABUSE_ALERT_THRESHOLD,
+      windowMs: ABUSE_ALERT_WINDOW_MS,
+    });
+  }
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -148,14 +233,14 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload));
 }
 
-function sendRateLimited(response, retryAfterSeconds) {
+function sendRateLimited(response, retryAfterSeconds, message = "Too many analysis requests from this client. Please try again later.") {
   response.writeHead(429, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "Retry-After": String(retryAfterSeconds),
   });
   response.end(JSON.stringify({
-    error: "Too many analysis requests from this client. Please try again later.",
+    error: message,
   }));
 }
 
@@ -166,6 +251,18 @@ const rateLimiter = createRateLimiter({
   maxBuckets: RATE_LIMIT_MAX_BUCKETS,
   upstashUrl: upstashRestUrl,
   upstashToken: upstashRestToken,
+  prefix: "epi:rate-limit:requester",
+  log,
+});
+
+const targetRateLimiter = createRateLimiter({
+  backend: rateLimitBackend,
+  windowMs: TARGET_RATE_LIMIT_WINDOW_MS,
+  maxRequests: TARGET_RATE_LIMIT_MAX_REQUESTS,
+  maxBuckets: RATE_LIMIT_MAX_BUCKETS,
+  upstashUrl: upstashRestUrl,
+  upstashToken: upstashRestToken,
+  prefix: "epi:rate-limit:target",
   log,
 });
 
@@ -269,10 +366,20 @@ const server = http.createServer(async (request, response) => {
       now: new Date().toISOString(),
       deploymentMode,
       rateLimit: {
-        backend: rateLimiter.backend,
-        distributed: rateLimiter.distributed,
-        maxRequests: RATE_LIMIT_MAX_REQUESTS,
-        windowMs: RATE_LIMIT_WINDOW_MS,
+        backend: targetRateLimiter.backend,
+        distributed: targetRateLimiter.distributed,
+        requester: {
+          maxRequests: RATE_LIMIT_MAX_REQUESTS,
+          windowMs: RATE_LIMIT_WINDOW_MS,
+        },
+        target: {
+          maxRequests: TARGET_RATE_LIMIT_MAX_REQUESTS,
+          windowMs: TARGET_RATE_LIMIT_WINDOW_MS,
+        },
+      },
+      abuseAlerting: {
+        threshold: ABUSE_ALERT_THRESHOLD,
+        windowMs: ABUSE_ALERT_WINDOW_MS,
       },
     });
     return;
@@ -289,8 +396,10 @@ const server = http.createServer(async (request, response) => {
     }
 
     const clientIp = getClientIp(request) || "unknown";
-    if (apiKey && getPresentedApiKey(request) !== apiKey) {
-      log("warn", "api_key_rejected", {
+    const presentedApiKey = getPresentedApiKey(request);
+    const requesterScope = getRequesterScope(clientIp, presentedApiKey);
+    if (apiKey && presentedApiKey !== apiKey) {
+      recordAbuseSignal("api_key_rejected", {
         clientIp,
         path: requestUrl.pathname,
       });
@@ -300,10 +409,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const rateLimitState = await rateLimiter.check(clientIp);
+    const rateLimitState = await rateLimiter.check(requesterScope);
     if (rateLimitState.limited) {
-      log("warn", "rate_limit_exceeded", {
+      recordAbuseSignal("rate_limit_exceeded", {
         clientIp,
+        requesterScope,
         path: requestUrl.pathname,
       });
       sendRateLimited(response, rateLimitState.retryAfterSeconds);
@@ -312,9 +422,30 @@ const server = http.createServer(async (request, response) => {
 
     try {
       const target = requestUrl.searchParams.get("url") || "";
+      const targetHost = parseTargetHostForQuota(target);
+      if (targetHost) {
+        const targetScope = `${requesterScope}:${targetHost}`;
+        const targetRateLimitState = await targetRateLimiter.check(targetScope);
+        if (targetRateLimitState.limited) {
+          recordAbuseSignal("target_quota_exceeded", {
+            clientIp,
+            requesterScope,
+            targetHost,
+            path: requestUrl.pathname,
+          });
+          sendRateLimited(
+            response,
+            targetRateLimitState.retryAfterSeconds,
+            "Too many analysis requests for this target from this client. Please try again later.",
+          );
+          return;
+        }
+      }
+
       const validatedTarget = await assertPublicHttpUrl(target);
       log("info", "analysis_requested", {
         clientIp,
+        requesterScope,
         target: validatedTarget.toString(),
       });
       const result = await analyzeUrl(validatedTarget.toString());
@@ -368,7 +499,17 @@ if (isProduction && deploymentMode === "multi-instance" && rateLimiter.backend !
   process.exit(1);
 }
 
-if (rateLimiter.backend === "upstash" && (!upstashRestUrl || !upstashRestToken)) {
+if (rateLimiter.backend !== targetRateLimiter.backend) {
+  log("error", "server_start_blocked", {
+    reason: "Requester and target rate limiter backends must match.",
+  });
+  process.exit(1);
+}
+
+if (
+  (rateLimiter.backend === "upstash" || targetRateLimiter.backend === "upstash")
+  && (!upstashRestUrl || !upstashRestToken)
+) {
   log("error", "server_start_blocked", {
     reason: "RATE_LIMIT_BACKEND=upstash requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
   });
@@ -384,7 +525,19 @@ server.listen(port, () => {
     allowUnauthenticated,
     trustProxy,
     deploymentMode,
-    rateLimitBackend: rateLimiter.backend,
-    distributedRateLimit: rateLimiter.distributed,
+    rateLimitBackend: targetRateLimiter.backend,
+    distributedRateLimit: targetRateLimiter.distributed,
+    requesterRateLimit: {
+      maxRequests: RATE_LIMIT_MAX_REQUESTS,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+    },
+    targetRateLimit: {
+      maxRequests: TARGET_RATE_LIMIT_MAX_REQUESTS,
+      windowMs: TARGET_RATE_LIMIT_WINDOW_MS,
+    },
+    abuseAlerting: {
+      threshold: ABUSE_ALERT_THRESHOLD,
+      windowMs: ABUSE_ALERT_WINDOW_MS,
+    },
   });
 });
