@@ -72,13 +72,13 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
 
   return (
     <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2">
           <BellRing className="h-5 w-5" />
           Monitoring Alerts
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {scoreSeries.length >= 2 ? (
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
             <div className="flex items-center justify-between gap-3">
@@ -127,7 +127,7 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
         ) : (
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score trend</p>
-            <p className="mt-2 text-sm text-slate-700">
+            <p className="mt-2 text-sm leading-6 text-slate-700">
               {scoreSeries.length === 1
                 ? "One saved scan recorded. Trend will appear after the next scan."
                 : "Trend will appear after at least two saved scans for this target."}
@@ -141,7 +141,7 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
             className="py-4"
           >
             <div className="font-semibold">{alert.title}</div>
-            <p className="mt-2 opacity-90">{alert.detail}</p>
+            <p className="mt-2 text-sm leading-6 opacity-90">{alert.detail}</p>
           </StatusAlert>
         ))}
       </CardContent>

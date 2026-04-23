@@ -11,9 +11,9 @@
 - [x] Add monitoring trend empty-state copy when only one snapshot exists
 - [x] Add tests for priority ranking logic (`src/lib/priorities.ts`)
 - [x] Add tests for area-score consistency rules (`src/lib/posture.ts`)
-- [ ] UX micro-pass on Monitoring + Posture Summary spacing/typography
-- [ ] Decide and implement whether category deltas belong in PDF/Markdown report headlines
-- [ ] Draft release notes for the next version bump
+- [x] UX micro-pass on Monitoring + Posture Summary spacing/typography
+- [x] Decide and implement whether category deltas belong in PDF/Markdown report headlines (decision: keep out of headline; now stated explicitly in exports)
+- [x] Draft release notes for the next version bump
 
 ## Carry-over
 
@@ -22,6 +22,6 @@
 - [x] Add empty-state copy for monitoring trend when only one snapshot exists
 - [x] Add small unit tests for priority ranking logic (`src/lib/priorities.ts`)
 - [x] Add unit tests for area score consistency rules (`src/lib/posture.ts`)
-- [ ] Decide whether to include category deltas in exported PDF/Markdown summary headline
-- [ ] Final UX micro-pass on spacing/typography for Monitoring + Posture Summary
-- [ ] Prepare release notes draft for next version bump (what changed + why it matters)
+- [x] Decide whether to include category deltas in exported PDF/Markdown summary headline
+- [x] Final UX micro-pass on spacing/typography for Monitoring + Posture Summary
+- [x] Prepare release notes draft for next version bump (what changed + why it matters)

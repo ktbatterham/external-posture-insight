@@ -9,17 +9,24 @@
   - abuse threshold telemetry logging
   - reverse proxy verification runbook
 - Added deployment-readiness validation coverage and updated server tests for hosted hardening behavior.
+- Added app-level unit tests for:
+  - posture score thresholds and clamping (`src/lib/posture.test.ts`)
+  - priority action ordering and weakest-area fallback coverage (`src/lib/priorities.test.ts`)
+- Added release notes draft for the upcoming version in `docs/RELEASE-NOTES-DRAFT.md`.
 
 ### Changed
 
 - Normalized panel language so neutral-positive states remain in `Strengths`, and only actionable items show under `Watch points` (Identity Provider, Certificate Transparency, WAF & Edge).
 - Updated daily QA tracking to include a live 3-target pass across mixed target profiles.
+- Tightened Monitoring + Posture Summary readability with spacing/typography refinements.
+- Clarified export headline behavior in Markdown/HTML reports by explicitly including the change headline and documenting why category deltas are not included.
 
 ### Verified
 
 - `npm run build`
 - `npm run test:core`
 - `npm run test:server`
+- `npm run test:app:unit`
 - Live CLI batch QA:
   - `https://www.ek.co` -> `84/100 (B)`
   - `https://www.bbc.co.uk` -> `88/100 (B)`
