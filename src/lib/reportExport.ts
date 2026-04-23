@@ -109,6 +109,22 @@ const buildThemeHtmlItems = (
         .join("")
     : "<li>No taxonomy themes recorded.</li>";
 
+const buildExportHeadlineMarkdown = (diff: HistoryDiff | null) =>
+  diff
+    ? [
+        `- Change headline: score ${diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}${diff.scoreDelta ?? 0}, ${diff.newIssues.length} new issue${diff.newIssues.length === 1 ? "" : "s"}, ${diff.resolvedIssues.length} resolved.`,
+        "- Category deltas are intentionally omitted from the export headline because per-category baseline snapshots are not embedded in exported reports.",
+      ]
+    : ["- Change headline: no previous local snapshot was available for comparison."];
+
+const buildExportHeadlineHtml = (diff: HistoryDiff | null) =>
+  diff
+    ? [
+        `<p>Change headline: score ${diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}${diff.scoreDelta ?? 0}, ${diff.newIssues.length} new issue${diff.newIssues.length === 1 ? "" : "s"}, ${diff.resolvedIssues.length} resolved.</p>`,
+        "<p>Category deltas are intentionally omitted from the export headline because per-category baseline snapshots are not embedded in exported reports.</p>",
+      ].join("")
+    : "<p>Change headline: no previous local snapshot was available for comparison.</p>";
+
 export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff | null = null) => {
   const areas = getAreaScores(analysis);
   const summary = getUnifiedIssueSummary(analysis);
@@ -127,6 +143,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     `- Grade: ${analysis.grade}`,
     `- Score: ${analysis.score}/100`,
     `- Status: ${analysis.statusCode}`,
+    ...buildExportHeadlineMarkdown(diff),
     "",
     "## Executive Readout",
     "",
@@ -389,6 +406,7 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
       <p>Grade: ${escapeHtml(analysis.grade)}</p>
       <p>Score: ${analysis.score}/100</p>
       <p>Status: ${analysis.statusCode}</p>
+      ${buildExportHeadlineHtml(diff)}
     </div>
     <div class="card">
       <h2>Executive Readout</h2>

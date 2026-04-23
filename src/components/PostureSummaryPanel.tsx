@@ -15,31 +15,31 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
 
   return (
     <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
-      <CardHeader>
+      <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5" />
           Posture Summary
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatBox variant="critical" label="Critical" value={<p className="text-3xl font-black">{severityCounts.critical}</p>} />
+          <StatBox variant="critical" label="Critical" value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.critical}</p>} />
           <StatBox
             variant="warning"
             label="Core Warnings"
-            value={<p className="text-3xl font-black">{severityCounts.coreWarnings}</p>}
+            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.coreWarnings}</p>}
             note={<p className="text-xs text-slate-500">From normalized scanner findings.</p>}
           />
           <StatBox
             variant="warning"
             label="Context Warnings"
-            value={<p className="text-3xl font-black">{severityCounts.contextWarnings}</p>}
+            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.contextWarnings}</p>}
             note={<p className="text-xs text-slate-500">From domain/content/trust panels.</p>}
           />
           <StatBox
             variant="info"
             label="Info Signals"
-            value={<p className="text-3xl font-black">{severityCounts.info}</p>}
+            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.info}</p>}
             note={<p className="text-xs text-slate-500">Core info + interesting exposure probes.</p>}
           />
         </div>
@@ -68,7 +68,7 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
                     style={{ width: `${area.score}%` }}
                   />
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs leading-5 text-slate-500">
                   {index === 0 ? "Weakest area in this scan" : area.notes[0]}
                 </p>
               </div>
