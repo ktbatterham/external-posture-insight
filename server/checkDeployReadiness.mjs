@@ -14,6 +14,10 @@ const upstashUrl = (env.UPSTASH_REDIS_REST_URL || "").trim();
 const upstashToken = (env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const rateLimitWindowMs = asNumber(env.RATE_LIMIT_WINDOW_MS, 900000);
 const rateLimitMaxRequests = asNumber(env.RATE_LIMIT_MAX_REQUESTS, 30);
+const targetRateLimitWindowMs = asNumber(env.TARGET_RATE_LIMIT_WINDOW_MS, 900000);
+const targetRateLimitMaxRequests = asNumber(env.TARGET_RATE_LIMIT_MAX_REQUESTS, 10);
+const abuseAlertWindowMs = asNumber(env.ABUSE_ALERT_WINDOW_MS, 600000);
+const abuseAlertThreshold = asNumber(env.ABUSE_ALERT_THRESHOLD, 25);
 
 const errors = [];
 const warnings = [];
@@ -51,6 +55,22 @@ if (!Number.isFinite(rateLimitMaxRequests) || rateLimitMaxRequests < 1) {
   errors.push("RATE_LIMIT_MAX_REQUESTS must be a number >= 1.");
 }
 
+if (!Number.isFinite(targetRateLimitWindowMs) || targetRateLimitWindowMs < 1000) {
+  errors.push("TARGET_RATE_LIMIT_WINDOW_MS must be a number >= 1000.");
+}
+
+if (!Number.isFinite(targetRateLimitMaxRequests) || targetRateLimitMaxRequests < 1) {
+  errors.push("TARGET_RATE_LIMIT_MAX_REQUESTS must be a number >= 1.");
+}
+
+if (!Number.isFinite(abuseAlertWindowMs) || abuseAlertWindowMs < 1000) {
+  errors.push("ABUSE_ALERT_WINDOW_MS must be a number >= 1000.");
+}
+
+if (!Number.isFinite(abuseAlertThreshold) || abuseAlertThreshold < 1) {
+  errors.push("ABUSE_ALERT_THRESHOLD must be a number >= 1.");
+}
+
 if (!env.TRUST_PROXY || env.TRUST_PROXY !== "true") {
   warnings.push("TRUST_PROXY is disabled. This is fine for direct traffic, but verify proxy topology before public edge deployment.");
 }
@@ -67,6 +87,10 @@ const summary = {
   trustProxy: env.TRUST_PROXY === "true",
   rateLimitWindowMs,
   rateLimitMaxRequests,
+  targetRateLimitWindowMs,
+  targetRateLimitMaxRequests,
+  abuseAlertWindowMs,
+  abuseAlertThreshold,
 };
 
 console.log(JSON.stringify({ ok: errors.length === 0, summary, warnings, errors }, null, 2));

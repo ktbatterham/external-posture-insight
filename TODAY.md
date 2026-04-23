@@ -1,7 +1,11 @@
 # Today Checklist
 
-- [x] Push latest `main` to GitHub (`04dc875`, `e1890b6`, `9b59764`)
-- [ ] Run a 3-target manual QA pass (`ek.co`, one "good" site, one "noisy" site)
+- [x] P2-1: Normalize panel language so positives stay under `Strengths` and only actionable items appear under `Watch points`
+- [x] P2-2: Run a 3-target manual QA pass (`https://ek.co`, `https://bbc.co.uk`, `https://github.com`) and capture outcomes
+- [x] P2-3: Update `CHANGELOG.md` with the latest deploy hardening + UX consistency work
+
+## Carry-over
+
 - [ ] Verify Priority Actions ordering always reflects weakest category first
 - [ ] Verify trend sparkline behavior with 1, 2, and 7+ snapshots
 - [ ] Add empty-state copy for monitoring trend when only one snapshot exists
