@@ -84,6 +84,8 @@ See:
 
 - [`docs/PUBLIC-DEPLOY-CHECKLIST.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/PUBLIC-DEPLOY-CHECKLIST.md)
 - [`docs/OWASP-MITRE-SELF-REVIEW.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/OWASP-MITRE-SELF-REVIEW.md)
+- [`docs/ABUSE-ALERTING.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/ABUSE-ALERTING.md)
+- [`docs/REVERSE-PROXY-VERIFICATION.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/REVERSE-PROXY-VERIFICATION.md)
 
 ## Notes
 

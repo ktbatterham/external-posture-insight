@@ -14,6 +14,8 @@ Run this checklist before exposing the server publicly.
 - Optional rate-limit tuning:
   - `RATE_LIMIT_MAX_REQUESTS` (default `30`)
   - `RATE_LIMIT_WINDOW_MS` (default `900000`, 15 minutes)
+  - `TARGET_RATE_LIMIT_MAX_REQUESTS` (default `10`)
+  - `TARGET_RATE_LIMIT_WINDOW_MS` (default `900000`, 15 minutes)
 - Set `RATE_LIMIT_BACKEND`:
   - `in-memory` for local/single-instance use.
   - `upstash` for distributed multi-instance deployments.
@@ -39,6 +41,11 @@ In `multi-instance`, startup is blocked unless the rate-limit backend is distrib
 - Confirm `/api/analyze` requires API key when `API_KEY` is set.
 - Confirm rate limiting behavior from expected client origin path (through proxy in production).
 - Confirm proxy IP attribution works as expected in your topology.
+- Configure abuse alert thresholds:
+  - `ABUSE_ALERT_THRESHOLD` (default `25`)
+  - `ABUSE_ALERT_WINDOW_MS` (default `600000`, 10 minutes)
+- Review abuse telemetry baseline in [`docs/ABUSE-ALERTING.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/ABUSE-ALERTING.md).
+- Run reverse-proxy checks from [`docs/REVERSE-PROXY-VERIFICATION.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/REVERSE-PROXY-VERIFICATION.md).
 
 ## 4) Security headers and static serving
 
