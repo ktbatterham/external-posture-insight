@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getPriorityActions } from "@/lib/priorities";
+import { AnalysisResult } from "@/types/analysis";
 
-const createAnalysis = (overrides: Record<string, unknown> = {}) =>
+const createAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =>
   ({
     headers: [],
     corsSecurity: { issues: [] },
@@ -19,7 +20,7 @@ const createAnalysis = (overrides: Record<string, unknown> = {}) =>
     certificate: { daysRemaining: 120 },
     issues: [],
     ...overrides,
-  }) as any;
+  }) as AnalysisResult;
 
 describe("getPriorityActions", () => {
   it("adds a fallback action for the weakest area when no explicit rule matched it", () => {

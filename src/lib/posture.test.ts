@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getAreaScores } from "@/lib/posture";
+import { AnalysisResult } from "@/types/analysis";
 
-const createAnalysis = (overrides: Record<string, unknown> = {}) =>
+const createAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =>
   ({
     headers: [],
     corsSecurity: { issues: [] },
@@ -16,7 +17,7 @@ const createAnalysis = (overrides: Record<string, unknown> = {}) =>
     thirdPartyTrust: { totalProviders: 0, highRiskProviders: 0, issues: [] },
     aiSurface: { detected: false, disclosures: [], issues: [] },
     ...overrides,
-  }) as any;
+  }) as AnalysisResult;
 
 describe("getAreaScores", () => {
   it("penalizes content security when CSP is missing", () => {
