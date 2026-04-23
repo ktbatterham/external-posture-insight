@@ -191,7 +191,9 @@ test("health endpoint includes deployment and rate-limit metadata", async () => 
     assert.equal(payload.deploymentMode, "single-instance");
     assert.equal(payload.rateLimit.backend, "in-memory");
     assert.equal(payload.rateLimit.distributed, false);
-    assert.equal(payload.rateLimit.maxRequests, 30);
+    assert.equal(payload.rateLimit.requester.maxRequests, 30);
+    assert.equal(payload.rateLimit.target.maxRequests, 10);
+    assert.equal(payload.abuseAlerting.threshold, 25);
   } finally {
     await server.stop();
   }
@@ -297,6 +299,28 @@ test("rate limiting supports environment overrides", async () => {
     assert.equal(two.status, 400);
     assert.equal(three.status, 429);
     assert.equal(three.headers.get("retry-after"), "2");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("target quota limits repeated requests to the same host per requester scope", async () => {
+  const server = await startServer({
+    TARGET_RATE_LIMIT_WINDOW_MS: "2000",
+    TARGET_RATE_LIMIT_MAX_REQUESTS: "2",
+  });
+
+  try {
+    const one = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://repeat-target.example.com")}`);
+    const two = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://repeat-target.example.com")}`);
+    const three = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://repeat-target.example.com")}`);
+
+    assert.equal(one.status, 400);
+    assert.equal(two.status, 400);
+    assert.equal(three.status, 429);
+    assert.equal(three.headers.get("retry-after"), "2");
+    const payload = await three.json();
+    assert.match(payload.error, /for this target/i);
   } finally {
     await server.stop();
   }
