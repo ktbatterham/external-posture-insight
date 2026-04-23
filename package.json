@@ -15,6 +15,7 @@
     "build": "npm run build:core && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "check:deploy": "node server/checkDeployReadiness.mjs",
     "pack:core": "npm pack --dry-run ./packages/core",
     "release:core:check": "npm run build:core && npm run typecheck:core:strict && npm run test:core && npm run lint && npm run pack:core",
     "test:core": "npm run build:core && node --test packages/core/test/*.test.mjs",

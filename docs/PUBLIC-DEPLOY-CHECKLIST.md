@@ -27,6 +27,7 @@ In `multi-instance`, startup is blocked unless the rate-limit backend is distrib
 
 ## 2) Pre-release verification
 
+- `npm run -s check:deploy`
 - `npm run -s build`
 - `npm run -s test:core`
 - `npm run -s test:server`
