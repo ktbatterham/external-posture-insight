@@ -11,13 +11,13 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
   const reviewItems = identityProvider.issues;
   const strengthItems = [
     ...(identityProvider.strengths.length
-    ? identityProvider.strengths
-    : ["No strong identity-provider signals were confirmed from passive evidence."]),
+      ? identityProvider.strengths
+      : ["No strong identity-provider signals were confirmed from passive evidence."]),
     ...(reviewItems.length === 0 && identityProvider.detected
-      ? ["No specific OAuth/OIDC review issues were confirmed from passive evidence alone."]
+      ? ["No immediate passive OAuth/OIDC watch points were identified."]
       : []),
     ...(reviewItems.length === 0 && !identityProvider.detected
-      ? ["No passive OAuth review issues were identified."]
+      ? ["No passive OAuth/OIDC watch points were identified."]
       : []),
   ];
 
@@ -140,7 +140,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
           </div>
           {reviewItems.length ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Review points</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Watch points</p>
               <ul className="mt-3 space-y-2 text-sm text-amber-900">
                 {reviewItems.map((item) => (
                   <li key={item} className="flex gap-2">
