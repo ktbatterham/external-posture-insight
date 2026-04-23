@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-04-23
+
+### Added
+
+- Added deploy and operations guidance for hosted mode:
+  - requester plus target quota controls on `/api/analyze`
+  - abuse threshold telemetry logging
+  - reverse proxy verification runbook
+- Added deployment-readiness validation coverage and updated server tests for hosted hardening behavior.
+
+### Changed
+
+- Normalized panel language so neutral-positive states remain in `Strengths`, and only actionable items show under `Watch points` (Identity Provider, Certificate Transparency, WAF & Edge).
+- Updated daily QA tracking to include a live 3-target pass across mixed target profiles.
+
+### Verified
+
+- `npm run build`
+- `npm run test:core`
+- `npm run test:server`
+- Live CLI batch QA:
+  - `https://www.ek.co` -> `84/100 (B)`
+  - `https://www.bbc.co.uk` -> `88/100 (B)`
+  - `https://github.com` -> `96/100 (A)`
+
 ## 2026-04-16 (v0.6.0)
 
 ### Added

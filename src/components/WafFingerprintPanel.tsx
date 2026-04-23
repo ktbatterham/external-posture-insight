@@ -10,10 +10,10 @@ export const WafFingerprintPanel = ({ wafFingerprint }: WafFingerprintPanelProps
   const reviewItems = wafFingerprint.issues;
   const strengthItems = [
     ...(wafFingerprint.strengths.length
-    ? wafFingerprint.strengths
-    : ["No positive WAF or edge-protection evidence was confirmed from passive signals."]),
+      ? wafFingerprint.strengths
+      : ["No positive WAF or edge-protection evidence was confirmed from passive signals."]),
     ...(reviewItems.length === 0 && wafFingerprint.detected
-      ? ["No WAF-specific review issues were identified from the passive evidence collected."]
+      ? ["No immediate WAF-specific watch points were identified from passive evidence."]
       : []),
     ...(reviewItems.length === 0 && !wafFingerprint.detected
       ? ["Passive evidence was limited, so absence of a branded match does not prove no WAF or edge control is present."]
@@ -86,7 +86,7 @@ export const WafFingerprintPanel = ({ wafFingerprint }: WafFingerprintPanelProps
           </div>
           {reviewItems.length ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Review points</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Watch points</p>
               <ul className="mt-3 space-y-2 text-sm text-amber-900">
                 {reviewItems.map((item) => (
                   <li key={item} className="flex gap-2">
