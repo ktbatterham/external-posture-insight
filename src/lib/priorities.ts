@@ -178,6 +178,18 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
     });
   }
 
+  const weakestArea = [...areaScores].sort((left, right) => left.score - right.score)[0];
+  const hasWeakestAreaAction = actions.some((action) => action.areaKey === weakestArea?.key);
+  if (weakestArea && weakestArea.score < 85 && !hasWeakestAreaAction) {
+    addAction({
+      title: `Review ${weakestArea.label.toLowerCase()} posture`,
+      detail: `${weakestArea.label} is currently the weakest category in this scan at ${weakestArea.score}/100.`,
+      severity: weakestArea.score < 65 ? "warning" : "info",
+      area: weakestArea.label,
+      areaKey: weakestArea.key,
+    });
+  }
+
   return actions
     .map((action) => {
       const score = action.areaKey ? areaScoreByKey.get(action.areaKey) ?? 100 : 100;

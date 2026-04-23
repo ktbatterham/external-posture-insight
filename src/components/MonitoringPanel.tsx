@@ -66,7 +66,7 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
       .join(" ");
   })();
 
-  if (!alerts.length && scoreSeries.length < 2) {
+  if (!alerts.length && scoreSeries.length === 0) {
     return null;
   }
 
@@ -124,7 +124,16 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
               </div>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score trend</p>
+            <p className="mt-2 text-sm text-slate-700">
+              {scoreSeries.length === 1
+                ? "One saved scan recorded. Trend will appear after the next scan."
+                : "Trend will appear after at least two saved scans for this target."}
+            </p>
+          </div>
+        )}
         {alerts.map((alert) => (
           <StatusAlert
             key={`${alert.title}-${alert.detail}`}
