@@ -8,7 +8,32 @@ interface DomainSecurityPanelProps {
   domainSecurity: DomainSecurityInfo;
 }
 
+const policyBadgeClass = {
+  strong: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  watch: "border-amber-200 bg-amber-50 text-amber-800",
+  weak: "border-rose-200 bg-rose-50 text-rose-800",
+  missing: "border-slate-200 bg-slate-100 text-slate-700",
+} as const;
+
+const policyLabel = {
+  strong: "Strong",
+  watch: "Watch",
+  weak: "Weak",
+  missing: "Missing",
+} as const;
+
 export const DomainSecurityPanel = ({ domainSecurity }: DomainSecurityPanelProps) => {
+  const emailPolicy = domainSecurity.emailPolicy ?? {
+    spf: {
+      status: domainSecurity.spf ? "watch" : "missing",
+      summary: domainSecurity.spf ? "SPF is present, but this older snapshot does not include parsed policy detail." : "No SPF record was detected at the zone apex.",
+    },
+    dmarc: {
+      status: domainSecurity.dmarc ? "watch" : "missing",
+      summary: domainSecurity.dmarc ? "DMARC is present, but this older snapshot does not include parsed policy detail." : "No DMARC record was detected.",
+    },
+  } as const;
+
   return (
     <Card className="h-full border-slate-200 shadow-sm">
       <CardHeader>
@@ -19,8 +44,30 @@ export const DomainSecurityPanel = ({ domainSecurity }: DomainSecurityPanelProps
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <StatBox label="SPF" value={<p className="overflow-hidden break-words text-sm leading-6 text-slate-700">{domainSecurity.spf ?? "Not found"}</p>} />
-          <StatBox label="DMARC" value={<p className="overflow-hidden break-words text-sm leading-6 text-slate-700">{domainSecurity.dmarc ?? "Not found"}</p>} />
+          <StatBox
+            label="SPF"
+            value={
+              <div className="space-y-3 text-sm leading-6 text-slate-700">
+                <Badge variant="outline" className={policyBadgeClass[emailPolicy.spf.status]}>
+                  {policyLabel[emailPolicy.spf.status]}
+                </Badge>
+                <p>{emailPolicy.spf.summary}</p>
+                <p className="overflow-hidden break-words text-xs text-slate-500">{domainSecurity.spf ?? "Not found"}</p>
+              </div>
+            }
+          />
+          <StatBox
+            label="DMARC"
+            value={
+              <div className="space-y-3 text-sm leading-6 text-slate-700">
+                <Badge variant="outline" className={policyBadgeClass[emailPolicy.dmarc.status]}>
+                  {policyLabel[emailPolicy.dmarc.status]}
+                </Badge>
+                <p>{emailPolicy.dmarc.summary}</p>
+                <p className="overflow-hidden break-words text-xs text-slate-500">{domainSecurity.dmarc ?? "Not found"}</p>
+              </div>
+            }
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
