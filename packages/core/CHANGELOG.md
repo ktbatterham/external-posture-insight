@@ -16,6 +16,7 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 - Added quiet scan mode via `analyzeUrl(target, { scanMode: "quiet" })` and CLI `--quiet`.
 
 ### Changed
+- Treat HTTP 5xx target responses as limited availability reads and cap their posture grade below `C` so unavailable pages do not look like normal mixed posture results.
 - Recalibrated `analyzeUrl()` scoring around weighted posture areas so the overall grade reflects domain/trust, exposure, API, third-party, and AI posture alongside core hardening controls.
 - Added bounded concurrency for CT host sampling, OSV vulnerability detail lookups, and related-page crawl checks.
 - Lazy-loaded Cheerio inside HTML analysis so importing the package is fast for CLI/help and workflows that do not parse page HTML.

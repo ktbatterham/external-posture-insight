@@ -297,6 +297,15 @@ export function detectAssessmentLimitation(
     };
   }
 
+  if (statusCode >= 500) {
+    return {
+      limited: true,
+      kind: "service_unavailable" as const,
+      title: "Assessment limited by service availability",
+      detail: `The target returned HTTP ${statusCode}, so this result reflects an unavailable or error response rather than the normal site posture.`,
+    };
+  }
+
   if (statusCode === 403 && html && isAccessDeniedHtml(headers, html)) {
     return {
       limited: true,

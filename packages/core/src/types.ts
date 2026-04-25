@@ -443,7 +443,7 @@ export interface ExecutiveSummaryInfo {
 
 export interface AssessmentLimitation {
   limited: boolean;
-  kind: "blocked_edge_response" | "auth_required" | "rate_limited" | "other" | null;
+  kind: "blocked_edge_response" | "auth_required" | "rate_limited" | "service_unavailable" | "other" | null;
   title: string | null;
   detail: string | null;
 }

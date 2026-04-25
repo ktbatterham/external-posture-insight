@@ -5,6 +5,7 @@ import { AnalysisResult } from "@/types/analysis";
 const createAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =>
   ({
     finalUrl: "https://example.com/",
+    statusCode: 200,
     headers: [],
     certificate: {
       available: true,
@@ -59,6 +60,16 @@ describe("getAreaScores", () => {
     const edge = getAreaScores(analysis).find((area) => area.key === "edge");
     expect(edge?.score).toBe(0);
     expect(edge?.status).toBe("weak");
+  });
+
+  it("penalizes edge security when the target returns a server error", () => {
+    const analysis = createAnalysis({
+      statusCode: 503,
+    });
+
+    const edge = getAreaScores(analysis).find((area) => area.key === "edge");
+    expect(edge?.score).toBe(65);
+    expect(edge?.notes).toContain("HTTP 503 limited assessment");
   });
 
   it("applies status thresholds consistently", () => {
