@@ -26,21 +26,21 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
           <StatBox variant="critical" label="Critical" value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.critical}</p>} />
           <StatBox
             variant="warning"
-            label="Core Warnings"
-            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.coreWarnings}</p>}
-            note={<p className="text-xs text-slate-500">From normalized scanner findings.</p>}
-          />
-          <StatBox
-            variant="warning"
-            label="Context Warnings"
-            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.contextWarnings}</p>}
-            note={<p className="text-xs text-slate-500">From domain/content/trust panels.</p>}
+            label="Priority Warnings"
+            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.priorityWarnings}</p>}
+            note={<p className="text-xs text-slate-500">Actionable normalized findings only.</p>}
           />
           <StatBox
             variant="info"
-            label="Info Signals"
-            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.info}</p>}
-            note={<p className="text-xs text-slate-500">Core info + interesting exposure probes.</p>}
+            label="Supporting Watch Items"
+            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.supportingWatchItems}</p>}
+            note={<p className="text-xs text-slate-500">Panel-level evidence; not added to warnings.</p>}
+          />
+          <StatBox
+            variant="info"
+            label="Observed Signals"
+            value={<p className="text-3xl font-semibold tracking-tight">{severityCounts.observedSignals}</p>}
+            note={<p className="text-xs text-slate-500">Informational findings plus interesting probes.</p>}
           />
         </div>
 
@@ -78,15 +78,15 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
 
         <div className="grid gap-4 md:grid-cols-3">
           <StatBox
-            label="Header issues"
+            label="Header gaps"
             value={<p className="text-2xl font-semibold">{analysis.headers.filter((header) => header.status !== "present").length}</p>}
           />
           <StatBox
-            label="Cookie issues"
+            label="Cookie watch items"
             value={<p className="text-2xl font-semibold">{analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0)}</p>}
           />
           <StatBox
-            label="Same-origin crawl pages"
+            label="Crawled same-origin pages"
             value={<p className="text-2xl font-semibold">{analysis.crawl.pages.filter((page) => page.sameOrigin).length}</p>}
           />
         </div>

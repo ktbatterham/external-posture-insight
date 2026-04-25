@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { getAreaScores } from "@/lib/posture";
+import { getAreaScores, getUnifiedIssueSummary } from "@/lib/posture";
 import { AnalysisResult } from "@/types/analysis";
 
 const createAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =>
   ({
+    finalUrl: "https://example.com/",
     headers: [],
+    certificate: {
+      available: true,
+      valid: true,
+      authorized: true,
+      issuer: "Example CA",
+      subject: "example.com",
+      validFrom: null,
+      validTo: null,
+      daysRemaining: 120,
+      protocol: "TLSv1.3",
+      cipher: null,
+      fingerprint: null,
+      subjectAltName: [],
+      issues: [],
+    },
     corsSecurity: { issues: [] },
     redirects: [],
     htmlSecurity: { issues: [], missingSriScriptUrls: [], passiveLeakSignals: [] },
@@ -61,5 +77,55 @@ describe("getAreaScores", () => {
     expect(strong?.status).toBe("strong");
     expect(watch?.status).toBe("watch");
     expect(weak?.status).toBe("weak");
+  });
+});
+
+describe("getUnifiedIssueSummary", () => {
+  it("keeps normalized warnings separate from supporting panel watch items", () => {
+    const analysis = createAnalysis({
+      issues: [
+        {
+          severity: "critical",
+          area: "headers",
+          title: "Critical issue",
+          detail: "Critical detail",
+          confidence: "high",
+          source: "observed",
+          owasp: [],
+          mitre: [],
+        },
+        {
+          severity: "warning",
+          area: "headers",
+          title: "Warning issue",
+          detail: "Warning detail",
+          confidence: "high",
+          source: "observed",
+          owasp: [],
+          mitre: [],
+        },
+        {
+          severity: "info",
+          area: "headers",
+          title: "Info issue",
+          detail: "Info detail",
+          confidence: "high",
+          source: "observed",
+          owasp: [],
+          mitre: [],
+        },
+      ],
+      domainSecurity: { issues: ["Missing MTA-STS"], dmarc: "v=DMARC1; p=reject;" },
+      htmlSecurity: { issues: ["Inline scripts detected"], missingSriScriptUrls: [], passiveLeakSignals: [] },
+      exposure: { issues: [], probes: [{ finding: "interesting" }] },
+    } as Partial<AnalysisResult>);
+
+    const summary = getUnifiedIssueSummary(analysis);
+
+    expect(summary.critical).toBe(1);
+    expect(summary.warning).toBe(1);
+    expect(summary.priorityWarnings).toBe(1);
+    expect(summary.supportingWatchItems).toBe(2);
+    expect(summary.observedSignals).toBe(2);
   });
 });

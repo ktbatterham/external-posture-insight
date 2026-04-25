@@ -2,11 +2,12 @@ import dns from "node:dns/promises";
 import {
   CT_CACHE_TTL_MS,
   CT_LOOKUP_TIMEOUT_MS,
+  CT_SAMPLE_CONCURRENCY_LIMIT,
   CT_SAMPLE_LIMIT,
 } from "./scannerConfig.js";
 import type { CtDiscoveryInfo, CtDiscoveredHost, CtHostObservation } from "./types.js";
 import { detectIdentityProviderName } from "./identityProvider.js";
-import { headerValue, safeResolve, unique, withTimeout } from "./utils.js";
+import { headerValue, mapWithConcurrency, safeResolve, unique, withTimeout } from "./utils.js";
 
 const CT_SUBDOMAIN_LIMIT = 20;
 const CT_WILDCARD_LIMIT = 5;
@@ -250,8 +251,10 @@ const observeSampledHosts = async (
   requestText: RequestTextFn,
 ): Promise<CtHostObservation[]> => {
   const samples = prioritizedHosts.slice(0, CT_SAMPLE_LIMIT);
-  const observations = await Promise.all(
-    samples.map(async (hostInfo) => {
+  const observations = await mapWithConcurrency(
+    samples,
+    CT_SAMPLE_CONCURRENCY_LIMIT,
+    async (hostInfo) => {
       const target = new URL(`https://${hostInfo.host}/`);
       const cnameTargets = (await safeResolve(() => dns.resolveCname(hostInfo.host))) || [];
 
@@ -303,7 +306,7 @@ const observeSampledHosts = async (
           note: error instanceof Error ? error.message : "CT sample request failed.",
         } satisfies CtHostObservation;
       }
-    }),
+    },
   );
 
   return observations;

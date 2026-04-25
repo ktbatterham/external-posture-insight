@@ -1,6 +1,6 @@
-import { ShieldCheck, ShieldAlert } from "lucide-react";
+import { Info, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox } from "@/components/ui/panel-primitives";
+import { SignalList, StatBox } from "@/components/ui/panel-primitives";
 import { IdentityProviderInfo } from "@/types/analysis";
 
 interface IdentityProviderPanelProps {
@@ -9,8 +9,9 @@ interface IdentityProviderPanelProps {
 
 export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPanelProps) => {
   const reviewItems = identityProvider.issues;
+  const hasPositiveEvidence = identityProvider.strengths.length > 0;
   const strengthItems = [
-    ...(identityProvider.strengths.length
+    ...(hasPositiveEvidence
       ? identityProvider.strengths
       : ["No strong identity-provider signals were confirmed from passive evidence."]),
     ...(reviewItems.length === 0 && identityProvider.detected
@@ -127,17 +128,12 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
         </div>
 
         <div className={`grid gap-3 ${reviewItems.length ? "xl:grid-cols-2" : ""}`}>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Strengths</p>
-            <ul className="mt-3 space-y-2 text-sm text-emerald-900">
-              {strengthItems.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <SignalList
+            title={hasPositiveEvidence ? "Strengths" : "Evidence read"}
+            items={strengthItems}
+            icon={hasPositiveEvidence ? <ShieldCheck /> : <Info />}
+            variant={hasPositiveEvidence ? "success" : "neutral"}
+          />
           {reviewItems.length ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Watch points</p>

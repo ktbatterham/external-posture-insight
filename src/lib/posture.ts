@@ -10,6 +10,18 @@ export interface AreaScore {
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
+const isHttpsFinalUrl = (finalUrl: string | undefined) => {
+  if (!finalUrl) {
+    return true;
+  }
+
+  try {
+    return new URL(finalUrl).protocol === "https:";
+  } catch {
+    return true;
+  }
+};
+
 const statusForScore = (score: number): AreaScore["status"] => {
   if (score >= 85) return "strong";
   if (score >= 65) return "watch";
@@ -31,8 +43,19 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
   const apiRespondedCount = analysis.apiSurface.probes.filter((probe) => probe.classification !== "absent").length;
   const apiFallbackCount = analysis.apiSurface.probes.filter((probe) => probe.classification === "fallback").length;
   const redirectPenalty = analysis.redirects.length > 1 ? Math.max(analysis.redirects.length - 1, 0) * 2 : 0;
+  const transportPenalty = isHttpsFinalUrl(analysis.finalUrl) ? 0 : 35;
+  const certificatePenalty =
+    analysis.certificate.available && !analysis.certificate.valid
+      ? 25
+      : analysis.certificate.protocol && /tlsv1(\.0|\.1)?$/i.test(analysis.certificate.protocol)
+        ? 15
+        : (analysis.certificate.daysRemaining ?? 365) <= 14
+          ? 10
+          : 0;
 
   const edgePenalty =
+    transportPenalty +
+    certificatePenalty +
     missingHeaderCount * 8 +
     warningHeaderCount * 4 +
     analysis.corsSecurity.issues.length * 8 +
@@ -143,8 +166,8 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
 
 export const getUnifiedIssueSummary = (analysis: AnalysisResult) => {
   const critical = analysis.issues.filter((issue) => issue.severity === "critical").length;
-  const coreWarnings = analysis.issues.filter((issue) => issue.severity === "warning").length;
-  const contextWarnings =
+  const priorityWarnings = analysis.issues.filter((issue) => issue.severity === "warning").length;
+  const supportingWatchItems =
     analysis.domainSecurity.issues.length +
     analysis.htmlSecurity.issues.length +
     analysis.corsSecurity.issues.length +
@@ -154,15 +177,20 @@ export const getUnifiedIssueSummary = (analysis: AnalysisResult) => {
     analysis.thirdPartyTrust.issues.length +
     analysis.aiSurface.issues.length;
   const coreInfo = analysis.issues.filter((issue) => issue.severity === "info").length;
-  const contextInfo = analysis.exposure.probes.filter((probe) => probe.finding === "interesting").length;
+  const interestingExposureSignals = analysis.exposure.probes.filter((probe) => probe.finding === "interesting").length;
+  const observedSignals = coreInfo + interestingExposureSignals;
 
   return {
     critical,
-    warning: coreWarnings + contextWarnings,
-    info: coreInfo + contextInfo,
-    coreWarnings,
-    contextWarnings,
+    warning: priorityWarnings,
+    info: observedSignals,
+    coreWarnings: priorityWarnings,
+    contextWarnings: supportingWatchItems,
+    priorityWarnings,
+    supportingWatchItems,
     coreInfo,
-    contextInfo,
+    contextInfo: interestingExposureSignals,
+    interestingExposureSignals,
+    observedSignals,
   };
 };

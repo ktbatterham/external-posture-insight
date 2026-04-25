@@ -1,10 +1,11 @@
 import {
   LIBRARY_RISK_LOOKUP_LIMIT,
+  OSV_DETAIL_CONCURRENCY_LIMIT,
   OSV_DETAIL_LOOKUP_LIMIT,
   OSV_QUERY_TIMEOUT_MS,
 } from "./scannerConfig.js";
 import type { LibraryFingerprint, LibraryRiskSignal, LibraryVulnerability } from "./types.js";
-import { unique } from "./utils.js";
+import { mapWithConcurrency, unique } from "./utils.js";
 
 const OSV_QUERYBATCH_URL = "https://api.osv.dev/v1/querybatch";
 const OSV_VULN_URL = "https://api.osv.dev/v1/vulns/";
@@ -139,15 +140,17 @@ export const fetchLibraryRiskSignals = async (fingerprints: LibraryFingerprint[]
       ),
     ).slice(0, OSV_DETAIL_LOOKUP_LIMIT);
 
-    const vulnerabilityDetails = await Promise.all(
-      vulnerabilityIds.map(async (id) => {
+    const vulnerabilityDetails = await mapWithConcurrency(
+      vulnerabilityIds,
+      OSV_DETAIL_CONCURRENCY_LIMIT,
+      async (id) => {
         try {
           const payload = await abortableJsonFetch(`${OSV_VULN_URL}${encodeURIComponent(id)}`);
           return [id, toVulnerability(payload)] as const;
         } catch {
           return [id, null] as const;
         }
-      }),
+      },
     );
 
     const vulnerabilityMap = new Map(vulnerabilityDetails.filter((entry): entry is readonly [string, LibraryVulnerability] => Boolean(entry[1])));

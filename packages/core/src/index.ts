@@ -5,6 +5,7 @@ import { fetchCtDiscovery } from "./ctDiscovery.js";
 import { analyzeDomainSecurity } from "./domain-security.js";
 import {
   API_SURFACE_PROBES,
+  CRAWL_CONCURRENCY_LIMIT,
   CRAWL_CANDIDATES,
   EXPOSURE_PROBES,
 } from "./scannerConfig.js";
@@ -23,6 +24,7 @@ import {
   isAccessDeniedHtml,
 } from "./html-extraction.js";
 import { analyzeIdentityProvider } from "./identityProvider.js";
+import { analyzeInfrastructure } from "./infrastructure.js";
 import {
   analyzeApiSurface,
   analyzeCorsSecurity,
@@ -38,10 +40,10 @@ import {
   requestWithHeaders,
 } from "./network.js";
 import { normalizeDiscoveredPath, rankDiscoveredPaths } from "./path-discovery.js";
-import { scoreAnalysis } from "./scoring.js";
+import { scoreAnalysis, scorePostureAnalysis, summarizePostureGrade } from "./scoring.js";
 import { fetchSecurityTxt } from "./security-txt.js";
 import { detectTechnologies } from "./technology-detection.js";
-import { headerValue, unique } from "./utils.js";
+import { headerValue, mapWithConcurrency, unique } from "./utils.js";
 import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type { AnalysisResult, AnalyzeTargetOptions, HtmlSecurityInfo } from "./types.js";
 
@@ -384,14 +386,12 @@ function summarizePageAnalysis(label, path, pageResult, rootHost) {
 async function crawlRelatedPages(rootResult, discovery) {
   const candidates = buildCrawlCandidates(rootResult, discovery.paths);
   const rootHost = new URL(rootResult.finalUrl).hostname;
-  const pages = [];
-
-  for (const candidate of candidates) {
+  const pages = await mapWithConcurrency(candidates, CRAWL_CONCURRENCY_LIMIT, async (candidate) => {
     try {
       const pageResult = await analyzeUrlCore(candidate.url, { includeCertificate: false });
-      pages.push(summarizePageAnalysis(candidate.label, candidate.path, pageResult, rootHost));
+      return summarizePageAnalysis(candidate.label, candidate.path, pageResult, rootHost);
     } catch {
-      pages.push({
+      return {
         label: candidate.label,
         path: candidate.path,
         finalUrl: candidate.url.toString(),
@@ -403,9 +403,9 @@ async function crawlRelatedPages(rootResult, discovery) {
         missingHeaders: SECURITY_HEADERS.map((header) => header.label),
         warningHeaders: [],
         issueCount: 1,
-      });
+      };
     }
-  }
+  });
 
   const comparablePages = pages.filter((page) => page.sameOrigin);
 
@@ -473,6 +473,8 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
   const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
   const publicSignals = await fetchPublicSignals(result.host, { requestText });
   const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
+  const technologies = mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies);
+  const infrastructure = await analyzeInfrastructure(finalUrl, result.rawHeaders, technologies);
   const ctDiscovery = await ctDiscoveryPromise;
   const identityProvider = await analyzeIdentityProvider(
     finalUrl,
@@ -493,26 +495,10 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     result.rawHeaders,
     htmlDocument?.html || null,
   );
-  const rescoredResult = assessmentLimitation.limited
-    ? scoreAnalysis({
-        isHttps: finalUrl.protocol === "https:",
-        headerResults: result.headers,
-        certificate: result.certificate,
-        cookies: result.cookies,
-        redirects: result.redirects,
-        limitedResponse: true,
-      })
-    : { score: result.score, grade: result.grade };
-
   const enrichedResult = {
     ...result,
-    score: rescoredResult.score,
-    grade: rescoredResult.grade,
-    summary: assessmentLimitation.limited
-      ? "Assessment is limited because the target returned a blocked or restricted response."
-      : result.summary,
     issues: [...result.issues, ...buildLibraryRiskIssues(libraryRiskSignals).map(classifyIssueTaxonomy)],
-    technologies: mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies),
+    technologies,
     crawl: await crawlRelatedPages(result, discovery),
     securityTxt: await fetchSecurityTxt(finalUrl, requestText),
     domainSecurity: await analyzeDomainSecurity(result.host, requestText),
@@ -521,6 +507,7 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     htmlSecurity,
     aiSurface: htmlSecurity.aiSurface,
     thirdPartyTrust,
+    infrastructure,
     wafFingerprint,
     exposure: await analyzeExposure(finalUrl, {
       exposureProbes: EXPOSURE_PROBES,
@@ -546,15 +533,25 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     publicSignals,
     assessmentLimitation,
   };
+  const postureScore = scorePostureAnalysis(enrichedResult);
+  const scoredResult = {
+    ...enrichedResult,
+    score: postureScore.score,
+    grade: postureScore.grade,
+    summary: assessmentLimitation.limited
+      ? "Assessment is limited because the target returned a blocked or restricted response."
+      : summarizePostureGrade(postureScore.grade),
+  };
 
   return {
-    ...enrichedResult,
-    executiveSummary: buildExecutiveSummary(enrichedResult),
+    ...scoredResult,
+    executiveSummary: buildExecutiveSummary(scoredResult),
   };
 }
 
 export const analyzeTarget = analyzeUrl;
 export { formatErrorMessage };
+export { analyzeInfrastructure } from "./infrastructure.js";
 export { buildHistoryDiff, buildHistoryDiffFromSnapshots, snapshotFromAnalysis } from "./historyDiff.js";
 export {
   assertPublicRequestTarget,

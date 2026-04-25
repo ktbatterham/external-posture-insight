@@ -37,6 +37,29 @@ export const safeResolve = async <T>(operation: () => Promise<T>): Promise<T | n
   }
 };
 
+export const mapWithConcurrency = async <T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, () => worker()),
+  );
+
+  return results;
+};
+
 export const getSiteDomain = (hostname: string): string => {
   const lower = hostname.toLowerCase();
   const parts = lower.split(".").filter(Boolean);
