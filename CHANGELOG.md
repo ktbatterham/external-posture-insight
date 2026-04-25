@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added structured SPF and DMARC policy evaluation so Domain & Email Security now reports hardfail/softfail, enforcing/monitor-only DMARC, rollout percentage, and reporting posture instead of only raw TXT records.
 - Added passive infrastructure inference to the Trust report, using DNS, reverse DNS, response headers, and detected stack evidence to identify likely cloud, CDN, edge, PaaS, or hosting providers.
 - Added deterministic core test coverage for passive infrastructure provider inference.
 - Added quiet scan mode for CLI and hosted API usage, preserving core DNS/TLS/header checks while skipping deeper page-content and probe enrichment.

@@ -7,6 +7,7 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 ## [Unreleased]
 
 ### Added
+- Added structured SPF and DMARC policy evaluation to `DomainSecurityInfo`, including SPF all-mechanism strength, DNS lookup-mechanism count, DMARC enforcement policy, rollout percentage, and reporting presence.
 - Added `analyzeInfrastructure()` for passive cloud/CDN/edge/hosting inference from DNS, reverse DNS, headers, and detected technology evidence.
 - Added `InfrastructureInfo` and related provider signal types to the public result model.
 - Added deterministic core test coverage for infrastructure provider inference.

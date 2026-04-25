@@ -197,6 +197,22 @@ export interface DomainSecurityInfo {
   };
   spf: string | null;
   dmarc: string | null;
+  emailPolicy: {
+    spf: {
+      status: "strong" | "watch" | "weak" | "missing";
+      allMechanism: "-all" | "~all" | "?all" | "+all" | null;
+      dnsLookupMechanisms: number;
+      summary: string;
+    };
+    dmarc: {
+      status: "strong" | "watch" | "weak" | "missing";
+      policy: "reject" | "quarantine" | "none" | null;
+      subdomainPolicy: "reject" | "quarantine" | "none" | null;
+      pct: number | null;
+      reporting: boolean;
+      summary: string;
+    };
+  };
   mtaSts: {
     dns: string | null;
     policyUrl: string | null;
