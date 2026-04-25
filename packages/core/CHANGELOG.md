@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-25
+
 ### Added
 - Added the short `epi` CLI binary alias alongside `external-posture-insight`.
 - Added lightweight interactive multi-target CLI progress on stderr while keeping stdout report output pipe-friendly.
