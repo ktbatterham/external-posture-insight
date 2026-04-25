@@ -399,6 +399,25 @@ export interface ThirdPartyTrustInfo {
   summary: string;
 }
 
+export interface InfrastructureSignal {
+  provider: string;
+  category: "cloud" | "cdn" | "edge" | "paas" | "hosting";
+  confidence: IssueConfidence;
+  source: "dns" | "reverse_dns" | "headers" | "technology";
+  evidence: string;
+}
+
+export interface InfrastructureInfo {
+  host: string;
+  addresses: string[];
+  cnameTargets: string[];
+  reverseDns: string[];
+  providers: InfrastructureSignal[];
+  issues: string[];
+  strengths: string[];
+  summary: string;
+}
+
 export interface ExecutiveSummaryInfo {
   overview: string;
   mainRisk: string;
@@ -494,6 +513,7 @@ export interface AnalysisResult {
   htmlSecurity: HtmlSecurityInfo;
   aiSurface: AiSurfaceInfo;
   thirdPartyTrust: ThirdPartyTrustInfo;
+  infrastructure: InfrastructureInfo;
   executiveSummary: ExecutiveSummaryInfo;
   assessmentLimitation: AssessmentLimitation;
   exposure: ExposureSummary;
@@ -505,4 +525,5 @@ export interface AnalysisResult {
 
 export interface AnalyzeTargetOptions {
   includeCertificate?: boolean;
+  scanMode?: "standard" | "quiet";
 }

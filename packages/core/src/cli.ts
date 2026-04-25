@@ -17,6 +17,7 @@ type ParsedArgs =
       failOnSeverity: FailOnSeverity | null;
       failOnRegression: boolean;
       failIfScoreBelow: number | null;
+      quiet: boolean;
     }
   | {
       command: "compare";
@@ -32,7 +33,7 @@ type ParsedArgs =
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  external-posture-insight scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--quiet] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   external-posture-insight --help
 
@@ -43,6 +44,7 @@ Examples:
   npx @ktbatterham/external-posture-core scan example.com --format sarif --output findings.sarif
   npx @ktbatterham/external-posture-core scan example.com --format ci-json --output ci.json
   npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
+  npx @ktbatterham/external-posture-core scan example.com --quiet
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json
   npx @ktbatterham/external-posture-core scan example.com --baseline previous-report.json --fail-on-regression
   npx @ktbatterham/external-posture-core scan example.com github.com --fail-on warning
@@ -70,6 +72,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
   let failOnSeverity: FailOnSeverity | null = null;
   let failOnRegression = false;
   let failIfScoreBelow: number | null = null;
+  let quiet = false;
   const positionals: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -135,6 +138,11 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       continue;
     }
 
+    if (arg === "--quiet") {
+      quiet = true;
+      continue;
+    }
+
     if (arg.startsWith("--")) {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -162,6 +170,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       failOnSeverity,
       failOnRegression,
       failIfScoreBelow,
+      quiet,
     };
   }
 
@@ -635,7 +644,7 @@ const main = async () => {
     if (parsed.command === "scan") {
       const analyses: AnalysisResult[] = [];
       for (const target of parsed.targets) {
-        analyses.push(await analyzeUrl(target));
+        analyses.push(await analyzeUrl(target, { scanMode: parsed.quiet ? "quiet" : "standard" }));
       }
 
       if (analyses.length === 1) {

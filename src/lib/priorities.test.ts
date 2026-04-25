@@ -4,6 +4,7 @@ import { AnalysisResult } from "@/types/analysis";
 
 const createAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =>
   ({
+    finalUrl: "https://example.com/",
     headers: [],
     corsSecurity: { issues: [] },
     redirects: [],
@@ -17,7 +18,21 @@ const createAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult
     thirdPartyTrust: { totalProviders: 0, highRiskProviders: 0, issues: [] },
     aiSurface: { detected: false, disclosures: [], issues: [] },
     crawl: { inconsistentHeaders: [] },
-    certificate: { daysRemaining: 120 },
+    certificate: {
+      available: true,
+      valid: true,
+      authorized: true,
+      issuer: "Example CA",
+      subject: "example.com",
+      validFrom: null,
+      validTo: null,
+      daysRemaining: 120,
+      protocol: "TLSv1.3",
+      cipher: null,
+      fingerprint: null,
+      subjectAltName: [],
+      issues: [],
+    },
     issues: [],
     ...overrides,
   }) as AnalysisResult;

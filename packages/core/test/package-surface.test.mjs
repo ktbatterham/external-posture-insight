@@ -12,6 +12,7 @@ test("package surface exports expected public functions", async () => {
   assert.equal(typeof pkg.analyzeTarget, "function");
   assert.equal(typeof pkg.analyzeUrl, "function");
   assert.equal(typeof pkg.analyzeHtmlDocument, "function");
+  assert.equal(typeof pkg.analyzeInfrastructure, "function");
   assert.equal(typeof pkg.snapshotFromAnalysis, "function");
   assert.equal(typeof pkg.buildHistoryDiffFromSnapshots, "function");
   assert.equal(typeof pkg.formatErrorMessage, "function");
@@ -28,5 +29,6 @@ test("package surface includes a working CLI help entrypoint", async () => {
   assert.match(stdout, /--fail-on info\|warning\|critical/);
   assert.match(stdout, /--fail-on-regression/);
   assert.match(stdout, /--fail-if-score-below <0-100>/);
+  assert.match(stdout, /--quiet/);
   assert.match(stdout, /compare <current-report\.json> <baseline-report\.json>/);
 });

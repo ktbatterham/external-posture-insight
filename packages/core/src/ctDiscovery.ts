@@ -2,11 +2,12 @@ import dns from "node:dns/promises";
 import {
   CT_CACHE_TTL_MS,
   CT_LOOKUP_TIMEOUT_MS,
+  CT_SAMPLE_CONCURRENCY_LIMIT,
   CT_SAMPLE_LIMIT,
 } from "./scannerConfig.js";
 import type { CtDiscoveryInfo, CtDiscoveredHost, CtHostObservation } from "./types.js";
 import { detectIdentityProviderName } from "./identityProvider.js";
-import { headerValue, safeResolve, unique, withTimeout } from "./utils.js";
+import { headerValue, mapWithConcurrency, safeResolve, unique, withTimeout } from "./utils.js";
 
 const CT_SUBDOMAIN_LIMIT = 20;
 const CT_WILDCARD_LIMIT = 5;
@@ -250,8 +251,10 @@ const observeSampledHosts = async (
   requestText: RequestTextFn,
 ): Promise<CtHostObservation[]> => {
   const samples = prioritizedHosts.slice(0, CT_SAMPLE_LIMIT);
-  const observations = await Promise.all(
-    samples.map(async (hostInfo) => {
+  const observations = await mapWithConcurrency(
+    samples,
+    CT_SAMPLE_CONCURRENCY_LIMIT,
+    async (hostInfo) => {
       const target = new URL(`https://${hostInfo.host}/`);
       const cnameTargets = (await safeResolve(() => dns.resolveCname(hostInfo.host))) || [];
 
@@ -303,7 +306,7 @@ const observeSampledHosts = async (
           note: error instanceof Error ? error.message : "CT sample request failed.",
         } satisfies CtHostObservation;
       }
-    }),
+    },
   );
 
   return observations;
@@ -313,7 +316,9 @@ export const fetchCtDiscovery = async (
   host: string,
   requestJson: RequestJsonFn,
   requestText: RequestTextFn,
+  options: { sampleHosts?: boolean } = {},
 ): Promise<CtDiscoveryInfo> => {
+  const { sampleHosts = true } = options;
   const queriedDomain = toDiscoveryDomain(host);
   const cached = ctCache.get(queriedDomain);
   if (cached && cached.expiresAt > Date.now()) {
@@ -347,12 +352,12 @@ export const fetchCtDiscovery = async (
     ).slice(0, CT_SUBDOMAIN_LIMIT);
 
     const prioritizedHosts = rankHosts(subdomains);
-    const sampledHosts = await observeSampledHosts(prioritizedHosts, requestText);
+    const sampledHosts = sampleHosts ? await observeSampledHosts(prioritizedHosts, requestText) : [];
     const authCount = prioritizedHosts.filter((entry) => entry.category === "auth").length;
     const edgeHits = sampledHosts.filter((entry) => entry.edgeProvider).length;
     const takeoverHits = sampledHosts.filter((entry) => entry.suspectedTakeover);
     const coverageSummary = subdomains.length
-      ? `CT logs surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} for ${queriedDomain}; ${prioritizedHosts.filter((entry) => entry.priority === "high").length} look high-priority and ${sampledHosts.length} were lightly sampled.`
+      ? `CT logs surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} for ${queriedDomain}; ${prioritizedHosts.filter((entry) => entry.priority === "high").length} look high-priority${sampleHosts ? ` and ${sampledHosts.length} were lightly sampled` : ""}.`
       : `CT logs did not surface distinct subdomains for ${queriedDomain}.`;
 
     const value: CtDiscoveryInfo = {

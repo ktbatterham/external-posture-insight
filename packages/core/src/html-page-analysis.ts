@@ -1,5 +1,5 @@
 import { URL } from "node:url";
-import * as cheerio from "cheerio";
+import { createRequire } from "node:module";
 import { analyzeAiSurface, detectHtmlTechnologies } from "./htmlInsights.js";
 import {
   collectClientExposureSignals,
@@ -15,6 +15,14 @@ import { normalizeDiscoveredPath, rankDiscoveredPaths } from "./path-discovery.j
 import { requestText } from "./network.js";
 import type { HtmlSecurityInfo } from "./types.js";
 import { headerValue, unique } from "./utils.js";
+
+const require = createRequire(import.meta.url);
+let cheerioModule: typeof import("cheerio") | null = null;
+
+function loadCheerio() {
+  cheerioModule ??= require("cheerio") as typeof import("cheerio");
+  return cheerioModule;
+}
 
 export async function fetchHtmlDocument(finalUrl: URL) {
   const response = await requestText(finalUrl);
@@ -73,6 +81,7 @@ export function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pag
     const html = document.html;
     const issues: string[] = [];
     const strengths: string[] = [];
+    const cheerio = loadCheerio();
     const $ = cheerio.load(html);
     const pageTitle = document.pageTitle || $("title").first().text().trim() || null;
     const metaGenerator = $('meta[name="generator"]').attr("content") || null;

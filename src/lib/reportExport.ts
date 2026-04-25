@@ -154,8 +154,9 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
     "## Summary",
     "",
     `- Critical findings: ${summary.critical}`,
-    `- Warning findings: ${summary.warning}`,
-    `- Informational findings: ${summary.info}`,
+    `- Priority warning findings: ${summary.priorityWarnings}`,
+    `- Supporting watch items: ${summary.supportingWatchItems}`,
+    `- Observed signals: ${summary.observedSignals}`,
     "",
     "## Risk Themes",
     "",
@@ -417,8 +418,9 @@ export const buildHtmlReport = (analysis: AnalysisResult, diff: HistoryDiff | nu
     <div class="card">
       <h2>Summary</h2>
       <p>Critical findings: ${summary.critical}</p>
-      <p>Warning findings: ${summary.warning}</p>
-      <p>Informational findings: ${summary.info}</p>
+      <p>Priority warning findings: ${summary.priorityWarnings}</p>
+      <p>Supporting watch items: ${summary.supportingWatchItems}</p>
+      <p>Observed signals: ${summary.observedSignals}</p>
     </div>
     <div class="card">
       <h2>Risk Themes</h2>

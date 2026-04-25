@@ -91,6 +91,53 @@ export const StatusAlert = ({ variant, icon, children, className }: StatusAlertP
 );
 
 // ---------------------------------------------------------------------------
+// SignalList
+// Grouped evidence list for positive strengths or neutral observational reads.
+// ---------------------------------------------------------------------------
+
+type SignalListVariant = "success" | "neutral";
+
+const signalListVariants: Record<SignalListVariant, { container: string; title: string; body: string; icon: string }> = {
+  success: {
+    container: "border-emerald-200 bg-emerald-50",
+    title: "text-emerald-700",
+    body: "text-emerald-900",
+    icon: "text-emerald-800",
+  },
+  neutral: {
+    container: "border-slate-200 bg-slate-50",
+    title: "text-slate-600",
+    body: "text-slate-700",
+    icon: "text-slate-500",
+  },
+};
+
+interface SignalListProps {
+  title: string;
+  items: string[];
+  icon: React.ReactNode;
+  variant?: SignalListVariant;
+}
+
+export const SignalList = ({ title, items, icon, variant = "neutral" }: SignalListProps) => {
+  const v = signalListVariants[variant];
+
+  return (
+    <div className={cn("rounded-2xl border p-4", v.container)}>
+      <p className={cn("text-xs font-semibold uppercase tracking-[0.18em]", v.title)}>{title}</p>
+      <ul className={cn("mt-3 space-y-2 text-sm", v.body)}>
+        {items.map((item, index) => (
+          <li key={`${item}-${index}`} className="flex gap-2">
+            <span className={cn("mt-0.5 shrink-0 [&>svg]:h-4 [&>svg]:w-4", v.icon)}>{icon}</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // EmptyState
 // Dashed-border placeholder for sections with no data.
 // ---------------------------------------------------------------------------

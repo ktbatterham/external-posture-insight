@@ -1,6 +1,6 @@
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { Info, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox } from "@/components/ui/panel-primitives";
+import { SignalList, StatBox } from "@/components/ui/panel-primitives";
 import { CtDiscoveryInfo } from "@/types/analysis";
 
 interface CtDiscoveryPanelProps {
@@ -9,8 +9,9 @@ interface CtDiscoveryPanelProps {
 
 export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
   const reviewItems = ctDiscovery.issues;
+  const hasPositiveEvidence = ctDiscovery.strengths.length > 0;
   const strengthItems = [
-    ...(ctDiscovery.strengths.length
+    ...(hasPositiveEvidence
       ? ctDiscovery.strengths
       : ["CT enrichment did not add any positive coverage signals for this target."]),
     ...(reviewItems.length === 0 ? ["No CT-specific watch points were identified in this scan."] : []),
@@ -128,17 +129,12 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
         </div>
 
         <div className={`grid gap-3 ${reviewItems.length ? "xl:grid-cols-2" : ""}`}>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Strengths</p>
-            <ul className="mt-3 space-y-2 text-sm text-emerald-900">
-              {strengthItems.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <SignalList
+            title={hasPositiveEvidence ? "Strengths" : "Evidence read"}
+            items={strengthItems}
+            icon={hasPositiveEvidence ? <ShieldCheck /> : <Info />}
+            variant={hasPositiveEvidence ? "success" : "neutral"}
+          />
           {reviewItems.length ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Watch points</p>

@@ -2,6 +2,7 @@ import { CtDiscoveryPanel } from "@/components/CtDiscoveryPanel";
 import { DisclosureTrustPanel } from "@/components/DisclosureTrustPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { IdentityProviderPanel } from "@/components/IdentityProviderPanel";
+import { InfrastructurePanel } from "@/components/InfrastructurePanel";
 import { PublicSignalsPanel } from "@/components/PublicSignalsPanel";
 import { WafFingerprintPanel } from "@/components/WafFingerprintPanel";
 import { AnalysisResult } from "@/types/analysis";
@@ -20,6 +21,7 @@ export const TrustSection = ({ analysisData }: { analysisData: AnalysisResult })
     </div>
     <div className="space-y-8">
       <IdentityProviderPanel identityProvider={analysisData.identityProvider} />
+      <InfrastructurePanel infrastructure={analysisData.infrastructure} />
       <WafFingerprintPanel wafFingerprint={analysisData.wafFingerprint} />
       <CtDiscoveryPanel ctDiscovery={analysisData.ctDiscovery} />
     </div>
