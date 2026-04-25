@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { execFile as execFileCallback } from "node:child_process";
 import test from "node:test";
 import { promisify } from "node:util";
@@ -23,6 +23,7 @@ test("package surface includes a working CLI help entrypoint", async () => {
   const { stdout } = await execFile(process.execPath, [new URL("../dist/cli.js", import.meta.url).pathname, "--help"]);
 
   assert.match(stdout, /External Posture Insight CLI/);
+  assert.match(stdout, /epi scan <target\.\.\.>/);
   assert.match(stdout, /scan <target\.\.\.>/);
   assert.match(stdout, /--baseline/);
   assert.match(stdout, /json\|markdown\|summary\|sarif\|ci-json/);
@@ -31,4 +32,11 @@ test("package surface includes a working CLI help entrypoint", async () => {
   assert.match(stdout, /--fail-if-score-below <0-100>/);
   assert.match(stdout, /--quiet/);
   assert.match(stdout, /compare <current-report\.json> <baseline-report\.json>/);
+});
+
+test("package surface exposes both long and short CLI binary names", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+
+  assert.equal(packageJson.bin.epi, "./dist/cli.js");
+  assert.equal(packageJson.bin["external-posture-insight"], "./dist/cli.js");
 });

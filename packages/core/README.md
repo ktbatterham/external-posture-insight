@@ -2,10 +2,17 @@
 
 [![npm version](https://img.shields.io/npm/v/%40ktbatterham%2Fexternal-posture-core)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
 [![npm package](https://img.shields.io/badge/npm-package-red)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 Low-noise external posture analysis for public web targets.
 
 This package is the reusable scanner engine extracted from the External Posture Insight app. It is designed for passive or near-passive posture assessment rather than active exploitation or noisy recon.
+
+## Safety model
+
+External Posture Insight is passive-first and production-conscious, but it is not magic invisibility dust. A standard scan may make DNS queries, perform TLS handshakes, fetch the target page, follow redirects, query third-party public datasets such as Certificate Transparency / OSV, and run a small set of low-noise HTTP checks. It does not attempt exploitation, brute forcing, authentication bypass, form submission, fuzzing, password testing, or vulnerability exploitation.
+
+Use it only against systems you own or are authorized to assess. Results are heuristic and should be treated as decision support, not a formal penetration test or compliance attestation.
 
 ## What it covers
 
@@ -55,10 +62,18 @@ The package now includes a pipe-friendly CLI:
 npx @ktbatterham/external-posture-core scan example.com
 ```
 
+Install globally if you want the short command:
+
+```bash
+npm install -g @ktbatterham/external-posture-core
+epi scan example.com
+```
+
 Scan multiple targets in one run:
 
 ```bash
 npx @ktbatterham/external-posture-core scan example.com github.com bbc.co.uk
+epi scan example.com github.com bbc.co.uk
 ```
 
 Available output formats:
@@ -70,6 +85,8 @@ npx @ktbatterham/external-posture-core scan example.com --format markdown
 npx @ktbatterham/external-posture-core scan example.com --format sarif
 npx @ktbatterham/external-posture-core scan example.com --format ci-json
 ```
+
+The CLI writes machine-readable report output to stdout, and lightweight multi-target progress to stderr only when running interactively. This keeps JSON/SARIF output pipe-friendly.
 
 CI policy modes:
 
@@ -177,3 +194,4 @@ console.log(htmlSecurity.clientExposureSignals);
 - Only use this against targets you are authorized to assess.
 - The package is intentionally conservative about active probing.
 - Scoring is heuristic and should be treated as a prioritization aid, not an absolute security truth.
+- The author is not responsible for misuse, unauthorized scanning, operational impact, or decisions made from the output without appropriate validation.

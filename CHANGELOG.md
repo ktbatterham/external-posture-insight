@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added a short `epi` CLI binary alias alongside `external-posture-insight`.
+- Added lightweight interactive multi-target CLI progress on stderr while keeping report output pipe-friendly.
 - Added structured SPF and DMARC policy evaluation so Domain & Email Security now reports hardfail/softfail, enforcing/monitor-only DMARC, rollout percentage, and reporting posture instead of only raw TXT records.
 - Added passive infrastructure inference to the Trust report, using DNS, reverse DNS, response headers, and detected stack evidence to identify likely cloud, CDN, edge, PaaS, or hosting providers.
 - Added deterministic core test coverage for passive infrastructure provider inference.
@@ -16,6 +18,7 @@
 - Reused a shared signal-list primitive across Identity Provider, Certificate Transparency, and WAF panels so neutral evidence no longer looks like a green strength.
 - Added bounded concurrency for CT host sampling, OSV vulnerability detail lookups, and related-page crawling to keep scans less bursty and more predictable.
 - Lazy-loaded Cheerio in the HTML analysis path so importing the core package is fast for CLI/help and non-HTML workflows.
+- Tightened public README positioning with clearer quick-start, capability limits, and authorization/safety wording.
 
 ### Verified
 
