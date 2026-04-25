@@ -13,6 +13,7 @@
 
 ### Changed
 
+- Treat HTTP 5xx target responses as limited availability reads, including a clearer banner and a lower grade cap so unavailable pages do not appear as normal `C` posture results.
 - Recalibrated the overall grade around weighted posture areas instead of primarily header/TLS/cookie hardening, reducing the previous tendency for very different targets to cluster around `B`.
 - Separated Posture Summary counts into `Priority Warnings`, `Supporting Watch Items`, and `Observed Signals` so contextual panel evidence is not presented as double-counted warnings.
 - Reused a shared signal-list primitive across Identity Provider, Certificate Transparency, and WAF panels so neutral evidence no longer looks like a green strength.

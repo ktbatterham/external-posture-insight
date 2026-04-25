@@ -70,6 +70,7 @@ test("scoreAnalysis preserves a strong score for a hardened HTTPS site", () => {
 
 const createPostureAnalysis = (overrides = {}) => ({
   finalUrl: "https://example.com/",
+  statusCode: 200,
   headers: [
     { key: "strict-transport-security", status: "present" },
     { key: "content-security-policy", status: "present" },
@@ -132,4 +133,19 @@ test("scorePostureAnalysis grades the wider passive posture, not just core heade
   assert.equal(posture.score < oldBaseline.score, true);
   assert.equal(posture.score < 90, true);
   assert.equal(posture.grade, "B");
+});
+
+test("scorePostureAnalysis caps unavailable targets below a C grade", () => {
+  const posture = scorePostureAnalysis(
+    createPostureAnalysis({
+      statusCode: 503,
+      assessmentLimitation: {
+        limited: true,
+        kind: "service_unavailable",
+      },
+    }),
+  );
+
+  assert.equal(posture.score <= 64, true);
+  assert.equal(posture.grade, "D");
 });

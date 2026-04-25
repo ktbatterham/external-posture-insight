@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { analyzeHtmlDocument } from "../dist/index.js";
+import { detectAssessmentLimitation } from "../dist/html-page-analysis.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,4 +74,12 @@ test("extracts sibling same-site hosts from page content without treating third 
   );
 
   assert.deepEqual(htmlSecurity.sameSiteHosts, ["account.bbc.co.uk", "static.bbc.co.uk"]);
+});
+
+test("detectAssessmentLimitation treats server errors as unavailable posture reads", () => {
+  const limitation = detectAssessmentLimitation(503, {}, "<html><body>Service Unavailable</body></html>");
+
+  assert.equal(limitation.limited, true);
+  assert.equal(limitation.kind, "service_unavailable");
+  assert.match(limitation.detail, /HTTP 503/);
 });

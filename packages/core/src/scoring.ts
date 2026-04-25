@@ -36,6 +36,18 @@ const POSTURE_WEIGHTS: Record<PostureAreaKey, number> = {
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
+const statusAvailabilityPenalty = (statusCode?: number) => {
+  if (!statusCode) return 0;
+  if (statusCode >= 500) return 35;
+  if (statusCode === 429) return 20;
+  return 0;
+};
+
+const limitedAssessmentScoreCap = (kind: PostureScoringInput["assessmentLimitation"]["kind"]) => {
+  if (kind === "service_unavailable") return 64;
+  return 84;
+};
+
 const statusForScore = (score: number): PostureAreaScore["status"] => {
   if (score >= 85) return "strong";
   if (score >= 65) return "watch";
@@ -149,6 +161,7 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
   const cspHeaderIssueCount = cspHeaderFindings.length;
   const cookieIssueCount = analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0);
   const redirectPenalty = analysis.redirects.length > 1 ? Math.max(analysis.redirects.length - 1, 0) * 2 : 0;
+  const availabilityPenalty = statusAvailabilityPenalty(analysis.statusCode);
   const transportPenalty = new URL(analysis.finalUrl).protocol === "https:" ? 0 : 35;
   const certificatePenalty =
     analysis.certificate.available && !analysis.certificate.valid
@@ -165,6 +178,7 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
     missingHeaderCount * 8 +
     warningHeaderCount * 4 +
     analysis.corsSecurity.issues.length * 8 +
+    availabilityPenalty +
     redirectPenalty;
 
   const contentPenalty =
@@ -214,7 +228,9 @@ export function scorePostureAnalysis(analysis: PostureScoringInput): { score: nu
   const weightedScore = Math.round(
     areaScores.reduce((total, area) => total + area.score * POSTURE_WEIGHTS[area.key], 0),
   );
-  const score = analysis.assessmentLimitation.limited ? Math.min(weightedScore, 84) : weightedScore;
+  const score = analysis.assessmentLimitation.limited
+    ? Math.min(weightedScore, limitedAssessmentScoreCap(analysis.assessmentLimitation.kind))
+    : weightedScore;
   return { score, grade: gradeForScore(score) };
 }
 

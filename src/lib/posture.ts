@@ -10,6 +10,13 @@ export interface AreaScore {
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
+const statusAvailabilityPenalty = (statusCode?: number) => {
+  if (!statusCode) return 0;
+  if (statusCode >= 500) return 35;
+  if (statusCode === 429) return 20;
+  return 0;
+};
+
 const isHttpsFinalUrl = (finalUrl: string | undefined) => {
   if (!finalUrl) {
     return true;
@@ -43,6 +50,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
   const apiRespondedCount = analysis.apiSurface.probes.filter((probe) => probe.classification !== "absent").length;
   const apiFallbackCount = analysis.apiSurface.probes.filter((probe) => probe.classification === "fallback").length;
   const redirectPenalty = analysis.redirects.length > 1 ? Math.max(analysis.redirects.length - 1, 0) * 2 : 0;
+  const availabilityPenalty = statusAvailabilityPenalty(analysis.statusCode);
   const transportPenalty = isHttpsFinalUrl(analysis.finalUrl) ? 0 : 35;
   const certificatePenalty =
     analysis.certificate.available && !analysis.certificate.valid
@@ -59,6 +67,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
     missingHeaderCount * 8 +
     warningHeaderCount * 4 +
     analysis.corsSecurity.issues.length * 8 +
+    availabilityPenalty +
     redirectPenalty;
 
   const contentPenalty =
@@ -96,6 +105,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       notes: [
         `${missingHeaderCount + warningHeaderCount} header findings`,
         `${analysis.corsSecurity.issues.length} CORS findings`,
+        ...(availabilityPenalty ? [`HTTP ${analysis.statusCode} limited assessment`] : []),
       ],
     },
     {
