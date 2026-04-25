@@ -34,9 +34,9 @@ export const ApiSurfacePanel = ({ apiSurface }: ApiSurfacePanelProps) => {
             return (
               <div key={probe.path} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-slate-950">{probe.label}</p>
-                    <p className="text-sm text-slate-500">{probe.path}</p>
+                    <p className="truncate text-sm text-slate-500" title={probe.path}>{probe.path}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className={styles[probe.classification]}>

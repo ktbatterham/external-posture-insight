@@ -73,7 +73,7 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
                         {provider.risk} risk
                       </Badge>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">{provider.domain}</p>
+                    <p className="mt-2 truncate text-sm text-slate-600" title={provider.domain}>{provider.domain}</p>
                     <p className="mt-1 text-xs text-slate-500">{provider.evidence}</p>
                   </div>
                 ))}

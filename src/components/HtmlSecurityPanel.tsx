@@ -1,7 +1,7 @@
 import { CodeXml, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
+import { StatBox, StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { HtmlSecurityInfo } from "@/types/analysis";
 
 interface HtmlSecurityPanelProps {
@@ -10,6 +10,10 @@ interface HtmlSecurityPanelProps {
 
 export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
   const warningLeakSignals = htmlSecurity.passiveLeakSignals.filter((signal) => signal.severity === "warning");
+  const visibleFirstPartyPaths = htmlSecurity.firstPartyPaths.slice(0, 8);
+  const hiddenFirstPartyPathCount = Math.max(htmlSecurity.firstPartyPaths.length - visibleFirstPartyPaths.length, 0);
+  const visibleSameSiteHosts = htmlSecurity.sameSiteHosts.slice(0, 8);
+  const hiddenSameSiteHostCount = Math.max(htmlSecurity.sameSiteHosts.length - visibleSameSiteHosts.length, 0);
 
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -49,11 +53,16 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
             <StatBox
               label="Discovered same-origin paths"
               value={
-                <div className="flex flex-wrap gap-2">
+                <div className="flex max-h-56 min-w-0 flex-wrap gap-2 overflow-y-auto pr-1">
                   {htmlSecurity.firstPartyPaths.length ? (
-                    htmlSecurity.firstPartyPaths.map((path) => (
-                      <Badge key={path} variant="outline">{path}</Badge>
-                    ))
+                    <>
+                      {visibleFirstPartyPaths.map((path) => <TruncatedChip key={path} value={path} />)}
+                      {hiddenFirstPartyPathCount > 0 && (
+                        <Badge variant="secondary" className="rounded-full px-3 py-1">
+                          +{hiddenFirstPartyPathCount} more
+                        </Badge>
+                      )}
+                    </>
                   ) : (
                     <span className="text-sm text-slate-500">No same-origin page links were discovered passively.</span>
                   )}
@@ -63,11 +72,16 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
             <StatBox
               label="Referenced same-site hosts"
               value={
-                <div className="flex flex-wrap gap-2">
+                <div className="flex max-h-56 min-w-0 flex-wrap gap-2 overflow-y-auto pr-1">
                   {htmlSecurity.sameSiteHosts.length ? (
-                    htmlSecurity.sameSiteHosts.map((host) => (
-                      <Badge key={host} variant="outline">{host}</Badge>
-                    ))
+                    <>
+                      {visibleSameSiteHosts.map((host) => <TruncatedChip key={host} value={host} />)}
+                      {hiddenSameSiteHostCount > 0 && (
+                        <Badge variant="secondary" className="rounded-full px-3 py-1">
+                          +{hiddenSameSiteHostCount} more
+                        </Badge>
+                      )}
+                    </>
                   ) : (
                     <span className="text-sm text-slate-500">No sibling same-site hosts were referenced by the fetched page.</span>
                   )}
@@ -103,9 +117,7 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
               label="Third-party scripts"
               value={
                 <div className="flex flex-wrap gap-2">
-                  {htmlSecurity.externalScriptDomains.map((domain) => (
-                    <Badge key={domain} variant="outline">{domain}</Badge>
-                  ))}
+                  {htmlSecurity.externalScriptDomains.map((domain) => <TruncatedChip key={domain} value={domain} />)}
                 </div>
               }
             />
@@ -113,9 +125,7 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
               label="Third-party stylesheets"
               value={
                 <div className="flex flex-wrap gap-2">
-                  {htmlSecurity.externalStylesheetDomains.map((domain) => (
-                    <Badge key={domain} variant="outline">{domain}</Badge>
-                  ))}
+                  {htmlSecurity.externalStylesheetDomains.map((domain) => <TruncatedChip key={domain} value={domain} />)}
                 </div>
               }
             />
@@ -138,7 +148,7 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
                     <p className="mt-2">{signal.detail}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {signal.evidence.map((item) => (
-                        <Badge key={item} variant="outline">{item}</Badge>
+                        <TruncatedChip key={item} value={item} />
                       ))}
                     </div>
                   </div>

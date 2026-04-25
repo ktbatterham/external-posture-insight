@@ -24,12 +24,12 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Badge variant="secondary" className={statusStyles[securityTxt.status]}>
             {securityTxt.status}
           </Badge>
           {securityTxt.url ? (
-            <a href={securityTxt.url} target="_blank" rel="noreferrer" className="text-sm text-sky-700 underline">
+            <a href={securityTxt.url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-sm text-sky-700 underline" title={securityTxt.url}>
               {securityTxt.url}
             </a>
           ) : (
@@ -42,7 +42,7 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
             label="Contact"
             value={
               <div className="space-y-1 text-sm text-slate-700">
-                {securityTxt.contact.length ? securityTxt.contact.map((item) => <p key={item}>{item}</p>) : <p>Not listed</p>}
+                {securityTxt.contact.length ? securityTxt.contact.map((item) => <p key={item} className="break-words">{item}</p>) : <p>Not listed</p>}
               </div>
             }
           />
@@ -57,7 +57,7 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
             label="Policy"
             value={
               <div className="space-y-1 text-sm text-slate-700">
-                {securityTxt.policy.map((item) => <p key={item}>{item}</p>)}
+                {securityTxt.policy.map((item) => <p key={item} className="break-words">{item}</p>)}
               </div>
             }
           />
