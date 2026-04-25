@@ -1,7 +1,7 @@
 import { FormInput, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
+import { StatBox, StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { getDataCollectionSummary } from "@/lib/passiveSurface";
 import { HtmlSecurityInfo } from "@/types/analysis";
 
@@ -40,7 +40,7 @@ export const DataCollectionPanel = ({ htmlSecurity }: DataCollectionPanelProps) 
             value={
               <div className="flex flex-wrap gap-2">
                 {summary.externalForms.map((action) => (
-                  <Badge key={action} variant="outline">{action}</Badge>
+                  <TruncatedChip key={action} value={action} />
                 ))}
               </div>
             }

@@ -1,7 +1,6 @@
 import { KeyRound, ShieldAlert } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
+import { StatBox, StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { getAuthSurfaceSummary } from "@/lib/passiveSurface";
 import { HtmlSecurityInfo } from "@/types/analysis";
 
@@ -40,9 +39,7 @@ export const AuthSurfacePanel = ({ htmlSecurity }: AuthSurfacePanelProps) => {
             value={
               <div className="flex flex-wrap gap-2">
                 {summary.authPaths.map((item) => (
-                  <Badge key={item.path} variant="outline">
-                    {item.path} · {item.category}
-                  </Badge>
+                  <TruncatedChip key={item.path} value={`${item.path} · ${item.category}`} />
                 ))}
               </div>
             }

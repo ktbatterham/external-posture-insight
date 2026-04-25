@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusAlert } from "@/components/ui/panel-primitives";
+import { StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { HtmlSecurityInfo } from "@/types/analysis";
 import { Cpu, ShieldAlert } from "lucide-react";
 
@@ -34,9 +34,7 @@ export const ClientExposurePanel = ({ htmlSecurity }: ClientExposurePanelProps) 
             <p className="mt-3 text-sm text-slate-600">{signal.detail}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {signal.evidence.map((item) => (
-                <Badge key={item} variant="outline">
-                  {item}
-                </Badge>
+                <TruncatedChip key={item} value={item} />
               ))}
             </div>
           </div>

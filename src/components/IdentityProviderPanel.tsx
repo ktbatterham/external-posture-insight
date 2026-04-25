@@ -1,6 +1,6 @@
 import { Info, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SignalList, StatBox } from "@/components/ui/panel-primitives";
+import { SignalList, StatBox, TruncatedChip } from "@/components/ui/panel-primitives";
 import { IdentityProviderInfo } from "@/types/analysis";
 
 interface IdentityProviderPanelProps {
@@ -47,10 +47,10 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Observed endpoints</p>
             <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-              <p><span className="font-semibold text-slate-900">Issuer:</span> {identityProvider.issuer ?? "Not discovered"}</p>
-              <p><span className="font-semibold text-slate-900">Authorization:</span> {identityProvider.authorizationEndpoint ?? "Not discovered"}</p>
-              <p><span className="font-semibold text-slate-900">Token:</span> {identityProvider.tokenEndpoint ?? "Not discovered"}</p>
-              <p><span className="font-semibold text-slate-900">End session:</span> {identityProvider.endSessionEndpoint ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-slate-900">Issuer:</span> {identityProvider.issuer ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-slate-900">Authorization:</span> {identityProvider.authorizationEndpoint ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-slate-900">Token:</span> {identityProvider.tokenEndpoint ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-slate-900">End session:</span> {identityProvider.endSessionEndpoint ?? "Not discovered"}</p>
               <p><span className="font-semibold text-slate-900">Tenant brand:</span> {identityProvider.tenantBrand ?? "Not discovered"}</p>
               <p><span className="font-semibold text-slate-900">Tenant region:</span> {identityProvider.tenantRegion ?? "Not discovered"}</p>
             </div>
@@ -62,9 +62,9 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               {identityProvider.redirectOrigins.length > 0 && (
                 <div className="mb-3">
                   <p className="font-semibold text-slate-900">Redirect origins</p>
-                  <ul className="mt-2 space-y-1">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.redirectOrigins.map((origin) => (
-                      <li key={origin}>{origin}</li>
+                      <li key={origin}><TruncatedChip value={origin} /></li>
                     ))}
                   </ul>
                 </div>
@@ -72,9 +72,9 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               {identityProvider.authHostCandidates.length > 0 && (
                 <div className="mb-3">
                   <p className="font-semibold text-slate-900">Auth-like hosts</p>
-                  <ul className="mt-2 space-y-1">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.authHostCandidates.map((host) => (
-                      <li key={host}>{host}</li>
+                      <li key={host}><TruncatedChip value={host} /></li>
                     ))}
                   </ul>
                 </div>
@@ -82,9 +82,9 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               {identityProvider.loginPaths.length > 0 && (
                 <div className="mb-3">
                   <p className="font-semibold text-slate-900">Login-like paths</p>
-                  <ul className="mt-2 space-y-1">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.loginPaths.map((path) => (
-                      <li key={path}>{path}</li>
+                      <li key={path}><TruncatedChip value={path} /></li>
                     ))}
                   </ul>
                 </div>
@@ -92,9 +92,9 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               {identityProvider.wellKnownEndpoints.length > 0 && (
                 <div className="mb-3">
                   <p className="font-semibold text-slate-900">Well-known endpoints</p>
-                  <ul className="mt-2 space-y-1 break-all">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.wellKnownEndpoints.map((endpoint) => (
-                      <li key={endpoint}>{endpoint}</li>
+                      <li key={endpoint}><TruncatedChip value={endpoint} /></li>
                     ))}
                   </ul>
                 </div>
@@ -112,9 +112,9 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               {identityProvider.redirectUriSignals.length > 0 && (
                 <div>
                   <p className="font-semibold text-slate-900">Public redirect URI signals</p>
-                  <ul className="mt-2 space-y-1">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.redirectUriSignals.map((signal) => (
-                      <li key={signal}>{signal}</li>
+                      <li key={signal}><TruncatedChip value={signal} /></li>
                     ))}
                   </ul>
                 </div>

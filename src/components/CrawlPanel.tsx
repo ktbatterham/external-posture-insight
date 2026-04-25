@@ -73,12 +73,12 @@ export const CrawlPanel = ({ crawl }: CrawlPanelProps) => {
             return (
               <div key={`${page.path}-${page.label}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-slate-950">{page.label}</h3>
-                      <code className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{page.path}</code>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h3 className="shrink-0 font-semibold text-slate-950">{page.label}</h3>
+                      <code className="min-w-0 truncate rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600" title={page.path}>{page.path}</code>
                     </div>
-                    <p className="mt-2 text-sm text-slate-500">{page.finalUrl}</p>
+                    <p className="mt-2 truncate text-sm text-slate-500" title={page.finalUrl}>{page.finalUrl}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className={gradeStyles[page.grade] ?? gradeStyles.F}>

@@ -236,8 +236,8 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
           {history.map((snapshot) => (
             <div key={`${snapshot.scannedAt}-${snapshot.finalUrl}`} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">{snapshot.finalUrl}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950" title={snapshot.finalUrl}>{snapshot.finalUrl}</p>
                   <p className="text-xs text-slate-500">{new Date(snapshot.scannedAt).toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-2">

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 // ---------------------------------------------------------------------------
 // StatBox
@@ -172,4 +173,31 @@ export const CodeBlock = ({ children, className }: CodeBlockProps) => (
   <pre className={cn("overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100", className)}>
     <code>{children}</code>
   </pre>
+);
+
+// ---------------------------------------------------------------------------
+// TruncatedChip
+// Safe pill for domains, paths, URLs, and evidence strings that may be long.
+// ---------------------------------------------------------------------------
+
+interface TruncatedChipProps {
+  value: string;
+  className?: string;
+  maxWidthClassName?: string;
+  variant?: React.ComponentProps<typeof Badge>["variant"];
+}
+
+export const TruncatedChip = ({
+  value,
+  className,
+  maxWidthClassName = "max-w-[18rem]",
+  variant = "outline",
+}: TruncatedChipProps) => (
+  <Badge
+    variant={variant}
+    title={value}
+    className={cn("max-w-full truncate rounded-full px-3 py-1 text-left font-medium", className)}
+  >
+    <span className={cn("block truncate", maxWidthClassName)}>{value}</span>
+  </Badge>
 );

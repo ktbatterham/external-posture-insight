@@ -1,7 +1,7 @@
 import { Bot, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox, StatusAlert } from "@/components/ui/panel-primitives";
+import { StatBox, StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { getAiSurfaceClassificationSummary } from "@/lib/aiSurface";
 import { AiSurfaceInfo } from "@/types/analysis";
 
@@ -73,9 +73,7 @@ export const AiSurfacePanel = ({ aiSurface }: AiSurfacePanelProps) => {
             label="AI-related paths"
             value={
               <div className="flex flex-wrap gap-2">
-                {aiSurface.discoveredPaths.map((path) => (
-                  <Badge key={path} variant="outline">{path}</Badge>
-                ))}
+                {aiSurface.discoveredPaths.map((path) => <TruncatedChip key={path} value={path} />)}
               </div>
             }
           />

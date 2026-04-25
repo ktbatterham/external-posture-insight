@@ -1,6 +1,6 @@
 import { Info, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SignalList, StatBox } from "@/components/ui/panel-primitives";
+import { SignalList, StatBox, TruncatedChip } from "@/components/ui/panel-primitives";
 import { CtDiscoveryInfo } from "@/types/analysis";
 
 interface CtDiscoveryPanelProps {
@@ -43,11 +43,9 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
           <div className="rounded-2xl bg-slate-50 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Discovered hosts</p>
             {ctDiscovery.subdomains.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex max-h-56 flex-wrap gap-2 overflow-y-auto pr-1">
                 {ctDiscovery.subdomains.map((host) => (
-                  <span key={host} className="rounded-full bg-white px-3 py-1 text-sm text-slate-700 shadow-sm">
-                    {host}
-                  </span>
+                  <TruncatedChip key={host} value={host} variant="secondary" className="bg-white text-slate-700 shadow-sm" />
                 ))}
               </div>
             ) : (
@@ -77,8 +75,8 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
               <ul className="mt-3 space-y-3 text-sm text-slate-700">
                 {ctDiscovery.prioritizedHosts.slice(0, 8).map((host) => (
                   <li key={host.host} className="rounded-2xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-slate-900">{host.host}</span>
+                    <div className="flex min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0 truncate font-semibold text-slate-900" title={host.host}>{host.host}</span>
                       <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         {host.priority} {host.category}
                       </span>
@@ -98,8 +96,8 @@ export const CtDiscoveryPanel = ({ ctDiscovery }: CtDiscoveryPanelProps) => {
               <ul className="mt-3 space-y-3 text-sm text-slate-700">
                 {ctDiscovery.sampledHosts.map((host) => (
                   <li key={host.host} className="rounded-2xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-slate-900">{host.host}</span>
+                    <div className="flex min-w-0 items-center justify-between gap-3">
+                      <span className="min-w-0 truncate font-semibold text-slate-900" title={host.host}>{host.host}</span>
                       <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         {host.reachable ? `${host.statusCode} ${host.responseKind}` : "unreachable"}
                       </span>
