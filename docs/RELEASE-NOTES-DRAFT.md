@@ -2,6 +2,9 @@
 
 ## Highlights
 
+- Recalibrated the overall security grade so it reflects weighted posture areas, not just the older header/TLS/cookie hardening baseline.
+- Added passive infrastructure inference for likely cloud, CDN, edge, PaaS, and hosting providers.
+- Reduced scan burstiness with bounded concurrency across CT sampling, crawl checks, and OSV detail lookups.
 - Improved report clarity by making neutral-positive states read as strengths and reserving watch language for actionable items.
 - Tightened monitoring UX with clearer trend behavior when only one saved snapshot exists.
 - Expanded app-level test coverage with unit tests for posture scoring and priority-action ranking logic.
@@ -17,10 +20,23 @@
 
 ### Priority and scoring behavior
 
+- Weighted the headline grade across Edge Security, Content Security, Domain & Trust, Exposure Control, API Surface, Third-Party Trust, and AI & Automation so mixed targets no longer over-cluster around `B`.
+- Split Posture Summary into priority warnings, supporting watch items, and observed signals to avoid implying double-counting between normalized findings and contextual panel evidence.
 - Ensured weakest posture category is always represented in Priority Actions via a fallback rule.
 - Added unit tests for:
   - category scoring thresholds and clamping
   - priority action ordering and fallback behavior
+
+### Passive infrastructure read
+
+- Added an Infrastructure Read panel under Trust.
+- Infers likely provider context from DNS, reverse DNS, response headers, and detected technology evidence without adding active cloud enumeration.
+- Added core test coverage for provider inference.
+
+### Scanner execution behavior
+
+- Added bounded concurrency for Certificate Transparency host sampling, related-page crawl checks, and OSV vulnerability detail lookups.
+- Lazy-loaded HTML parsing internals so CLI/help and non-HTML package imports stay fast.
 
 ### Export behavior
 

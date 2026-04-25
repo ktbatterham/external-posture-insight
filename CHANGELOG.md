@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-04-25
+
+### Added
+
+- Added passive infrastructure inference to the Trust report, using DNS, reverse DNS, response headers, and detected stack evidence to identify likely cloud, CDN, edge, PaaS, or hosting providers.
+- Added deterministic core test coverage for passive infrastructure provider inference.
+
+### Changed
+
+- Recalibrated the overall grade around weighted posture areas instead of primarily header/TLS/cookie hardening, reducing the previous tendency for very different targets to cluster around `B`.
+- Separated Posture Summary counts into `Priority Warnings`, `Supporting Watch Items`, and `Observed Signals` so contextual panel evidence is not presented as double-counted warnings.
+- Reused a shared signal-list primitive across Identity Provider, Certificate Transparency, and WAF panels so neutral evidence no longer looks like a green strength.
+- Added bounded concurrency for CT host sampling, OSV vulnerability detail lookups, and related-page crawling to keep scans less bursty and more predictable.
+- Lazy-loaded Cheerio in the HTML analysis path so importing the core package is fast for CLI/help and non-HTML workflows.
+
+### Verified
+
+- `npm run build`
+- `npm run test:core`
+- `npm run test:app:unit`
+
 ## 2026-04-23
 
 ### Added
