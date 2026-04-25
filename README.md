@@ -2,8 +2,11 @@
 
 [![npm version](https://img.shields.io/npm/v/%40ktbatterham%2Fexternal-posture-core)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
 [![npm package](https://img.shields.io/badge/npm-package-red)](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-External Posture Insight is a low-noise external posture analysis app for public web targets. It inspects a target URL through a local Node API, follows redirects, reads response headers, evaluates TLS certificate details, parses `Set-Cookie` flags, and produces a layered report in the browser.
+External Posture Insight is a low-noise external posture analysis app for public web targets. It inspects a target URL through a local Node API, follows redirects, reads response headers, evaluates TLS certificate details, parses `Set-Cookie` flags, and produces a layered, client-ready report in the browser.
+
+It is built for passive-first posture review: the kind of quick external read you can run before noisy scanners, sales calls, supplier reviews, monitoring checks, or deeper authorized testing.
 
 ## Published package
 
@@ -12,6 +15,22 @@ The reusable scanner core is now published on npm:
 - [`@ktbatterham/external-posture-core`](https://www.npmjs.com/package/@ktbatterham/external-posture-core)
 
 This app consumes that core package locally from the workspace during development.
+
+CLI quick start:
+
+```sh
+npx @ktbatterham/external-posture-core scan example.com
+npx @ktbatterham/external-posture-core scan example.com --format markdown --output report.md
+npx @ktbatterham/external-posture-core scan example.com --format json --output report.json
+npx @ktbatterham/external-posture-core compare current-report.json previous-report.json
+```
+
+Global install with the short command:
+
+```sh
+npm install -g @ktbatterham/external-posture-core
+epi scan example.com
+```
 
 ## Release status
 
@@ -42,6 +61,26 @@ This app consumes that core package locally from the workspace during developmen
 - SARIF export for CI and security tooling ingestion
 - JSON, Markdown, and HTML report export
 - Recent scan history in the browser
+
+## What it can and cannot do
+
+External Posture Insight can:
+
+- highlight visible external hardening gaps across headers, TLS, cookies, DNS/mail posture, public trust signals, client-side exposure clues, CT-discovered hosts, and passive supply-chain signals
+- provide OWASP/MITRE-aligned context for findings without pretending every finding is an exploit
+- compare saved reports so regressions are visible over time
+- generate browser-based exports that are suitable for stakeholder review
+
+External Posture Insight cannot:
+
+- prove a site is secure
+- replace a penetration test, authenticated application review, SAST/DAST program, or formal compliance assessment
+- see controls hidden behind bot challenges, authentication, IP allowlists, or different browser/user-agent behavior
+- guarantee zero operational footprint; standard scans may perform DNS lookups, TLS handshakes, page fetches, public dataset lookups, and a small set of low-noise HTTP checks
+
+## Safety and authorization
+
+Use this only against systems you own or are authorized to assess. The tool is passive-first and intentionally conservative, but the author is not responsible for misuse, unauthorized scanning, operational impact, or decisions made from the output without appropriate validation.
 
 ## Stack
 

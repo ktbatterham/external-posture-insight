@@ -33,8 +33,10 @@ type ParsedArgs =
 const usage = `External Posture Insight CLI
 
 Usage:
-  external-posture-insight scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--quiet] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
-  external-posture-insight compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  epi scan <target...> [--format json|markdown|summary|sarif|ci-json] [--baseline <report.json>] [--output <file>] [--quiet] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  epi compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  external-posture-insight scan <target...> [...]
+  external-posture-insight compare <current-report.json> <baseline-report.json> [...]
   external-posture-insight --help
 
 Examples:
@@ -52,6 +54,11 @@ Examples:
   npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json
   npx @ktbatterham/external-posture-core compare current-report.json baseline-report.json --format sarif --fail-on critical
 `;
+
+process.once("SIGINT", () => {
+  process.stderr.write("\nScan interrupted. No temporary files were created by the CLI.\n");
+  process.exit(130);
+});
 
 const parseArgs = (argv: string[]): ParsedArgs => {
   const args = [...argv];
@@ -630,6 +637,30 @@ const renderComparisonOutput = (
   return `${formatComparisonSummary(current, baseline, diff)}\n`;
 };
 
+const shouldShowProgress = (parsed: Extract<ParsedArgs, { command: "scan" }>) =>
+  parsed.targets.length > 1
+  && parsed.format === "summary"
+  && !parsed.outputPath
+  && Boolean(process.stderr.isTTY);
+
+const scanTargets = async (parsed: Extract<ParsedArgs, { command: "scan" }>): Promise<AnalysisResult[]> => {
+  const analyses: AnalysisResult[] = [];
+  const showProgress = shouldShowProgress(parsed);
+
+  for (const [index, target] of parsed.targets.entries()) {
+    if (showProgress) {
+      process.stderr.write(`Scanning ${index + 1}/${parsed.targets.length}: ${target}\n`);
+    }
+    analyses.push(await analyzeUrl(target, { scanMode: parsed.quiet ? "quiet" : "standard" }));
+  }
+
+  if (showProgress) {
+    process.stderr.write(`Completed ${analyses.length}/${parsed.targets.length} scans.\n`);
+  }
+
+  return analyses;
+};
+
 const main = async () => {
   try {
     const parsed = parseArgs(process.argv.slice(2));
@@ -642,10 +673,7 @@ const main = async () => {
     let policyMessages: string[] = [];
 
     if (parsed.command === "scan") {
-      const analyses: AnalysisResult[] = [];
-      for (const target of parsed.targets) {
-        analyses.push(await analyzeUrl(target, { scanMode: parsed.quiet ? "quiet" : "standard" }));
-      }
+      const analyses = await scanTargets(parsed);
 
       if (analyses.length === 1) {
         const [analysis] = analyses;
