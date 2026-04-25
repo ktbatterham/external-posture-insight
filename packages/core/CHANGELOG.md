@@ -10,6 +10,7 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 - Added `analyzeInfrastructure()` for passive cloud/CDN/edge/hosting inference from DNS, reverse DNS, headers, and detected technology evidence.
 - Added `InfrastructureInfo` and related provider signal types to the public result model.
 - Added deterministic core test coverage for infrastructure provider inference.
+- Added quiet scan mode via `analyzeUrl(target, { scanMode: "quiet" })` and CLI `--quiet`.
 
 ### Changed
 - Recalibrated `analyzeUrl()` scoring around weighted posture areas so the overall grade reflects domain/trust, exposure, API, third-party, and AI posture alongside core hardening controls.

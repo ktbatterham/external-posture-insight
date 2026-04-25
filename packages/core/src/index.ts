@@ -47,6 +47,8 @@ import { headerValue, mapWithConcurrency, unique } from "./utils.js";
 import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type { AnalysisResult, AnalyzeTargetOptions, HtmlSecurityInfo } from "./types.js";
 
+type ScanMode = NonNullable<AnalyzeTargetOptions["scanMode"]>;
+
 function normalizeUrl(input) {
   let candidate = input.trim();
   if (!candidate) {
@@ -443,18 +445,103 @@ async function crawlRelatedPages(rootResult, discovery) {
   };
 }
 
-export async function analyzeUrl(input: string): Promise<AnalysisResult> {
+const emptyCrawlSummary = (sources: string[] = []) => ({
+  pages: [],
+  weakestPage: null,
+  strongestPage: null,
+  inconsistentHeaders: [],
+  discoverySources: sources,
+});
+
+const emptySecurityTxt = (finalUrl: URL) => ({
+  status: "missing" as const,
+  url: null,
+  contact: [],
+  expires: null,
+  policy: [],
+  acknowledgments: [],
+  encryption: [],
+  hiring: [],
+  preferredLanguages: [],
+  canonical: [],
+  raw: null,
+  issues: [],
+});
+
+const emptyIdentityProvider = () => ({
+  detected: false,
+  provider: null,
+  protocol: null,
+  redirectOrigins: [],
+  authHostCandidates: [],
+  loginPaths: [],
+  openIdConfigurationUrl: null,
+  wellKnownEndpoints: [],
+  issuer: null,
+  authorizationEndpoint: null,
+  tokenEndpoint: null,
+  endSessionEndpoint: null,
+  redirectUriSignals: [],
+  tenantBrand: null,
+  tenantRegion: null,
+  tenantSignals: [],
+  issues: [],
+  strengths: [],
+});
+
+const emptyExposure = () => ({
+  probes: [],
+  issues: [],
+  strengths: [],
+});
+
+const emptyCorsSecurity = () => ({
+  allowedOrigin: null,
+  allowCredentials: null,
+  allowMethods: [],
+  allowHeaders: [],
+  allowPrivateNetwork: null,
+  vary: null,
+  optionsStatus: 0,
+  issues: [],
+  strengths: [],
+});
+
+const emptyApiSurface = () => ({
+  probes: [],
+  issues: [],
+  strengths: [],
+});
+
+export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = {}): Promise<AnalysisResult> {
+  const scanMode: ScanMode = options.scanMode || "standard";
+  const pageAnalysisEnabled = scanMode === "standard";
   const result = await analyzeUrlCore(input, { includeCertificate: true });
   const finalUrl = new URL(result.finalUrl);
-  const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson, requestText);
+  const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson, requestText, {
+    sampleHosts: pageAnalysisEnabled,
+  });
   let htmlDocument = null;
-  try {
-    htmlDocument = await fetchHtmlDocument(finalUrl);
-  } catch {
-    htmlDocument = null;
+  if (pageAnalysisEnabled) {
+    try {
+      htmlDocument = await fetchHtmlDocument(finalUrl);
+    } catch {
+      htmlDocument = null;
+    }
   }
-  const baseHtmlSecurity = analyzeHtmlSecurity(finalUrl, htmlDocument);
-  const libraryRiskSignals = await fetchLibraryRiskSignals(baseHtmlSecurity.libraryFingerprints);
+  const baseHtmlSecurity = pageAnalysisEnabled
+    ? analyzeHtmlSecurity(finalUrl, htmlDocument)
+    : {
+        ...analyzeHtmlSecurity(finalUrl, null),
+        issues: [],
+        aiSurface: {
+          ...analyzeHtmlSecurity(finalUrl, null).aiSurface,
+          issues: [],
+        },
+      };
+  const libraryRiskSignals = pageAnalysisEnabled
+    ? await fetchLibraryRiskSignals(baseHtmlSecurity.libraryFingerprints)
+    : [];
   const htmlSecurity = {
     ...baseHtmlSecurity,
     libraryRiskSignals,
@@ -470,20 +557,24 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
         ? [...baseHtmlSecurity.strengths, "No OSV advisory matches were found for the explicitly versioned client libraries detected on the fetched page."]
         : baseHtmlSecurity.strengths,
   };
-  const discovery = await collectDiscoveryPaths(finalUrl, htmlSecurity);
+  const discovery = pageAnalysisEnabled
+    ? await collectDiscoveryPaths(finalUrl, htmlSecurity)
+    : { paths: [], sources: ["quiet mode"] };
   const publicSignals = await fetchPublicSignals(result.host, { requestText });
   const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
   const technologies = mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies);
   const infrastructure = await analyzeInfrastructure(finalUrl, result.rawHeaders, technologies);
   const ctDiscovery = await ctDiscoveryPromise;
-  const identityProvider = await analyzeIdentityProvider(
-    finalUrl,
-    result.redirects,
-    htmlSecurity,
-    htmlDocument?.html || null,
-    requestJson,
-    ctDiscovery,
-  );
+  const identityProvider = pageAnalysisEnabled
+    ? await analyzeIdentityProvider(
+        finalUrl,
+        result.redirects,
+        htmlSecurity,
+        htmlDocument?.html || null,
+        requestJson,
+        ctDiscovery,
+      )
+    : emptyIdentityProvider();
   const wafFingerprint = analyzeWafFingerprint(
     finalUrl,
     result.rawHeaders,
@@ -499,8 +590,8 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     ...result,
     issues: [...result.issues, ...buildLibraryRiskIssues(libraryRiskSignals).map(classifyIssueTaxonomy)],
     technologies,
-    crawl: await crawlRelatedPages(result, discovery),
-    securityTxt: await fetchSecurityTxt(finalUrl, requestText),
+    crawl: pageAnalysisEnabled ? await crawlRelatedPages(result, discovery) : emptyCrawlSummary(discovery.sources),
+    securityTxt: pageAnalysisEnabled ? await fetchSecurityTxt(finalUrl, requestText) : emptySecurityTxt(finalUrl),
     domainSecurity: await analyzeDomainSecurity(result.host, requestText),
     identityProvider,
     ctDiscovery,
@@ -509,27 +600,33 @@ export async function analyzeUrl(input: string): Promise<AnalysisResult> {
     thirdPartyTrust,
     infrastructure,
     wafFingerprint,
-    exposure: await analyzeExposure(finalUrl, {
-      exposureProbes: EXPOSURE_PROBES,
-      requestOnce,
-      requestText,
-      fetchWithRedirects,
-      headerValue,
-      formatErrorMessage,
-      isAccessDeniedHtml,
-    }),
-    corsSecurity: await analyzeCorsSecurity(finalUrl, result.rawHeaders, {
-      requestWithHeaders,
-      headerValue,
-    }),
-    apiSurface: await analyzeApiSurface(finalUrl, htmlDocument, {
-      apiSurfaceProbes: API_SURFACE_PROBES,
-      requestText,
-      fetchWithRedirects,
-      headerValue,
-      isAccessDeniedHtml,
-      classifyHtmlApiFallback,
-    }),
+    exposure: pageAnalysisEnabled
+      ? await analyzeExposure(finalUrl, {
+          exposureProbes: EXPOSURE_PROBES,
+          requestOnce,
+          requestText,
+          fetchWithRedirects,
+          headerValue,
+          formatErrorMessage,
+          isAccessDeniedHtml,
+        })
+      : emptyExposure(),
+    corsSecurity: pageAnalysisEnabled
+      ? await analyzeCorsSecurity(finalUrl, result.rawHeaders, {
+          requestWithHeaders,
+          headerValue,
+        })
+      : emptyCorsSecurity(),
+    apiSurface: pageAnalysisEnabled
+      ? await analyzeApiSurface(finalUrl, htmlDocument, {
+          apiSurfaceProbes: API_SURFACE_PROBES,
+          requestText,
+          fetchWithRedirects,
+          headerValue,
+          isAccessDeniedHtml,
+          classifyHtmlApiFallback,
+        })
+      : emptyApiSurface(),
     publicSignals,
     assessmentLimitation,
   };

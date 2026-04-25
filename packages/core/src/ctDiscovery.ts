@@ -316,7 +316,9 @@ export const fetchCtDiscovery = async (
   host: string,
   requestJson: RequestJsonFn,
   requestText: RequestTextFn,
+  options: { sampleHosts?: boolean } = {},
 ): Promise<CtDiscoveryInfo> => {
+  const { sampleHosts = true } = options;
   const queriedDomain = toDiscoveryDomain(host);
   const cached = ctCache.get(queriedDomain);
   if (cached && cached.expiresAt > Date.now()) {
@@ -350,12 +352,12 @@ export const fetchCtDiscovery = async (
     ).slice(0, CT_SUBDOMAIN_LIMIT);
 
     const prioritizedHosts = rankHosts(subdomains);
-    const sampledHosts = await observeSampledHosts(prioritizedHosts, requestText);
+    const sampledHosts = sampleHosts ? await observeSampledHosts(prioritizedHosts, requestText) : [];
     const authCount = prioritizedHosts.filter((entry) => entry.category === "auth").length;
     const edgeHits = sampledHosts.filter((entry) => entry.edgeProvider).length;
     const takeoverHits = sampledHosts.filter((entry) => entry.suspectedTakeover);
     const coverageSummary = subdomains.length
-      ? `CT logs surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} for ${queriedDomain}; ${prioritizedHosts.filter((entry) => entry.priority === "high").length} look high-priority and ${sampledHosts.length} were lightly sampled.`
+      ? `CT logs surfaced ${subdomains.length} subdomain${subdomains.length === 1 ? "" : "s"} for ${queriedDomain}; ${prioritizedHosts.filter((entry) => entry.priority === "high").length} look high-priority${sampleHosts ? ` and ${sampledHosts.length} were lightly sampled` : ""}.`
       : `CT logs did not surface distinct subdomains for ${queriedDomain}.`;
 
     const value: CtDiscoveryInfo = {

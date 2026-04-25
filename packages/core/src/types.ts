@@ -525,4 +525,5 @@ export interface AnalysisResult {
 
 export interface AnalyzeTargetOptions {
   includeCertificate?: boolean;
+  scanMode?: "standard" | "quiet";
 }

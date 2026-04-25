@@ -5,6 +5,7 @@
 - Recalibrated the overall security grade so it reflects weighted posture areas, not just the older header/TLS/cookie hardening baseline.
 - Added passive infrastructure inference for likely cloud, CDN, edge, PaaS, and hosting providers.
 - Reduced scan burstiness with bounded concurrency across CT sampling, crawl checks, and OSV detail lookups.
+- Added quiet scan mode for lower-noise CLI/API use cases where page-content enrichment is not required.
 - Improved report clarity by making neutral-positive states read as strengths and reserving watch language for actionable items.
 - Tightened monitoring UX with clearer trend behavior when only one saved snapshot exists.
 - Expanded app-level test coverage with unit tests for posture scoring and priority-action ranking logic.
@@ -36,6 +37,7 @@
 ### Scanner execution behavior
 
 - Added bounded concurrency for Certificate Transparency host sampling, related-page crawl checks, and OSV vulnerability detail lookups.
+- Added `--quiet` CLI mode and `mode=quiet` API support to keep scans to core transport, header, DNS, CT, HSTS preload, and infrastructure reads while skipping deeper page-content/crawl/probe enrichment.
 - Lazy-loaded HTML parsing internals so CLI/help and non-HTML package imports stay fast.
 
 ### Export behavior

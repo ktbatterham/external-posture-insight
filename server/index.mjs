@@ -448,7 +448,8 @@ const server = http.createServer(async (request, response) => {
         requesterScope,
         target: validatedTarget.toString(),
       });
-      const result = await analyzeUrl(validatedTarget.toString());
+      const mode = requestUrl.searchParams.get("mode") === "quiet" ? "quiet" : "standard";
+      const result = await analyzeUrl(validatedTarget.toString(), { scanMode: mode });
       sendJson(response, 200, result);
     } catch (error) {
       log("warn", "analysis_failed", {
