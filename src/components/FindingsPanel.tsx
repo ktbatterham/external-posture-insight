@@ -16,9 +16,9 @@ const issueVariants = {
 } as const;
 
 const confidenceStyles = {
-  high: "bg-slate-200 text-slate-800",
-  medium: "bg-amber-100 text-amber-900",
-  low: "bg-sky-100 text-sky-900",
+  high: "bg-white/[0.12] text-slate-100",
+  medium: "bg-[#b56a2c]/14 text-[#f0d5bc]",
+  low: "bg-[#4f6676]/14 text-[#d6e5ec]",
 } as const;
 
 export const FindingsPanel = ({ issues, strengths }: FindingsPanelProps) => {
@@ -32,7 +32,7 @@ export const FindingsPanel = ({ issues, strengths }: FindingsPanelProps) => {
   });
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle>Top Findings</CardTitle>
       </CardHeader>

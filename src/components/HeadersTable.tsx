@@ -8,9 +8,9 @@ interface HeadersTableProps {
 }
 
 const statusStyles: Record<SecurityHeaderResult["status"], string> = {
-  present: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  warning: "bg-amber-100 text-amber-900 border-amber-200",
-  missing: "bg-rose-100 text-rose-800 border-rose-200",
+  present: "border-white/10 bg-white/[0.08] text-slate-100",
+  warning: "border-[#b56a2c]/35 bg-[#b56a2c]/14 text-[#f0d5bc]",
+  missing: "border-[#8e5c3b]/35 bg-[#8e5c3b]/14 text-[#f0d5bc]",
 };
 
 const statusIcons = {
@@ -24,18 +24,18 @@ export const HeadersTable = ({ headers }: HeadersTableProps) => {
     <div className="space-y-4">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[220px]">Header</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead>Value</TableHead>
+          <TableRow className="border-white/10 hover:bg-transparent">
+            <TableHead className="w-[220px] text-slate-400">Header</TableHead>
+            <TableHead className="w-[120px] text-slate-400">Status</TableHead>
+            <TableHead className="text-slate-400">Value</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {headers.map((header) => (
-            <TableRow key={header.key} className="align-top">
+            <TableRow key={header.key} className="align-top border-white/10 hover:bg-white/[0.02]">
               <TableCell className="space-y-1">
-                <div className="font-medium text-slate-950">{header.label}</div>
-                <p className="text-xs text-slate-500">{header.description}</p>
+                <div className="font-medium text-slate-100">{header.label}</div>
+                <p className="text-xs text-slate-400">{header.description}</p>
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={`gap-1 ${statusStyles[header.status]}`}>
@@ -44,12 +44,12 @@ export const HeadersTable = ({ headers }: HeadersTableProps) => {
                 </Badge>
               </TableCell>
               <TableCell className="space-y-2">
-                <code className="block rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-700">
+                <code className="block rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2 text-xs text-slate-200">
                   {header.value ?? "Not returned by the origin"}
                 </code>
-                <p className="text-xs text-slate-500">{header.summary}</p>
+                <p className="text-xs text-slate-400">{header.summary}</p>
                 {header.status !== "present" && (
-                  <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <div className="flex gap-2 rounded-xl border border-[#b56a2c]/35 bg-[#b56a2c]/12 px-3 py-2 text-xs text-[#f0d5bc]">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>{header.recommendation}</span>
                   </div>

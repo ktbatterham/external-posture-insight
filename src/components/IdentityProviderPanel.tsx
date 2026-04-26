@@ -23,15 +23,15 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
   ];
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>Identity Provider</CardTitle>
-          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
+          <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
             {identityProvider.detected ? "Detected" : "Not detected"}
           </div>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-400">
           Passive OAuth and OIDC exposure signals from redirects, login paths, and public well-known endpoints.
         </p>
       </CardHeader>
@@ -45,23 +45,23 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
 
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Observed endpoints</p>
-            <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-              <p className="break-words"><span className="font-semibold text-slate-900">Issuer:</span> {identityProvider.issuer ?? "Not discovered"}</p>
-              <p className="break-words"><span className="font-semibold text-slate-900">Authorization:</span> {identityProvider.authorizationEndpoint ?? "Not discovered"}</p>
-              <p className="break-words"><span className="font-semibold text-slate-900">Token:</span> {identityProvider.tokenEndpoint ?? "Not discovered"}</p>
-              <p className="break-words"><span className="font-semibold text-slate-900">End session:</span> {identityProvider.endSessionEndpoint ?? "Not discovered"}</p>
-              <p><span className="font-semibold text-slate-900">Tenant brand:</span> {identityProvider.tenantBrand ?? "Not discovered"}</p>
-              <p><span className="font-semibold text-slate-900">Tenant region:</span> {identityProvider.tenantRegion ?? "Not discovered"}</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Observed endpoints</p>
+            <div className="space-y-2 rounded-[1.25rem] border border-white/10 bg-slate-950/45 p-4 text-sm text-slate-300">
+              <p className="break-words"><span className="font-semibold text-white">Issuer:</span> {identityProvider.issuer ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-white">Authorization:</span> {identityProvider.authorizationEndpoint ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-white">Token:</span> {identityProvider.tokenEndpoint ?? "Not discovered"}</p>
+              <p className="break-words"><span className="font-semibold text-white">End session:</span> {identityProvider.endSessionEndpoint ?? "Not discovered"}</p>
+              <p><span className="font-semibold text-white">Tenant brand:</span> {identityProvider.tenantBrand ?? "Not discovered"}</p>
+              <p><span className="font-semibold text-white">Tenant region:</span> {identityProvider.tenantRegion ?? "Not discovered"}</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Discovery</p>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Discovery</p>
+            <div className="rounded-[1.25rem] border border-white/10 bg-slate-950/45 p-4 text-sm text-slate-300">
               {identityProvider.redirectOrigins.length > 0 && (
                 <div className="mb-3">
-                  <p className="font-semibold text-slate-900">Redirect origins</p>
+                  <p className="font-semibold text-white">Redirect origins</p>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.redirectOrigins.map((origin) => (
                       <li key={origin}><TruncatedChip value={origin} /></li>
@@ -71,7 +71,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               )}
               {identityProvider.authHostCandidates.length > 0 && (
                 <div className="mb-3">
-                  <p className="font-semibold text-slate-900">Auth-like hosts</p>
+                  <p className="font-semibold text-white">Auth-like hosts</p>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.authHostCandidates.map((host) => (
                       <li key={host}><TruncatedChip value={host} /></li>
@@ -81,7 +81,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               )}
               {identityProvider.loginPaths.length > 0 && (
                 <div className="mb-3">
-                  <p className="font-semibold text-slate-900">Login-like paths</p>
+                  <p className="font-semibold text-white">Login-like paths</p>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.loginPaths.map((path) => (
                       <li key={path}><TruncatedChip value={path} /></li>
@@ -91,7 +91,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               )}
               {identityProvider.wellKnownEndpoints.length > 0 && (
                 <div className="mb-3">
-                  <p className="font-semibold text-slate-900">Well-known endpoints</p>
+                  <p className="font-semibold text-white">Well-known endpoints</p>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.wellKnownEndpoints.map((endpoint) => (
                       <li key={endpoint}><TruncatedChip value={endpoint} /></li>
@@ -101,7 +101,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               )}
               {identityProvider.tenantSignals.length > 0 && (
                 <div>
-                  <p className="font-semibold text-slate-900">Tenant clues</p>
+                  <p className="font-semibold text-white">Tenant clues</p>
                   <ul className="mt-2 space-y-1">
                     {identityProvider.tenantSignals.map((signal) => (
                       <li key={signal}>{signal}</li>
@@ -111,7 +111,7 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
               )}
               {identityProvider.redirectUriSignals.length > 0 && (
                 <div>
-                  <p className="font-semibold text-slate-900">Public redirect URI signals</p>
+                  <p className="font-semibold text-white">Public redirect URI signals</p>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {identityProvider.redirectUriSignals.map((signal) => (
                       <li key={signal}><TruncatedChip value={signal} /></li>
@@ -135,9 +135,9 @@ export const IdentityProviderPanel = ({ identityProvider }: IdentityProviderPane
             variant={hasPositiveEvidence ? "success" : "neutral"}
           />
           {reviewItems.length ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Watch points</p>
-              <ul className="mt-3 space-y-2 text-sm text-amber-900">
+            <div className="rounded-[1.25rem] border border-amber-400/30 bg-amber-400/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">Watch points</p>
+              <ul className="mt-3 space-y-2 text-sm text-amber-50">
                 {reviewItems.map((item) => (
                   <li key={item} className="flex gap-2">
                     <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />

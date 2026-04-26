@@ -71,7 +71,7 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
   }
 
   return (
-    <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
+    <Card className="rounded-[1.75rem] border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2">
           <BellRing className="h-5 w-5" />
@@ -80,13 +80,13 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
       </CardHeader>
       <CardContent className="space-y-4">
         {scoreSeries.length >= 2 ? (
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
+          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.55)]">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score trend (last {scoreSeries.length} scans)</p>
-              <div className="flex items-center gap-1 text-sm font-semibold text-slate-700">
-                {trendDirection === "up" ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : null}
-                {trendDirection === "down" ? <TrendingDown className="h-4 w-4 text-rose-600" /> : null}
-                {trendDirection === "flat" ? <Minus className="h-4 w-4 text-slate-500" /> : null}
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Score trend (last {scoreSeries.length} scans)</p>
+              <div className="flex items-center gap-1 text-sm font-semibold text-slate-200">
+                {trendDirection === "up" ? <TrendingUp className="h-4 w-4 text-[#e0b286]" /> : null}
+                {trendDirection === "down" ? <TrendingDown className="h-4 w-4 text-[#c78455]" /> : null}
+                {trendDirection === "flat" ? <Minus className="h-4 w-4 text-slate-400" /> : null}
                 <span>
                   {trendDirection === "up" ? "Improving" : trendDirection === "down" ? "Degrading" : "Stable"}
                 </span>
@@ -101,20 +101,20 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
               >
                 <polyline
                   fill="none"
-                  stroke={trendDirection === "down" ? "#e11d48" : trendDirection === "up" ? "#059669" : "#64748b"}
+                  stroke={trendDirection === "down" ? "#c78455" : trendDirection === "up" ? "#e0b286" : "#64748b"}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   points={sparklinePoints}
                 />
               </svg>
-              <p className="text-sm font-semibold text-slate-700">
+              <p className="text-sm font-semibold text-slate-200">
                 {trendDelta > 0 ? "+" : ""}
                 {trendDelta} over window
               </p>
             </div>
             {areaDeltas.length ? (
-              <div className="mt-3 border-t border-white/80 pt-3 text-xs text-slate-600">
+              <div className="mt-3 border-t border-white/10 pt-3 text-xs text-slate-400">
                 {areaDeltas.map((item) => (
                   <p key={item.label}>
                     {item.label}: {item.delta > 0 ? "+" : ""}
@@ -125,9 +125,9 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
             ) : null}
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score trend</p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
+          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.55)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Score trend</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
               {scoreSeries.length === 1
                 ? "One saved scan recorded. Trend will appear after the next scan."
                 : "Trend will appear after at least two saved scans for this target."}

@@ -17,7 +17,7 @@ export const DataCollectionPanel = ({ htmlSecurity }: DataCollectionPanelProps) 
   }
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FormInput className="h-5 w-5" />
@@ -25,7 +25,7 @@ export const DataCollectionPanel = ({ htmlSecurity }: DataCollectionPanelProps) 
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <p className="text-sm leading-6 text-slate-600">{summary.summary}</p>
+        <p className="text-sm leading-6 text-slate-300">{summary.summary}</p>
 
         <div className="grid gap-4 md:grid-cols-4">
           <StatBox label="Public forms" value={<p className="text-2xl font-semibold">{summary.totalForms}</p>} />

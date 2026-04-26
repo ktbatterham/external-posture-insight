@@ -10,16 +10,16 @@ interface ExposurePanelProps {
 }
 
 const findingStyles = {
-  safe: "bg-emerald-100 text-emerald-900",
-  interesting: "bg-amber-100 text-amber-900",
-  blocked: "bg-slate-200 text-slate-900",
-  exposed: "bg-rose-100 text-rose-900",
-  error: "bg-orange-100 text-orange-900",
+  safe: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  interesting: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
+  blocked: "bg-white/[0.08] text-slate-100",
+  exposed: "bg-[#b56a2c]/16 text-[#f0d5bc]",
+  error: "bg-[#b56a2c]/18 text-[#f0d5bc]",
 } as const;
 
 export const ExposurePanel = ({ exposure }: ExposurePanelProps) => {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FolderSearch className="h-5 w-5" />
@@ -31,24 +31,24 @@ export const ExposurePanel = ({ exposure }: ExposurePanelProps) => {
           {exposure.probes.map((probe) => {
             const status = probe.statusCode ? getHttpStatusDetails(probe.statusCode) : null;
             return (
-              <div key={probe.path} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={probe.path} className="rounded-[1.25rem] border border-white/10 bg-white/[0.04] p-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-950">{probe.label}</p>
-                    <p className="truncate text-sm text-slate-500" title={probe.path}>{probe.path}</p>
+                    <p className="font-semibold text-slate-50">{probe.label}</p>
+                    <p className="truncate text-sm text-slate-400" title={probe.path}>{probe.path}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className={findingStyles[probe.finding]}>
                       {probe.finding}
                     </Badge>
-                    <span className="text-sm font-semibold text-slate-700">
+                    <span className="text-sm font-semibold text-slate-200">
                       {probe.statusCode ? `${probe.statusCode} ${status?.label}` : "n/a"}
                     </span>
                   </div>
                 </div>
-                <p className="mt-3 text-sm text-slate-600">{probe.detail}</p>
+                <p className="mt-3 text-sm text-slate-300">{probe.detail}</p>
                 {status ? (
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
                     {status.meaning}
                   </p>
                 ) : null}

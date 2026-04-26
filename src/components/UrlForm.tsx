@@ -34,25 +34,29 @@ export const UrlForm = ({ onSubmit, isLoading, initialValue = "" }: UrlFormProps
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full rounded-[2rem] border border-slate-200 bg-white/90 p-3 shadow-xl shadow-slate-200/40 backdrop-blur"
+      className="w-full rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-2 shadow-2xl shadow-black/20 backdrop-blur"
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="flex flex-1 items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3">
-          <Globe className="h-5 w-5 text-slate-400" />
+        <div className="flex flex-1 items-center gap-3 rounded-[1.25rem] border border-white/10 bg-slate-950/60 px-4 py-3">
+          <Globe className="h-5 w-5 text-[#d89a63]" />
           <Input
             type="text"
             placeholder="example.com"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            className="border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
+            className="border-0 bg-transparent px-0 text-base text-slate-50 shadow-none placeholder:text-slate-500 focus-visible:ring-0"
           />
         </div>
-        <Button type="submit" disabled={isLoading} className="h-12 rounded-2xl px-6 text-sm font-semibold">
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="h-12 rounded-[1.25rem] bg-[#b56a2c] px-6 text-sm font-semibold text-[#f8efe7] shadow-lg shadow-[#2f1d12]/30 hover:bg-[#c07a3f]"
+        >
           <Search className="mr-2 h-4 w-4" />
           {isLoading ? "Scanning..." : "Run Scan"}
         </Button>
       </div>
-      <p className="px-2 pt-3 text-sm text-slate-500">
+      <p className="px-2 pt-3 text-sm text-slate-400">
         Enter a domain or full URL. If you omit the scheme, the scanner will try HTTPS automatically.
       </p>
     </form>

@@ -8,11 +8,11 @@ interface PublicSignalsPanelProps {
 }
 
 const statusStyles = {
-  preloaded: "bg-emerald-100 text-emerald-900",
-  pending: "bg-sky-100 text-sky-900",
-  eligible: "bg-amber-100 text-amber-900",
-  not_preloaded: "bg-slate-200 text-slate-800",
-  unknown: "bg-slate-200 text-slate-800",
+  preloaded: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  pending: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  eligible: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
+  not_preloaded: "bg-white/[0.08] text-slate-200",
+  unknown: "bg-white/[0.08] text-slate-200",
 } as const;
 
 const formatStatus = (status: PublicSignalsInfo["hstsPreload"]["status"]) =>
@@ -23,7 +23,7 @@ const formatStatus = (status: PublicSignalsInfo["hstsPreload"]["status"]) =>
 
 export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) => {
   return (
-    <Card className="h-full border-slate-200 shadow-sm">
+    <Card className="h-full border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Radar className="h-5 w-5" />
@@ -31,19 +31,19 @@ export const PublicSignalsPanel = ({ publicSignals }: PublicSignalsPanelProps) =
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
+        <div className="min-w-0 rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">HSTS preload dataset</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">HSTS preload dataset</p>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[publicSignals.hstsPreload.status]}`}>
               {formatStatus(publicSignals.hstsPreload.status)}
             </span>
           </div>
-          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-slate-700">{publicSignals.hstsPreload.summary}</p>
+          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-slate-200">{publicSignals.hstsPreload.summary}</p>
           <a
             href={publicSignals.hstsPreload.sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex text-sm font-medium text-sky-700 hover:text-sky-900"
+            className="mt-3 inline-flex text-sm font-medium text-[#e0b286] hover:text-[#f0d5bc]"
           >
             Open dataset reference
           </a>

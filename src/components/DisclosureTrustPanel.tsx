@@ -13,7 +13,7 @@ export const DisclosureTrustPanel = ({ analysis }: DisclosureTrustPanelProps) =>
   const disclosure = getDisclosurePosture(analysis);
 
   return (
-    <Card className="h-full border-slate-200 shadow-sm">
+    <Card className="h-full border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileCheck2 className="h-5 w-5" />
@@ -21,9 +21,9 @@ export const DisclosureTrustPanel = ({ analysis }: DisclosureTrustPanelProps) =>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="min-w-0 rounded-2xl bg-slate-50 p-5">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Public-facing read</p>
-          <p className="mt-3 overflow-hidden break-words text-sm leading-7 text-slate-800">{disclosure.summary}</p>
+        <div className="min-w-0 rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Public-facing read</p>
+          <p className="mt-3 overflow-hidden break-words text-sm leading-7 text-slate-200">{disclosure.summary}</p>
         </div>
 
         <StatBox
@@ -37,7 +37,7 @@ export const DisclosureTrustPanel = ({ analysis }: DisclosureTrustPanelProps) =>
                   </Badge>
                 ))
               ) : (
-                <span className="text-sm leading-6 text-slate-500">No obvious policy, trust, or contact pages were discovered passively.</span>
+                <span className="text-sm leading-6 text-slate-400">No obvious policy, trust, or contact pages were discovered passively.</span>
               )}
             </div>
           }

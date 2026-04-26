@@ -9,14 +9,14 @@ interface SecurityTxtPanelProps {
 }
 
 const statusStyles: Record<SecurityTxtInfo["status"], string> = {
-  present: "bg-emerald-100 text-emerald-900",
-  invalid: "bg-amber-100 text-amber-900",
-  missing: "bg-rose-100 text-rose-900",
+  present: "bg-white/[0.08] text-slate-100",
+  invalid: "bg-[#b56a2c]/14 text-[#f0d5bc]",
+  missing: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
 };
 
 export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileSearch className="h-5 w-5" />
@@ -29,11 +29,11 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
             {securityTxt.status}
           </Badge>
           {securityTxt.url ? (
-            <a href={securityTxt.url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-sm text-sky-700 underline" title={securityTxt.url}>
+            <a href={securityTxt.url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-sm text-[#e0b286] underline" title={securityTxt.url}>
               {securityTxt.url}
             </a>
           ) : (
-            <span className="text-sm text-slate-500">No file discovered</span>
+            <span className="text-sm text-slate-400">No file discovered</span>
           )}
         </div>
 
@@ -41,14 +41,14 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
           <StatBox
             label="Contact"
             value={
-              <div className="space-y-1 text-sm text-slate-700">
-                {securityTxt.contact.length ? securityTxt.contact.map((item) => <p key={item} className="break-words">{item}</p>) : <p>Not listed</p>}
+              <div className="space-y-1 text-sm text-slate-200">
+                {securityTxt.contact.length ? securityTxt.contact.map((item) => <p key={item} className="break-words text-slate-200">{item}</p>) : <p className="text-slate-400">Not listed</p>}
               </div>
             }
           />
           <StatBox
             label="Expires"
-            value={<p className="text-sm text-slate-700">{securityTxt.expires ?? "Not listed"}</p>}
+            value={<p className="text-sm text-slate-200">{securityTxt.expires ?? "Not listed"}</p>}
           />
         </div>
 
@@ -56,8 +56,8 @@ export const SecurityTxtPanel = ({ securityTxt }: SecurityTxtPanelProps) => {
           <StatBox
             label="Policy"
             value={
-              <div className="space-y-1 text-sm text-slate-700">
-                {securityTxt.policy.map((item) => <p key={item} className="break-words">{item}</p>)}
+              <div className="space-y-1 text-sm text-slate-200">
+                {securityTxt.policy.map((item) => <p key={item} className="break-words text-slate-200">{item}</p>)}
               </div>
             }
           />

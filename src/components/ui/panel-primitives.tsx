@@ -10,24 +10,24 @@ type StatBoxVariant = "default" | "critical" | "warning" | "info";
 
 const statBoxVariants: Record<StatBoxVariant, { container: string; label: string; value: string }> = {
   default: {
-    container: "border-slate-200/80 bg-slate-50/85",
-    label: "text-slate-500",
-    value: "text-slate-950",
+    container: "border-white/10 bg-white/[0.04]",
+    label: "text-slate-400",
+    value: "text-white",
   },
   critical: {
-    container: "border-rose-200/80 bg-rose-50/85",
-    label: "text-rose-700",
-    value: "text-rose-900",
+    container: "border-[#b56a2c]/35 bg-[#b56a2c]/12",
+    label: "text-[#d89a63]",
+    value: "text-[#f4dfcd]",
   },
   warning: {
-    container: "border-amber-200/80 bg-amber-50/85",
-    label: "text-amber-700",
-    value: "text-amber-900",
+    container: "border-[#9b774f]/30 bg-[#9b774f]/10",
+    label: "text-[#d9b488]",
+    value: "text-[#f0dfcf]",
   },
   info: {
-    container: "border-sky-200/80 bg-sky-50/85",
-    label: "text-sky-700",
-    value: "text-sky-900",
+    container: "border-[#4f6676]/35 bg-[#4f6676]/12",
+    label: "text-[#bcd4de]",
+    value: "text-[#ebf2f5]",
   },
 };
 
@@ -44,14 +44,14 @@ export const StatBox = ({ label, value, note, variant = "default", className }: 
   return (
     <div
       className={cn(
-        "rounded-2xl border p-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.3),0_1px_0_rgba(255,255,255,0.55)_inset]",
+        "rounded-[1.35rem] border p-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.55),0_1px_0_rgba(255,255,255,0.04)_inset]",
         v.container,
         className,
       )}
     >
       <p className={cn("text-xs uppercase tracking-[0.18em]", v.label)}>{label}</p>
       <div className={cn("mt-2", v.value)}>{value}</div>
-      {note && <div className="mt-1">{note}</div>}
+      {note && <div className="mt-1 text-slate-400">{note}</div>}
     </div>
   );
 };
@@ -64,10 +64,10 @@ export const StatBox = ({ label, value, note, variant = "default", className }: 
 type StatusAlertVariant = "success" | "warning" | "critical" | "info";
 
 const statusAlertVariants: Record<StatusAlertVariant, string> = {
-  success: "border-emerald-200/80 bg-emerald-50/85 text-emerald-900",
-  warning: "border-amber-200/80 bg-amber-50/85 text-amber-900",
-  critical: "border-rose-200/80 bg-rose-50/85 text-rose-900",
-  info: "border-sky-200/80 bg-sky-50/85 text-sky-900",
+  success: "border-[#4f6676]/35 bg-[#4f6676]/12 text-[#edf3f6]",
+  warning: "border-[#b56a2c]/35 bg-[#b56a2c]/12 text-[#f4dfcd]",
+  critical: "border-[#b56a2c]/45 bg-[#3a2a20] text-[#f4dfcd]",
+  info: "border-white/10 bg-white/[0.04] text-slate-100",
 };
 
 interface StatusAlertProps {
@@ -80,7 +80,7 @@ interface StatusAlertProps {
 export const StatusAlert = ({ variant, icon, children, className }: StatusAlertProps) => (
   <div
     className={cn(
-      "rounded-2xl border px-4 py-3 text-sm shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.5)_inset]",
+      "rounded-[1.35rem] border px-4 py-3 text-sm shadow-[0_12px_30px_-18px_rgba(0,0,0,0.55),0_1px_0_rgba(255,255,255,0.04)_inset]",
       icon ? "flex gap-3" : "",
       statusAlertVariants[variant],
       className,
@@ -100,16 +100,16 @@ type SignalListVariant = "success" | "neutral";
 
 const signalListVariants: Record<SignalListVariant, { container: string; title: string; body: string; icon: string }> = {
   success: {
-    container: "border-emerald-200 bg-emerald-50",
-    title: "text-emerald-700",
-    body: "text-emerald-900",
-    icon: "text-emerald-800",
+    container: "border-[#4f6676]/35 bg-[#4f6676]/12",
+    title: "text-[#bcd4de]",
+    body: "text-[#edf3f6]",
+    icon: "text-[#bcd4de]",
   },
   neutral: {
-    container: "border-slate-200 bg-slate-50",
-    title: "text-slate-600",
-    body: "text-slate-700",
-    icon: "text-slate-500",
+    container: "border-white/10 bg-white/[0.04]",
+    title: "text-slate-400",
+    body: "text-slate-200",
+    icon: "text-slate-400",
   },
 };
 
@@ -124,7 +124,7 @@ export const SignalList = ({ title, items, icon, variant = "neutral" }: SignalLi
   const v = signalListVariants[variant];
 
   return (
-    <div className={cn("rounded-2xl border p-4", v.container)}>
+    <div className={cn("rounded-[1.35rem] border p-4 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.55)]", v.container)}>
       <p className={cn("text-xs font-semibold uppercase tracking-[0.18em]", v.title)}>{title}</p>
       <ul className={cn("mt-3 space-y-2 text-sm", v.body)}>
         {items.map((item, index) => (
@@ -151,7 +151,7 @@ interface EmptyStateProps {
 export const EmptyState = ({ children, className }: EmptyStateProps) => (
   <div
     className={cn(
-      "rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500",
+      "rounded-[1.35rem] border border-dashed border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-400",
       className,
     )}
   >
@@ -170,7 +170,7 @@ interface CodeBlockProps {
 }
 
 export const CodeBlock = ({ children, className }: CodeBlockProps) => (
-  <pre className={cn("overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100", className)}>
+  <pre className={cn("overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/85 p-4 text-xs text-slate-100", className)}>
     <code>{children}</code>
   </pre>
 );

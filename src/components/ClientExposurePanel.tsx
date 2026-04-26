@@ -14,7 +14,7 @@ export const ClientExposurePanel = ({ htmlSecurity }: ClientExposurePanelProps) 
   }
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Cpu className="h-5 w-5" />
@@ -23,15 +23,15 @@ export const ClientExposurePanel = ({ htmlSecurity }: ClientExposurePanelProps) 
       </CardHeader>
       <CardContent className="space-y-4">
         {htmlSecurity.clientExposureSignals.map((signal) => (
-          <div key={`${signal.category}-${signal.title}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div key={`${signal.category}-${signal.title}`} className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold text-slate-950">{signal.title}</p>
+              <p className="font-semibold text-slate-50">{signal.title}</p>
               <Badge variant={signal.severity === "warning" ? "destructive" : "secondary"}>
                 {signal.severity}
               </Badge>
               <Badge variant="outline">{signal.category.replace(/_/g, " ")}</Badge>
             </div>
-            <p className="mt-3 text-sm text-slate-600">{signal.detail}</p>
+            <p className="mt-3 text-sm text-slate-300">{signal.detail}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {signal.evidence.map((item) => (
                 <TruncatedChip key={item} value={item} />

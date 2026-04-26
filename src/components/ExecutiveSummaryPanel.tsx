@@ -7,14 +7,14 @@ interface ExecutiveSummaryPanelProps {
 }
 
 const postureStyles = {
-  strong: "border-emerald-200 bg-emerald-50 text-emerald-950",
-  mixed: "border-amber-200 bg-amber-50 text-amber-950",
-  weak: "border-rose-200 bg-rose-50 text-rose-950",
+  strong: "border-[#4f6676]/35 bg-[#4f6676]/12 text-[#edf3f6]",
+  mixed: "border-[#8e5c3b]/30 bg-[#8e5c3b]/12 text-[#f0dfcf]",
+  weak: "border-[#b56a2c]/35 bg-[#3a2a20] text-[#f4dfcd]",
 } as const;
 
 export const ExecutiveSummaryPanel = ({ summary }: ExecutiveSummaryPanelProps) => {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <NotebookText className="h-5 w-5" />
@@ -30,17 +30,17 @@ export const ExecutiveSummaryPanel = ({ summary }: ExecutiveSummaryPanelProps) =
           <p className="mt-3 text-xl font-semibold leading-8">{summary.overview}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-50 p-5">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Main visible risk</p>
-          <p className="mt-3 text-base font-medium leading-7 text-slate-900">{summary.mainRisk}</p>
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Main visible risk</p>
+          <p className="mt-3 text-base font-medium leading-7 text-slate-50">{summary.mainRisk}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-50 p-5">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">What stands out</p>
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-400">What stands out</p>
           <div className="mt-4 space-y-3">
             {summary.takeaways.map((takeaway, index) => (
-              <div key={takeaway} className="flex gap-3 rounded-2xl bg-white px-4 py-4 text-sm text-slate-700">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+              <div key={takeaway} className="flex gap-3 rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4 text-sm text-slate-300">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#b56a2c]/16 text-xs font-semibold text-[#f0d5bc]">
                   {index + 1}
                 </div>
                 <p className="leading-6">{takeaway}</p>
