@@ -9,9 +9,9 @@ interface ThirdPartyTrustPanelProps {
 }
 
 const riskStyles = {
-  low: "bg-emerald-100 text-emerald-900",
-  medium: "bg-amber-100 text-amber-900",
-  high: "bg-rose-100 text-rose-900",
+  low: "bg-white/[0.08] text-slate-100",
+  medium: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
+  high: "bg-[#b56a2c]/18 text-[#f0d5bc]",
 } as const;
 
 const categoryLabel = {
@@ -39,7 +39,7 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
     thirdPartyTrust.totalProviders === 0 ? "Minimal" : thirdPartyTrust.totalProviders <= 5 ? "Moderate" : "Broad";
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Boxes className="h-5 w-5" />
@@ -65,20 +65,20 @@ export const ThirdPartyTrustPanel = ({ thirdPartyTrust }: ThirdPartyTrustPanelPr
             value={
               <div className="grid gap-3">
                 {highlightedProviders.map((provider) => (
-                  <div key={provider.domain} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div key={provider.domain} className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-slate-900">{provider.name}</span>
+                      <span className="font-medium text-slate-50">{provider.name}</span>
                       <Badge variant="outline">{categoryLabel[provider.category]}</Badge>
                       <Badge variant="secondary" className={riskStyles[provider.risk]}>
                         {provider.risk} risk
                       </Badge>
                     </div>
-                    <p className="mt-2 truncate text-sm text-slate-600" title={provider.domain}>{provider.domain}</p>
-                    <p className="mt-1 text-xs text-slate-500">{provider.evidence}</p>
+                    <p className="mt-2 truncate text-sm text-slate-300" title={provider.domain}>{provider.domain}</p>
+                    <p className="mt-1 text-xs text-slate-400">{provider.evidence}</p>
                   </div>
                 ))}
                 {thirdPartyTrust.providers.length > highlightedProviders.length && (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-400">
                     Showing the most important {highlightedProviders.length} providers from a total of {thirdPartyTrust.providers.length}.
                   </p>
                 )}

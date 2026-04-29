@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildExecutiveSummary } from "../dist/htmlInsights.js";
 import { scoreAnalysis, scorePostureAnalysis } from "../dist/scoring.js";
 
 test("scoreAnalysis heavily penalizes plain HTTP and invalid transport posture", () => {
@@ -132,7 +133,7 @@ test("scorePostureAnalysis grades the wider passive posture, not just core heade
   assert.equal(oldBaseline.score >= 90, true);
   assert.equal(posture.score < oldBaseline.score, true);
   assert.equal(posture.score < 90, true);
-  assert.equal(posture.grade, "B");
+  assert.equal(posture.grade, "C");
 });
 
 test("scorePostureAnalysis caps unavailable targets below a C grade", () => {
@@ -146,6 +147,90 @@ test("scorePostureAnalysis caps unavailable targets below a C grade", () => {
     }),
   );
 
+  assert.equal(posture.score <= 49, true);
+  assert.equal(posture.grade, "U");
+});
+
+test("scorePostureAnalysis marks blocked or restricted reads as unable to complete", () => {
+  const posture = scorePostureAnalysis(
+    createPostureAnalysis({
+      statusCode: 403,
+      assessmentLimitation: {
+        limited: true,
+        kind: "blocked_edge_response",
+      },
+    }),
+  );
+
   assert.equal(posture.score <= 64, true);
-  assert.equal(posture.grade, "D");
+  assert.equal(posture.grade, "U");
+});
+
+test("buildExecutiveSummary keeps browser hardening as the main risk when header gaps dominate", () => {
+  const summary = buildExecutiveSummary({
+    score: 72,
+    headers: [
+      { key: "strict-transport-security", status: "missing" },
+      { key: "content-security-policy", status: "missing" },
+      { key: "x-frame-options", status: "missing" },
+      { key: "x-content-type-options", status: "missing" },
+      { key: "referrer-policy", status: "missing" },
+      { key: "permissions-policy", status: "missing" },
+    ],
+    thirdPartyTrust: { totalProviders: 0, highRiskProviders: 0, issues: [] },
+    aiSurface: { detected: false, issues: [], disclosures: [] },
+    domainSecurity: { issues: ["Missing SPF", "Missing DMARC"] },
+    publicSignals: { issues: ["Not HSTS preloaded"] },
+    htmlSecurity: { issues: [] },
+    assessmentLimitation: { limited: false, kind: null, title: null, detail: null },
+  });
+
+  assert.equal(summary.mainRisk, "Browser-layer hardening gaps are the main visible risk.");
+  assert.equal(summary.takeaways[0], "6 browser-facing protections are missing or weak on the scanned response.");
+});
+
+test("buildExecutiveSummary describes unavailable targets as limited availability reads", () => {
+  const summary = buildExecutiveSummary({
+    score: 0,
+    headers: [],
+    thirdPartyTrust: { totalProviders: 0, highRiskProviders: 0, issues: [] },
+    aiSurface: { detected: false, issues: [], disclosures: [] },
+    domainSecurity: { issues: [] },
+    publicSignals: { issues: [] },
+    htmlSecurity: { issues: [] },
+    assessmentLimitation: {
+      limited: true,
+      kind: "service_unavailable",
+      title: "The target did not respond in time.",
+      detail: "The scanner could not complete a trusted response fetch before timing out, so this is only a limited assessment.",
+    },
+  });
+
+  assert.match(summary.overview, /limited availability read/i);
+  assert.equal(summary.mainRisk, "Availability or reachability issues prevented a normal posture read.");
+});
+
+test("buildExecutiveSummary adds lab/training interpretation without changing the main risk model", () => {
+  const summary = buildExecutiveSummary({
+    score: 65,
+    headers: [
+      { key: "strict-transport-security", status: "missing" },
+      { key: "content-security-policy", status: "missing" },
+    ],
+    thirdPartyTrust: { totalProviders: 0, highRiskProviders: 0, issues: [] },
+    aiSurface: { detected: false, issues: [], disclosures: [] },
+    domainSecurity: { issues: [] },
+    publicSignals: { issues: [] },
+    htmlSecurity: {
+      issues: ["Page content suggests an intentionally vulnerable training or challenge surface."],
+    },
+    assessmentLimitation: { limited: false, kind: null, title: null, detail: null },
+  });
+
+  assert.match(summary.overview, /intentionally vulnerable lab or training surface/i);
+  assert.equal(summary.mainRisk, "Browser-layer hardening gaps are the main visible risk.");
+  assert.equal(
+    summary.takeaways[0],
+    "This target appears to be an intentionally vulnerable lab or training surface, so read the grade as posture-only context rather than a business-risk verdict.",
+  );
 });

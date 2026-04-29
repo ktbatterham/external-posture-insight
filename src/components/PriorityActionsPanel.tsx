@@ -1,6 +1,5 @@
 import { ListTodo } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusAlert } from "@/components/ui/panel-primitives";
 import { AnalysisResult } from "@/types/analysis";
 import { getPriorityActions } from "@/lib/priorities";
 
@@ -8,10 +7,19 @@ interface PriorityActionsPanelProps {
   analysis: AnalysisResult;
 }
 
-const variantMap = {
-  critical: "critical",
-  warning: "warning",
-  info: "info",
+const severityTone = {
+  critical: {
+    rail: "bg-[#b56a2c]",
+    chip: "bg-[#8e5c3b]/18 text-[#f0d5bc] border-[#b56a2c]/28",
+  },
+  warning: {
+    rail: "bg-[#8e5c3b]",
+    chip: "bg-[#74452b]/18 text-[#e2c0a2] border-[#8e5c3b]/28",
+  },
+  info: {
+    rail: "bg-slate-300",
+    chip: "bg-white/[0.08] text-slate-200 border-white/10",
+  },
 } as const;
 
 export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) => {
@@ -22,34 +30,54 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
   }
 
   return (
-    <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
-      <CardHeader>
+    <Card className="rounded-[1.75rem] border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
-          <ListTodo className="h-5 w-5" />
-          Priority Actions
+          <ListTodo className="h-5 w-5 text-[#d89a63]" />
+          Priority Actions for This Target
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {actions.map((action, index) => (
-          <StatusAlert
-            key={`${action.area}-${action.title}`}
-            variant={variantMap[action.severity]}
-            className="py-4"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-semibold">
-                {index + 1}. {action.title}
+      <CardContent>
+        <div className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/[0.03] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+          {actions.map((action, index) => {
+            const tone = severityTone[action.severity];
+            return (
+              <div
+                key={`${action.area}-${action.title}`}
+                className={`grid gap-3 px-4 py-4 md:grid-cols-[2rem_minmax(0,1fr)_11rem] md:items-start ${
+                  index < actions.length - 1 ? "border-b border-white/10" : ""
+                }`}
+              >
+                <div className="flex items-start justify-center pt-0.5">
+                  <div className="flex flex-col items-center gap-2">
+                    <span className={`h-7 w-1.5 rounded-full ${tone.rail}`} aria-hidden="true" />
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      {index + 1}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-semibold text-white">{action.title}</p>
+                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone.chip}`}>
+                      {action.severity}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{action.detail}</p>
+                  {action.priorityReason ? (
+                    <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+                      {action.priorityReason}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="md:pt-1 md:text-right">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Focus area</p>
+                  <p className="mt-2 text-sm font-medium text-slate-200">{action.area}</p>
+                </div>
               </div>
-              <span className="text-xs uppercase tracking-[0.18em] opacity-75">{action.area}</span>
-            </div>
-            <p className="mt-2 opacity-90">{action.detail}</p>
-            {action.priorityReason ? (
-              <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] opacity-70">
-                {action.priorityReason}
-              </p>
-            ) : null}
-          </StatusAlert>
-        ))}
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );

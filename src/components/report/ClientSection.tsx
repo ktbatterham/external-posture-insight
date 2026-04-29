@@ -7,9 +7,14 @@ import { ThirdPartyTrustPanel } from "@/components/ThirdPartyTrustPanel";
 import { AnalysisResult } from "@/types/analysis";
 import { ReportSectionHeader } from "./ReportSectionHeader";
 
-export const ClientSection = ({ analysisData }: { analysisData: AnalysisResult }) => (
+interface ClientSectionProps {
+  analysisData: AnalysisResult;
+  compact?: boolean;
+}
+
+export const ClientSection = ({ analysisData, compact = false }: ClientSectionProps) => (
   <div id="client" className="space-y-6">
-    <ReportSectionHeader eyebrow="Client Surface" title="What the application reveals about itself" />
+    {!compact ? <ReportSectionHeader eyebrow="Client Surface" title="What the application reveals about itself" /> : null}
     <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
     <div className="space-y-8">
       <ClientExposurePanel htmlSecurity={analysisData.htmlSecurity} />

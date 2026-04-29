@@ -27,9 +27,10 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
     .join(" ");
   const trendDelta = trendPoints.length > 1 ? trendPoints.at(-1)!.score - trendPoints[0].score : 0;
   const trendLabel = trendDelta >= 5 ? "Improving" : trendDelta <= -5 ? "Degrading" : "Stable";
+  const trendStroke = trendDelta > 0 ? "#7aa6b6" : trendDelta < 0 ? "#b56a2c" : "#94a3b8";
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" />
@@ -39,43 +40,43 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
       <CardContent className="space-y-5">
         {diff && diff.previousScore !== null ? (
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score change</p>
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Score change</p>
               <div className="mt-2 flex items-center gap-2">
                 {diff.scoreDelta !== null && diff.scoreDelta >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  <TrendingUp className="h-4 w-4 text-[#bcd4de]" />
                 ) : (
-                  <TrendingDown className="h-4 w-4 text-rose-600" />
+                  <TrendingDown className="h-4 w-4 text-[#d89a63]" />
                 )}
-                <span className="text-lg font-semibold text-slate-950">
+                <span className="text-lg font-semibold text-slate-50">
                   {diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}
                   {diff.scoreDelta ?? 0}
                 </span>
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-slate-400">
                   from {diff.previousGrade} / {diff.previousScore}
                 </span>
               </div>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Issue delta</p>
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Issue delta</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <Badge variant="secondary" className="bg-rose-100 text-rose-900">
+                <Badge variant="secondary" className="bg-[#b56a2c]/14 text-[#f0d5bc]">
                   {diff.newIssues.length} new
                 </Badge>
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-900">
+                <Badge variant="secondary" className="bg-[#4f6676]/14 text-[#d6e5ec]">
                   {diff.resolvedIssues.length} resolved
                 </Badge>
-                <Badge variant="secondary" className="bg-amber-100 text-amber-900">
+                <Badge variant="secondary" className="bg-[#9b774f]/14 text-[#f0d5bc]">
                   {diff.headerChanges.length} header changes
                 </Badge>
               </div>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score trend</p>
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Score trend</p>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-slate-950">{trendLabel}</p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-lg font-semibold text-slate-50">{trendLabel}</p>
+                  <p className="text-sm text-slate-400">
                     {trendDelta > 0 ? "+" : ""}
                     {trendDelta} over {trendPoints.length} saved scan{trendPoints.length === 1 ? "" : "s"}
                   </p>
@@ -83,11 +84,10 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
                 <svg viewBox="0 0 100 40" className="h-10 w-28 overflow-visible">
                   <polyline
                     fill="none"
-                    stroke="currentColor"
+                    stroke={trendStroke}
                     strokeWidth="4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={trendDelta >= 0 ? "text-emerald-600" : "text-rose-600"}
                     points={sparkline
                       .split(" ")
                       .map((point) => {
@@ -102,12 +102,12 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
           </div>
         ) : trendPoints.length > 1 ? (
           <div className="grid gap-4 md:grid-cols-1">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Score trend</p>
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Score trend</p>
               <div className="mt-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-slate-950">{trendLabel}</p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-lg font-semibold text-slate-50">{trendLabel}</p>
+                  <p className="text-sm text-slate-400">
                     {trendDelta > 0 ? "+" : ""}
                     {trendDelta} over {trendPoints.length} saved scan{trendPoints.length === 1 ? "" : "s"}
                   </p>
@@ -115,11 +115,10 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
                 <svg viewBox="0 0 100 40" className="h-10 w-28 overflow-visible">
                   <polyline
                     fill="none"
-                    stroke="currentColor"
+                    stroke={trendStroke}
                     strokeWidth="4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={trendDelta >= 0 ? "text-emerald-600" : "text-rose-600"}
                     points={sparkline
                       .split(" ")
                       .map((point) => {
@@ -136,21 +135,21 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
 
         {diff && (
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-              <p className="text-sm font-semibold text-rose-900">New issues</p>
-              <div className="mt-3 space-y-2 text-sm text-rose-900">
+            <div className="rounded-[1.35rem] border border-[#b56a2c]/35 bg-[#b56a2c]/12 p-4">
+              <p className="text-sm font-semibold text-[#f0d5bc]">New issues</p>
+              <div className="mt-3 space-y-2 text-sm text-[#f4dfcd]">
                 {diff.newIssues.length ? diff.newIssues.map((issue) => <p key={issue}>{issue}</p>) : <p>None</p>}
               </div>
             </div>
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-sm font-semibold text-emerald-900">Resolved issues</p>
-              <div className="mt-3 space-y-2 text-sm text-emerald-900">
+            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
+              <p className="text-sm font-semibold text-[#d6e5ec]">Resolved issues</p>
+              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
                 {diff.resolvedIssues.length ? diff.resolvedIssues.map((issue) => <p key={issue}>{issue}</p>) : <p>None</p>}
               </div>
             </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-semibold text-amber-900">Header changes</p>
-              <div className="mt-3 space-y-2 text-sm text-amber-900">
+            <div className="rounded-[1.35rem] border border-[#9b774f]/35 bg-[#9b774f]/10 p-4">
+              <p className="text-sm font-semibold text-[#f0d5bc]">Header changes</p>
+              <div className="mt-3 space-y-2 text-sm text-[#f4dfcd]">
                 {diff.headerChanges.length ? diff.headerChanges.map((change) => (
                   <p key={`${change.label}-${change.from}-${change.to}`}>
                     {change.label}: {change.from} {"->"} {change.to}
@@ -163,9 +162,9 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
 
         {diff && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-              <p className="text-sm font-semibold text-sky-900">Third-party changes</p>
-              <div className="mt-3 space-y-2 text-sm text-sky-900">
+            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
+              <p className="text-sm font-semibold text-[#d6e5ec]">Third-party changes</p>
+              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
                 {diff.newThirdPartyProviders.length
                   ? diff.newThirdPartyProviders.map((provider) => <p key={`new-third-party-${provider}`}>New: {provider}</p>)
                   : <p>No new providers</p>}
@@ -174,9 +173,9 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
                   : null}
               </div>
             </div>
-            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-              <p className="text-sm font-semibold text-violet-900">Identity / WAF</p>
-              <div className="mt-3 space-y-2 text-sm text-violet-900">
+            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
+              <p className="text-sm font-semibold text-[#d6e5ec]">Identity / WAF</p>
+              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
                 {diff.identityProviderChange ? (
                   <p>
                     IdP: {diff.identityProviderChange.from ?? "none"} {"->"} {diff.identityProviderChange.to ?? "none"}
@@ -193,9 +192,9 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
                 {!diff.wafProviderChanges.newProviders.length && !diff.wafProviderChanges.removedProviders.length ? <p>No WAF change</p> : null}
               </div>
             </div>
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-sm font-semibold text-emerald-900">CT / AI changes</p>
-              <div className="mt-3 space-y-2 text-sm text-emerald-900">
+            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
+              <p className="text-sm font-semibold text-[#d6e5ec]">CT / AI changes</p>
+              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
                 {diff.ctPriorityHostChanges.newHosts.length
                   ? diff.ctPriorityHostChanges.newHosts.map((host) => <p key={`new-ct-${host}`}>New CT host: {host}</p>)
                   : <p>No new CT priority hosts</p>}
@@ -207,9 +206,9 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
                   : null}
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-900">Transport delta</p>
-              <div className="mt-3 space-y-2 text-sm text-slate-700">
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-semibold text-slate-100">Transport delta</p>
+              <div className="mt-3 space-y-2 text-sm text-slate-200">
                 <p>
                   HTTP: {diff.statusCodeDelta?.from ?? "unknown"} {"->"} {diff.statusCodeDelta?.to ?? "unknown"}
                 </p>
@@ -222,9 +221,9 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
         )}
 
         {diff?.summary.length ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">What changed</p>
-            <div className="mt-3 space-y-2 text-sm text-slate-700">
+          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-sm font-semibold text-slate-100">What changed</p>
+            <div className="mt-3 space-y-2 text-sm text-slate-300">
               {diff.summary.map((item) => (
                 <p key={item}>{item}</p>
               ))}
@@ -234,15 +233,15 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
 
         <div className="grid gap-3">
           {history.map((snapshot) => (
-            <div key={`${snapshot.scannedAt}-${snapshot.finalUrl}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div key={`${snapshot.scannedAt}-${snapshot.finalUrl}`} className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950" title={snapshot.finalUrl}>{snapshot.finalUrl}</p>
-                  <p className="text-xs text-slate-500">{new Date(snapshot.scannedAt).toLocaleString()}</p>
+                  <p className="truncate text-sm font-semibold text-slate-50" title={snapshot.finalUrl}>{snapshot.finalUrl}</p>
+                  <p className="text-xs text-slate-400">{new Date(snapshot.scannedAt).toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{snapshot.grade}</Badge>
-                  <span className="text-sm font-semibold text-slate-700">{snapshot.score}/100</span>
+                  <Badge variant="secondary" className="bg-white/[0.1] text-slate-100">{snapshot.grade}</Badge>
+                  <span className="text-sm font-semibold text-slate-200">{snapshot.score}/100</span>
                 </div>
               </div>
             </div>

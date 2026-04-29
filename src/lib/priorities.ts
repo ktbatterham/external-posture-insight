@@ -196,7 +196,7 @@ export const getPriorityActions = (analysis: AnalysisResult): PrioritizedAction[
       const label = action.areaKey ? areaLabelByKey.get(action.areaKey) ?? action.area : action.area;
       return {
         ...action,
-        priorityReason: `Priority driver: ${label} is at ${score}/100.`,
+        priorityReason: `Why this matters for the scanned target: ${label} is currently at ${score}/100.`,
       };
     })
     .sort((left, right) => {

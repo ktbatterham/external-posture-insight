@@ -199,6 +199,27 @@ test("health endpoint includes deployment and rate-limit metadata", async () => 
   }
 });
 
+test("health endpoint returns minimal readiness data in production mode", async () => {
+  const server = await startServer({
+    NODE_ENV: "production",
+    API_KEY: "test-secret",
+    DEPLOYMENT_MODE: "single-instance",
+  });
+
+  try {
+    const response = await fetch(`${server.baseUrl}/api/health`);
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.ok, true);
+    assert.ok(payload.now);
+    assert.equal("deploymentMode" in payload, false);
+    assert.equal("rateLimit" in payload, false);
+    assert.equal("abuseAlerting" in payload, false);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("analyze endpoint returns a sanitized error for invalid targets", async () => {
   const server = await startServer();
 
@@ -227,8 +248,25 @@ test("analyze endpoint rejects unsupported methods", async () => {
     const payload = await response.json();
 
     assert.equal(response.status, 405);
-    assert.equal(response.headers.get("allow"), "GET, HEAD");
+    assert.equal(response.headers.get("allow"), "GET");
     assert.match(payload.error, /Method not allowed/i);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("analyze endpoint rejects HEAD requests without triggering scan work", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await fetch(
+      `${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://example.com")}`,
+      { method: "HEAD" },
+    );
+
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get("allow"), "GET");
+    assert.doesNotMatch(server.getStdout(), /analysis_requested/);
   } finally {
     await server.stop();
   }
@@ -299,6 +337,29 @@ test("rate limiting supports environment overrides", async () => {
     assert.equal(two.status, 400);
     assert.equal(three.status, 429);
     assert.equal(three.headers.get("retry-after"), "2");
+  } finally {
+    await server.stop();
+  }
+});
+
+test("upstash limiter falls back to local throttling when backend requests fail", async () => {
+  const server = await startServer({
+    RATE_LIMIT_BACKEND: "upstash",
+    UPSTASH_REDIS_REST_URL: "http://127.0.0.1:9",
+    UPSTASH_REDIS_REST_TOKEN: "test-token",
+    RATE_LIMIT_WINDOW_MS: "2000",
+    RATE_LIMIT_MAX_REQUESTS: "2",
+  });
+
+  try {
+    const one = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://localhost-1.example.com")}`);
+    const two = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://localhost-2.example.com")}`);
+    const three = await fetch(`${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://localhost-3.example.com")}`);
+
+    assert.equal(one.status, 400);
+    assert.equal(two.status, 400);
+    assert.equal(three.status, 429);
+    assert.match(server.getStderr(), /rate_limit_backend_error/);
   } finally {
     await server.stop();
   }

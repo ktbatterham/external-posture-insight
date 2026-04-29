@@ -45,7 +45,7 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
         })
         .filter((item) => item.delta !== 0)
         .sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta))
-        .slice(0, 3)
+        .slice(0, 4)
     : [];
 
   const sparklinePoints = (() => {
@@ -71,28 +71,98 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
   }
 
   return (
-    <Card className="rounded-[1.75rem] border-slate-200/80 bg-white/90 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
-      <CardHeader className="pb-2">
+    <Card className="rounded-[1.75rem] border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
-          <BellRing className="h-5 w-5" />
-          Monitoring Alerts
+          <BellRing className="h-5 w-5 text-[#d89a63]" />
+          Monitoring
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {scoreSeries.length >= 2 ? (
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score trend (last {scoreSeries.length} scans)</p>
-              <div className="flex items-center gap-1 text-sm font-semibold text-slate-700">
-                {trendDirection === "up" ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : null}
-                {trendDirection === "down" ? <TrendingDown className="h-4 w-4 text-rose-600" /> : null}
-                {trendDirection === "flat" ? <Minus className="h-4 w-4 text-slate-500" /> : null}
+        {diff ? (
+          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Since last scan</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Compact change summary against the previous saved snapshot.</p>
+              </div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Delta board</p>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score</p>
+                <p className="mt-3 text-3xl font-semibold text-white">
+                  {diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}
+                  {diff.scoreDelta ?? 0}
+                </p>
+                <p className="mt-2 text-xs text-slate-400">
+                  {diff.previousScore !== null ? `From ${diff.previousScore}` : "No prior score"}
+                </p>
+              </div>
+              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">New findings</p>
+                <p className="mt-3 text-3xl font-semibold text-white">{diff.newIssues.length}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
+                  {diff.newIssues[0] ?? "No new findings"}
+                </p>
+              </div>
+              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resolved</p>
+                <p className="mt-3 text-3xl font-semibold text-white">{diff.resolvedIssues.length}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
+                  {diff.resolvedIssues[0] ?? "No resolved findings"}
+                </p>
+              </div>
+              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Header changes</p>
+                <p className="mt-3 text-3xl font-semibold text-white">{diff.headerChanges.length}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
+                  {diff.headerChanges[0]?.label ?? "No header movement"}
+                </p>
+              </div>
+            </div>
+            {areaDeltas.length ? (
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {areaDeltas.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2 text-sm text-slate-300"
+                  >
+                    <span className="font-medium text-white">{item.label}</span>: {item.delta > 0 ? "+" : ""}
+                    {item.delta}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Score trend</p>
+              <p className="mt-2 text-sm text-slate-300">
+                {scoreSeries.length >= 2
+                  ? "Short-window movement across recent saved scans."
+                  : scoreSeries.length === 1
+                    ? "One saved scan recorded. Trend appears after the next scan."
+                    : "Trend appears after at least two saved scans for this target."}
+              </p>
+            </div>
+            {scoreSeries.length >= 2 ? (
+              <div className="flex items-center gap-1 text-sm font-semibold text-slate-200">
+                {trendDirection === "up" ? <TrendingUp className="h-4 w-4 text-[#d89a63]" /> : null}
+                {trendDirection === "down" ? <TrendingDown className="h-4 w-4 text-[#c78455]" /> : null}
+                {trendDirection === "flat" ? <Minus className="h-4 w-4 text-slate-400" /> : null}
                 <span>
                   {trendDirection === "up" ? "Improving" : trendDirection === "down" ? "Degrading" : "Stable"}
                 </span>
               </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3">
+            ) : null}
+          </div>
+
+          {scoreSeries.length >= 2 ? (
+            <div className="mt-4 flex items-center justify-between gap-4">
               <svg
                 viewBox="0 0 180 44"
                 className="h-11 w-full max-w-[220px]"
@@ -101,49 +171,36 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
               >
                 <polyline
                   fill="none"
-                  stroke={trendDirection === "down" ? "#e11d48" : trendDirection === "up" ? "#059669" : "#64748b"}
+                  stroke={trendDirection === "down" ? "#c78455" : trendDirection === "up" ? "#d89a63" : "#64748b"}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   points={sparklinePoints}
                 />
               </svg>
-              <p className="text-sm font-semibold text-slate-700">
+              <p className="text-sm font-semibold text-slate-200">
                 {trendDelta > 0 ? "+" : ""}
                 {trendDelta} over window
               </p>
             </div>
-            {areaDeltas.length ? (
-              <div className="mt-3 border-t border-white/80 pt-3 text-xs text-slate-600">
-                {areaDeltas.map((item) => (
-                  <p key={item.label}>
-                    {item.label}: {item.delta > 0 ? "+" : ""}
-                    {item.delta} vs previous scan
-                  </p>
-                ))}
+          ) : null}
+        </div>
+
+        {alerts.length ? (
+          <div className="overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/[0.03] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+            {alerts.map((alert, index) => (
+              <div
+                key={`${alert.title}-${alert.detail}`}
+                className={`px-4 py-4 ${index < alerts.length - 1 ? "border-b border-white/10" : ""}`}
+              >
+                <StatusAlert variant={variantMap[alert.severity]} className="py-0">
+                  <div className="font-semibold">{alert.title}</div>
+                  <p className="mt-2 text-sm leading-6 opacity-90">{alert.detail}</p>
+                </StatusAlert>
               </div>
-            ) : null}
+            ))}
           </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/85 px-4 py-4 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.28),0_1px_0_rgba(255,255,255,0.55)_inset]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score trend</p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              {scoreSeries.length === 1
-                ? "One saved scan recorded. Trend will appear after the next scan."
-                : "Trend will appear after at least two saved scans for this target."}
-            </p>
-          </div>
-        )}
-        {alerts.map((alert) => (
-          <StatusAlert
-            key={`${alert.title}-${alert.detail}`}
-            variant={variantMap[alert.severity]}
-            className="py-4"
-          >
-            <div className="font-semibold">{alert.title}</div>
-            <p className="mt-2 text-sm leading-6 opacity-90">{alert.detail}</p>
-          </StatusAlert>
-        ))}
+        ) : null}
       </CardContent>
     </Card>
   );

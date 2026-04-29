@@ -8,11 +8,16 @@ import { WafFingerprintPanel } from "@/components/WafFingerprintPanel";
 import { AnalysisResult } from "@/types/analysis";
 import { ReportSectionHeader, sectionTitleClass } from "./ReportSectionHeader";
 
-export const TrustSection = ({ analysisData }: { analysisData: AnalysisResult }) => (
+interface TrustSectionProps {
+  analysisData: AnalysisResult;
+  compact?: boolean;
+}
+
+export const TrustSection = ({ analysisData, compact = false }: TrustSectionProps) => (
   <div id="trust" className="space-y-6">
-    <ReportSectionHeader eyebrow="Trust" title="Domain, identity, and public trust posture" />
+    {!compact ? <ReportSectionHeader eyebrow="Trust" title="Domain, identity, and public trust posture" /> : null}
     <div className="space-y-4">
-      <p className={sectionTitleClass}>Domain & email foundation</p>
+      {!compact ? <p className={sectionTitleClass}>Domain & email foundation</p> : null}
       <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />
     </div>
     <div className="space-y-8">

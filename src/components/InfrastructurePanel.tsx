@@ -16,21 +16,21 @@ const sourceLabel = {
 } as const;
 
 const categoryClass = {
-  cloud: "bg-sky-100 text-sky-900",
-  cdn: "bg-violet-100 text-violet-900",
-  edge: "bg-emerald-100 text-emerald-900",
-  paas: "bg-indigo-100 text-indigo-900",
-  hosting: "bg-amber-100 text-amber-900",
+  cloud: "bg-white/[0.08] text-slate-100",
+  cdn: "bg-white/[0.08] text-slate-100",
+  edge: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
+  paas: "bg-white/[0.08] text-slate-100",
+  hosting: "bg-[#b56a2c]/18 text-[#f0d5bc]",
 } as const;
 
 export const InfrastructurePanel = ({ infrastructure }: InfrastructurePanelProps) => (
-  <Card className="border-slate-200 bg-white shadow-sm">
+  <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
     <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-slate-950">
-        <Network className="h-5 w-5" />
+      <CardTitle className="flex items-center gap-2">
+        <Network className="h-5 w-5 text-[#e0b286]" />
         Infrastructure Read
       </CardTitle>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-slate-400">
         Passive hosting and edge-provider inference from DNS, reverse DNS, headers, and detected stack signals.
       </p>
     </CardHeader>
@@ -46,23 +46,23 @@ export const InfrastructurePanel = ({ infrastructure }: InfrastructurePanelProps
           {infrastructure.providers.map((signal, index) => (
             <div
               key={`${signal.provider}-${signal.source}-${index}`}
-              className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3"
+              className="rounded-[1.25rem] border border-white/10 bg-slate-950/45 px-4 py-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 font-semibold text-slate-950">
-                  <Cloud className="h-4 w-4 text-slate-500" />
+                <div className="flex items-center gap-2 font-semibold text-white">
+                  <Cloud className="h-4 w-4 text-slate-400" />
                   {signal.provider}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary" className={categoryClass[signal.category]}>
                     {signal.category}
                   </Badge>
-                  <Badge variant="secondary" className="bg-slate-200 text-slate-900">
+                  <Badge variant="secondary" className="bg-white/10 text-slate-100">
                     {sourceLabel[signal.source]}
                   </Badge>
                 </div>
               </div>
-              <p className="mt-2 break-words text-sm text-slate-600">{signal.evidence}</p>
+              <p className="mt-2 break-words text-sm text-slate-300">{signal.evidence}</p>
             </div>
           ))}
         </div>

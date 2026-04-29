@@ -179,7 +179,7 @@ export const buildMarkdownReport = (analysis: AnalysisResult, diff: HistoryDiff 
         )
       : ["- No core findings recorded."]),
     "",
-    "## Priority Actions",
+    "## Priority Actions for This Target",
     "",
     ...(priorityActions.length
       ? priorityActions.flatMap((action, index) => [

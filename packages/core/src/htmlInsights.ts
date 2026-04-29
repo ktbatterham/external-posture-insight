@@ -385,39 +385,93 @@ export const analyzeThirdPartyTrust = (
 };
 
 export const buildExecutiveSummary = (
-  result: Pick<AnalysisResult, "score" | "headers" | "thirdPartyTrust" | "aiSurface" | "domainSecurity" | "publicSignals" | "assessmentLimitation">,
+  result: Pick<AnalysisResult, "score" | "headers" | "thirdPartyTrust" | "aiSurface" | "domainSecurity" | "publicSignals" | "assessmentLimitation" | "htmlSecurity">,
 ): ExecutiveSummaryInfo => {
-  const missingHeaderCount = result.headers.filter((header) => header.status === "missing").length;
+  const headerWeaknessCount = result.headers.filter((header) => header.status === "missing" || header.status === "warning").length;
   const highRiskThirdParties = result.thirdPartyTrust.highRiskProviders;
+  const domainTrustIssueCount = result.domainSecurity.issues.length + result.publicSignals.issues.length;
+  const aiIssueCount = result.aiSurface.issues.length;
+  const trainingSurfaceDetected = result.htmlSecurity.issues.includes(
+    "Page content suggests an intentionally vulnerable training or challenge surface.",
+  );
+  const browserRiskWeight = headerWeaknessCount * 2;
+  const domainRiskWeight = domainTrustIssueCount;
+  const thirdPartyRiskWeight = highRiskThirdParties * 3 + result.thirdPartyTrust.issues.length;
+  const aiRiskWeight = aiIssueCount * 3 + result.aiSurface.disclosures.length;
   const posture: ExecutiveSummaryInfo["posture"] =
     result.score >= 80 ? "strong" : result.score >= 60 ? "mixed" : "weak";
 
   let mainRisk = "Browser-layer hardening gaps are the main visible risk.";
-  if (highRiskThirdParties >= 3) {
+  if (result.assessmentLimitation.limited && result.assessmentLimitation.kind === "service_unavailable") {
+    mainRisk = "Availability or reachability issues prevented a normal posture read.";
+  } else if (result.assessmentLimitation.limited && result.assessmentLimitation.kind) {
+    mainRisk = "Transport trust or access controls prevented a normal posture read.";
+  } else if (thirdPartyRiskWeight > browserRiskWeight && thirdPartyRiskWeight >= domainRiskWeight) {
     mainRisk = "Third-party trust and data-flow sprawl are the main visible risk.";
-  } else if (result.aiSurface.detected && result.aiSurface.issues.length > 0) {
+  } else if (aiRiskWeight > browserRiskWeight && aiRiskWeight >= domainRiskWeight && result.aiSurface.detected) {
     mainRisk = "Public AI or automation signals are visible without much supporting disclosure or privacy guidance.";
-  } else if (result.domainSecurity.issues.length > 0 || result.publicSignals.issues.length > 0) {
+  } else if (domainRiskWeight > browserRiskWeight) {
     mainRisk = "Public trust and domain hygiene signals need attention alongside the web posture.";
   }
 
-  const takeaways = [
-    result.assessmentLimitation.limited && result.assessmentLimitation.detail
-      ? result.assessmentLimitation.detail
+  const takeawayCandidates = [
+    trainingSurfaceDetected
+      ? {
+          weight: 90,
+          text: "This target appears to be an intentionally vulnerable lab or training surface, so read the grade as posture-only context rather than a business-risk verdict.",
+        }
       : null,
-    missingHeaderCount > 0
-      ? `${missingHeaderCount} browser-facing protections are missing or weak on the scanned response.`
-      : "Core browser-facing protections look consistently present on the scanned response.",
+    result.assessmentLimitation.limited && result.assessmentLimitation.detail
+      ? { weight: 100, text: result.assessmentLimitation.detail }
+      : null,
+    headerWeaknessCount > 0
+      ? {
+          weight: browserRiskWeight || 1,
+          text: `${headerWeaknessCount} browser-facing protection${headerWeaknessCount === 1 ? " is" : "s are"} missing or weak on the scanned response.`,
+        }
+      : {
+          weight: 1,
+          text: "Core browser-facing protections look consistently present on the scanned response.",
+        },
+    domainTrustIssueCount > 0
+      ? {
+          weight: domainRiskWeight || 1,
+          text: `${domainTrustIssueCount} domain, disclosure, or public-trust signal${domainTrustIssueCount === 1 ? " needs" : "s need"} attention.`,
+        }
+      : null,
     result.thirdPartyTrust.totalProviders > 0
-      ? `${result.thirdPartyTrust.totalProviders} third-party provider${result.thirdPartyTrust.totalProviders === 1 ? " was" : "s were"} detected, including ${highRiskThirdParties} higher-risk integration${highRiskThirdParties === 1 ? "" : "s"}.`
-      : "No obvious third-party script or stylesheet providers were detected on the fetched page.",
+      ? {
+          weight: thirdPartyRiskWeight || 1,
+          text: `${result.thirdPartyTrust.totalProviders} third-party provider${result.thirdPartyTrust.totalProviders === 1 ? " was" : "s were"} detected, including ${highRiskThirdParties} higher-risk integration${highRiskThirdParties === 1 ? "" : "s"}.`,
+        }
+      : {
+          weight: 1,
+          text: "No obvious third-party script or stylesheet providers were detected on the fetched page.",
+        },
     result.aiSurface.detected
-      ? `${result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length} public AI or automation signal${(result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length) === 1 ? " was" : "s were"} detected.`
-      : "No obvious public-facing AI or automation surface was detected.",
-  ];
+      ? {
+          weight: aiRiskWeight || 1,
+          text: `${result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length} public AI or automation signal${(result.aiSurface.vendors.length || result.aiSurface.discoveredPaths.length) === 1 ? " was" : "s were"} detected.`,
+        }
+      : {
+          weight: 1,
+          text: "No obvious public-facing AI or automation surface was detected.",
+        },
+  ]
+    .filter((item): item is { weight: number; text: string } => Boolean(item))
+    .sort((left, right) => right.weight - left.weight);
+
+  const takeaways = takeawayCandidates
+    .map((item) => item.text)
+    .filter((text, index, items) => items.indexOf(text) === index)
+    .slice(0, 3);
 
   const overview = result.assessmentLimitation.limited
-    ? "The scanner reached a blocked or edge-managed response, so this assessment is only a partial read of the target’s normal posture."
+    ? result.assessmentLimitation.kind === "service_unavailable"
+      ? "The scanner could not obtain a stable response from the target, so this assessment is only a limited availability read."
+      : "The scanner could not establish a normal trusted read of the target, so this assessment is only a partial posture view."
+    : trainingSurfaceDetected
+      ? "The target appears to be an intentionally vulnerable lab or training surface, so this assessment should be read as passive posture context rather than a normal business-risk verdict."
     : posture === "strong"
       ? "External posture looks broadly solid, with only a few areas that still deserve tuning."
       : posture === "mixed"

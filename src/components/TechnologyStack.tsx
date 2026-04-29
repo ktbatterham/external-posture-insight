@@ -10,32 +10,32 @@ interface TechnologyStackProps {
 const categoryConfig = {
   server: {
     icon: <Server className="h-4 w-4" />,
-    color: "bg-sky-100 text-sky-900",
+    color: "bg-white/[0.08] text-slate-100",
   },
   frontend: {
     icon: <Code2 className="h-4 w-4" />,
-    color: "bg-emerald-100 text-emerald-900",
+    color: "bg-white/[0.08] text-slate-100",
   },
   security: {
     icon: <Shield className="h-4 w-4" />,
-    color: "bg-amber-100 text-amber-900",
+    color: "bg-[#b56a2c]/16 text-[#f0d5bc]",
   },
   hosting: {
     icon: <Cloud className="h-4 w-4" />,
-    color: "bg-indigo-100 text-indigo-900",
+    color: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
   },
   network: {
     icon: <Network className="h-4 w-4" />,
-    color: "bg-violet-100 text-violet-900",
+    color: "bg-[#4f6676]/18 text-[#d9e4ea]",
   },
 } as const;
 
 const categoryOrder: Array<keyof typeof categoryConfig> = ["network", "hosting", "server", "frontend", "security"];
 
 const confidenceStyles = {
-  high: "bg-slate-200 text-slate-900",
-  medium: "bg-amber-100 text-amber-900",
-  low: "bg-sky-100 text-sky-900",
+  high: "bg-white/[0.08] text-slate-100",
+  medium: "bg-[#b56a2c]/16 text-[#f0d5bc]",
+  low: "bg-[#4f6676]/18 text-[#d9e4ea]",
 } as const;
 
 export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
@@ -49,9 +49,9 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
   }, {});
 
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-slate-900">
+        <CardTitle className="flex items-center gap-2 text-slate-50">
           <Globe className="h-5 w-5" />
           Detected Stack
         </CardTitle>
@@ -62,7 +62,7 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
           const config = categoryConfig[category as keyof typeof categoryConfig];
           return (
             <div key={category} className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold capitalize text-slate-700">
+              <div className="flex items-center gap-2 text-sm font-semibold capitalize text-slate-300">
                 {config.icon}
                 {category}
               </div>
@@ -70,10 +70,10 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
                 {items.map((tech) => (
                   <div
                     key={`${tech.category}-${tech.name}-${tech.version ?? "none"}`}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                    className="rounded-[1.25rem] border border-white/10 bg-white/[0.04] px-4 py-3"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="font-medium text-slate-900">{tech.name}</div>
+                      <div className="font-medium text-slate-50">{tech.name}</div>
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <Badge variant="secondary" className={config.color}>
                           {tech.version ?? tech.detection}
@@ -83,7 +83,7 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
                         </Badge>
                       </div>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">{tech.evidence}</p>
+                    <p className="mt-2 text-xs text-slate-400">{tech.evidence}</p>
                   </div>
                 ))}
               </div>

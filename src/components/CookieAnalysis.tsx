@@ -10,14 +10,14 @@ interface CookieAnalysisProps {
 }
 
 const riskStyles: Record<CookieResult["risk"], string> = {
-  low: "bg-emerald-100 text-emerald-900",
-  medium: "bg-amber-100 text-amber-900",
-  high: "bg-rose-100 text-rose-900",
+  low: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  medium: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
+  high: "bg-[#b56a2c]/16 text-[#f0d5bc]",
 };
 
 export const CookieAnalysis = ({ cookies }: CookieAnalysisProps) => {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Cookie className="h-5 w-5" />
@@ -40,8 +40,8 @@ export const CookieAnalysis = ({ cookies }: CookieAnalysisProps) => {
               </TableHeader>
               <TableBody>
                 {cookies.map((cookie) => (
-                  <TableRow key={cookie.name} className="align-top">
-                    <TableCell className="font-medium text-slate-900">{cookie.name}</TableCell>
+                <TableRow key={cookie.name} className="align-top border-white/10 hover:bg-white/[0.02]">
+                    <TableCell className="font-medium text-slate-50">{cookie.name}</TableCell>
                     <TableCell className="space-y-2">
                       <div className="flex flex-wrap gap-2">
                         <Badge variant={cookie.secure ? "default" : "destructive"}>
@@ -55,7 +55,7 @@ export const CookieAnalysis = ({ cookies }: CookieAnalysisProps) => {
                         </Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-slate-600">
+                    <TableCell className="text-sm text-slate-300">
                       <div>{cookie.domain ? `Domain ${cookie.domain}` : "Host-only"}</div>
                       <div>{cookie.path ? `Path ${cookie.path}` : "Default path"}</div>
                       <div>{cookie.expires ? `Expires ${cookie.expires}` : "Session cookie"}</div>

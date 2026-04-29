@@ -36,6 +36,17 @@ const POSTURE_WEIGHTS: Record<PostureAreaKey, number> = {
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
+const severeAssessmentCaps: Record<
+  NonNullable<PostureScoringInput["assessmentLimitation"]["kind"]>,
+  { default: number; domain: number }
+> = {
+  blocked_edge_response: { default: 59, domain: 78 },
+  auth_required: { default: 59, domain: 78 },
+  rate_limited: { default: 54, domain: 74 },
+  service_unavailable: { default: 35, domain: 72 },
+  other: { default: 59, domain: 74 },
+};
+
 const statusAvailabilityPenalty = (statusCode?: number) => {
   if (!statusCode) return 0;
   if (statusCode >= 500) return 35;
@@ -44,8 +55,22 @@ const statusAvailabilityPenalty = (statusCode?: number) => {
 };
 
 const limitedAssessmentScoreCap = (kind: PostureScoringInput["assessmentLimitation"]["kind"]) => {
-  if (kind === "service_unavailable") return 64;
-  return 84;
+  if (kind === "service_unavailable") return 49;
+  if (kind === "rate_limited") return 59;
+  return 64;
+};
+
+const cappedAreaScore = (
+  areaKey: PostureAreaKey,
+  score: number,
+  assessmentLimitation: PostureScoringInput["assessmentLimitation"],
+) => {
+  if (!assessmentLimitation.limited || !assessmentLimitation.kind) {
+    return score;
+  }
+
+  const caps = severeAssessmentCaps[assessmentLimitation.kind];
+  return Math.min(score, areaKey === "domain" ? caps.domain : caps.default);
 };
 
 const statusForScore = (score: number): PostureAreaScore["status"] => {
@@ -61,6 +86,17 @@ export function gradeForScore(score: number): string {
   if (score >= 70) return "C";
   if (score >= 60) return "D";
   return "F";
+}
+
+function gradeForPostureScore(
+  score: number,
+  assessmentLimitation: PostureScoringInput["assessmentLimitation"],
+): string {
+  if (assessmentLimitation.limited) {
+    return "U";
+  }
+
+  return gradeForScore(score);
 }
 
 export function scoreAnalysis({
@@ -182,9 +218,9 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
     redirectPenalty;
 
   const contentPenalty =
-    cspHeaderIssueCount * 10 +
-    analysis.htmlSecurity.issues.length * 8 +
-    cookieIssueCount * 4;
+    cspHeaderIssueCount * 18 +
+    analysis.htmlSecurity.issues.length * 10 +
+    cookieIssueCount * 6;
 
   const domainPenalty =
     analysis.domainSecurity.issues.length * 8 +
@@ -208,13 +244,13 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
     (analysis.aiSurface.detected && !analysis.aiSurface.disclosures.length ? 8 : 0);
 
   const areas: Array<Omit<PostureAreaScore, "status">> = [
-    { key: "edge", label: "Edge Security", score: clamp(100 - edgePenalty) },
-    { key: "content", label: "Content Security", score: clamp(100 - contentPenalty) },
-    { key: "domain", label: "Domain & Trust", score: clamp(100 - domainPenalty) },
-    { key: "exposure", label: "Exposure Control", score: clamp(100 - exposurePenalty) },
-    { key: "api", label: "API Surface", score: clamp(100 - apiPenalty) },
-    { key: "trust", label: "Third-Party Trust", score: clamp(100 - trustPenalty) },
-    { key: "ai", label: "AI & Automation", score: clamp(100 - aiPenalty) },
+    { key: "edge", label: "Edge Security", score: cappedAreaScore("edge", clamp(100 - edgePenalty), analysis.assessmentLimitation) },
+    { key: "content", label: "Content Security", score: cappedAreaScore("content", clamp(100 - contentPenalty), analysis.assessmentLimitation) },
+    { key: "domain", label: "Domain & Trust", score: cappedAreaScore("domain", clamp(100 - domainPenalty), analysis.assessmentLimitation) },
+    { key: "exposure", label: "Exposure Control", score: cappedAreaScore("exposure", clamp(100 - exposurePenalty), analysis.assessmentLimitation) },
+    { key: "api", label: "API Surface", score: cappedAreaScore("api", clamp(100 - apiPenalty), analysis.assessmentLimitation) },
+    { key: "trust", label: "Third-Party Trust", score: cappedAreaScore("trust", clamp(100 - trustPenalty), analysis.assessmentLimitation) },
+    { key: "ai", label: "AI & Automation", score: cappedAreaScore("ai", clamp(100 - aiPenalty), analysis.assessmentLimitation) },
   ];
 
   return areas.map((area) => ({
@@ -225,16 +261,23 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
 
 export function scorePostureAnalysis(analysis: PostureScoringInput): { score: number; grade: string } {
   const areaScores = getPostureAreaScores(analysis);
+  const weakAreaCount = areaScores.filter((area) => area.score < 65).length;
+  const watchAreaCount = areaScores.filter((area) => area.score >= 65 && area.score < 85).length;
+  const breadthPenalty = Math.max(0, weakAreaCount - 1) * 4 + Math.min(watchAreaCount, 2) * 2;
   const weightedScore = Math.round(
     areaScores.reduce((total, area) => total + area.score * POSTURE_WEIGHTS[area.key], 0),
   );
+  const adjustedScore = clamp(weightedScore - breadthPenalty);
   const score = analysis.assessmentLimitation.limited
-    ? Math.min(weightedScore, limitedAssessmentScoreCap(analysis.assessmentLimitation.kind))
-    : weightedScore;
-  return { score, grade: gradeForScore(score) };
+    ? Math.min(adjustedScore, limitedAssessmentScoreCap(analysis.assessmentLimitation.kind))
+    : adjustedScore;
+  return { score, grade: gradeForPostureScore(score, analysis.assessmentLimitation) };
 }
 
 export function summarizePostureGrade(grade: string): string {
+  if (grade === "U") {
+    return "Assessment confidence is limited, so this result should be treated as directional rather than a full posture read.";
+  }
   if (grade === "A+" || grade === "A") {
     return "External posture looks strong across the main passive checks.";
   }
