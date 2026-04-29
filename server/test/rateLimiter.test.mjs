@@ -51,7 +51,7 @@ test("upstash limiter marks request as limited when count exceeds threshold", as
   }
 });
 
-test("upstash limiter fails open and logs when backend call fails", async () => {
+test("upstash limiter falls back to local throttling and logs when backend call fails", async () => {
   const originalFetch = globalThis.fetch;
 
   try {
@@ -73,16 +73,18 @@ test("upstash limiter fails open and logs when backend call fails", async () => 
       log: (...args) => logs.push(args),
     });
 
-    const result = await limiter.check("198.51.100.3");
-    assert.equal(result.limited, false);
-    assert.ok(result.retryAfterSeconds >= 1);
+    const one = await limiter.check("198.51.100.3");
+    const two = await limiter.check("198.51.100.3");
+    assert.equal(one.limited, false);
+    assert.equal(two.limited, true);
+    assert.ok(two.retryAfterSeconds >= 1);
     assert.ok(logs.some((entry) => entry[1] === "rate_limit_backend_error"));
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("upstash limiter fails open for malformed payload", async () => {
+test("upstash limiter falls back to local throttling for malformed payload", async () => {
   const originalFetch = globalThis.fetch;
 
   try {
@@ -102,9 +104,11 @@ test("upstash limiter fails open for malformed payload", async () => {
       log: () => {},
     });
 
-    const result = await limiter.check("198.51.100.4");
-    assert.equal(result.limited, false);
-    assert.ok(result.retryAfterSeconds >= 1);
+    const one = await limiter.check("198.51.100.4");
+    const two = await limiter.check("198.51.100.4");
+    assert.equal(one.limited, false);
+    assert.equal(two.limited, true);
+    assert.ok(two.retryAfterSeconds >= 1);
   } finally {
     globalThis.fetch = originalFetch;
   }

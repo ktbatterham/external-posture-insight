@@ -147,6 +147,7 @@ export const analyzeExposure = async (
   const probes: ExposureSummary["probes"] = [];
   const issues: string[] = [];
   const strengths: string[] = [];
+  let sawErrorProbe = false;
 
   for (const probe of deps.exposureProbes) {
     const probeUrl = new URL(probe.path, finalUrl.origin);
@@ -208,10 +209,11 @@ export const analyzeExposure = async (
           detail = "Sensitive path may exist but is access-controlled.";
           strengths.push(`${probe.label} appears access-controlled.`);
         }
-      } else if (response.statusCode >= 500) {
-        finding = "error";
-        detail = "Sensitive path triggered a server-side error, so the path may exist or be handled unexpectedly.";
-      }
+        } else if (response.statusCode >= 500) {
+          finding = "error";
+          detail = "Sensitive path triggered a server-side error, so the path may exist or be handled unexpectedly.";
+          sawErrorProbe = true;
+        }
 
       probes.push({
         label: probe.label,
@@ -230,10 +232,15 @@ export const analyzeExposure = async (
         finding: "error",
         detail: deps.formatErrorMessage(error) || "Probe failed unexpectedly.",
       });
+      sawErrorProbe = true;
     }
   }
 
-  if (!issues.length) {
+  if (sawErrorProbe) {
+    issues.push("Some sensitive-path probes triggered server-side errors, so exposure could not be ruled out cleanly.");
+  }
+
+  if (!issues.length && !sawErrorProbe) {
     strengths.push("No obvious high-signal sensitive files were openly exposed in the limited probe set.");
   }
 
@@ -318,6 +325,7 @@ export const analyzeApiSurface = async (
   const probes: ApiSurfaceInfo["probes"] = [];
   const issues: string[] = [];
   const strengths: string[] = [];
+  let sawErrorProbe = false;
   const homepageSignature = homepageContext?.signature || "";
   const homepageTitle = homepageContext?.pageTitle || null;
 
@@ -357,6 +365,7 @@ export const analyzeApiSurface = async (
       } else if (response.statusCode >= 500) {
         classification = "error";
         detail = "Endpoint triggered a server-side error, so the path exists or is handled but did not respond cleanly.";
+        sawErrorProbe = true;
       } else if (response.statusCode >= 200 && response.statusCode < 300) {
         if ((contentType || "").includes("application/json")) {
           classification = "public";
@@ -409,10 +418,15 @@ export const analyzeApiSurface = async (
         contentType: null,
         detail: error instanceof Error ? error.message : "Probe failed.",
       });
+      sawErrorProbe = true;
     }
   }
 
-  if (!issues.length) {
+  if (sawErrorProbe) {
+    issues.push("Some API-style probes triggered server-side errors, so application handling on those paths deserves review.");
+  }
+
+  if (!issues.length && !sawErrorProbe) {
     strengths.push("No obviously public API endpoints were detected in the limited probe set.");
   }
   if (probes.some((probe) => probe.classification === "fallback")) {

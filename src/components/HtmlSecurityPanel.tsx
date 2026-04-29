@@ -14,6 +14,49 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
   const hiddenFirstPartyPathCount = Math.max(htmlSecurity.firstPartyPaths.length - visibleFirstPartyPaths.length, 0);
   const visibleSameSiteHosts = htmlSecurity.sameSiteHosts.slice(0, 8);
   const hiddenSameSiteHostCount = Math.max(htmlSecurity.sameSiteHosts.length - visibleSameSiteHosts.length, 0);
+  const visibleTechnologies = htmlSecurity.detectedTechnologies.slice(0, 6);
+  const hiddenTechnologyCount = Math.max(htmlSecurity.detectedTechnologies.length - visibleTechnologies.length, 0);
+  const visibleLibraryFingerprints = htmlSecurity.libraryFingerprints.slice(0, 5);
+  const hiddenLibraryFingerprintCount = Math.max(htmlSecurity.libraryFingerprints.length - visibleLibraryFingerprints.length, 0);
+  const apiExposureSignals = htmlSecurity.clientExposureSignals.filter((signal) => signal.category === "api_endpoint");
+  const configExposureSignals = htmlSecurity.clientExposureSignals.filter(
+    (signal) => signal.category === "config" || signal.category === "environment" || signal.category === "service",
+  );
+  const analyticsTechnologies = htmlSecurity.detectedTechnologies.filter((technology) => technology.category === "network");
+  const securityTechnologies = htmlSecurity.detectedTechnologies.filter((technology) => technology.category === "security");
+  const frameworkTechnologies = htmlSecurity.detectedTechnologies.filter(
+    (technology) => technology.category === "frontend" || technology.category === "hosting",
+  );
+  const clientCodeSignalRows = [
+    {
+      label: "Framework / stack",
+      value: frameworkTechnologies.length
+        ? frameworkTechnologies.map((technology) => technology.version ? `${technology.name} ${technology.version}` : technology.name)
+        : ["No obvious framework markers surfaced from the fetched page."],
+    },
+    {
+      label: "Analytics / client vendors",
+      value: analyticsTechnologies.length || securityTechnologies.length
+        ? [...analyticsTechnologies, ...securityTechnologies]
+            .slice(0, 6)
+            .map((technology) => technology.name)
+        : ["No prominent analytics or client-side trust vendors were inferred from visible assets."],
+    },
+    {
+      label: "API / config clues",
+      value: apiExposureSignals.length || configExposureSignals.length
+        ? [...apiExposureSignals, ...configExposureSignals]
+            .slice(0, 6)
+            .map((signal) => signal.title)
+        : ["No obvious public API or client configuration clues were surfaced from markup."],
+    },
+    {
+      label: "Version hints",
+      value: visibleLibraryFingerprints.length
+        ? visibleLibraryFingerprints.map((fingerprint) => `${fingerprint.packageName} ${fingerprint.version}`)
+        : ["No explicit client-library version markers were detected."],
+    },
+  ];
 
   return (
     <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
@@ -24,6 +67,31 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        <StatBox
+          label="Client code signals"
+          value={
+            <div className="grid gap-3 md:grid-cols-2">
+              {clientCodeSignalRows.map((row) => (
+                <div key={row.label} className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{row.label}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {row.value.map((item) => (
+                      <TruncatedChip key={`${row.label}-${item}`} value={item} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          }
+          note={
+            htmlSecurity.detectedTechnologies.length || htmlSecurity.clientExposureSignals.length || htmlSecurity.libraryFingerprints.length ? (
+              <p className="text-xs text-slate-400">
+                Derived from visible client assets, markup, and versioned resource hints. These signals help with surface intelligence, not exploit proof.
+              </p>
+            ) : null
+          }
+        />
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
           <StatBox label="Page title" value={<p className="line-clamp-2 text-sm font-semibold">{htmlSecurity.pageTitle || "Unavailable"}</p>} />
           <StatBox label="Forms" value={<p className="text-2xl font-semibold">{htmlSecurity.forms.length}</p>} />
@@ -88,6 +156,51 @@ export const HtmlSecurityPanel = ({ htmlSecurity }: HtmlSecurityPanelProps) => {
                 </div>
               }
             />
+          </div>
+        )}
+
+        {(htmlSecurity.detectedTechnologies.length > 0 || htmlSecurity.libraryFingerprints.length > visibleLibraryFingerprints.length) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {htmlSecurity.detectedTechnologies.length > 0 && (
+              <StatBox
+                label="Detected technologies"
+                value={
+                  <div className="flex flex-wrap gap-2">
+                    {visibleTechnologies.map((technology) => (
+                      <TruncatedChip
+                        key={`${technology.name}-${technology.category}`}
+                        value={technology.version ? `${technology.name} ${technology.version}` : technology.name}
+                      />
+                    ))}
+                    {hiddenTechnologyCount > 0 && (
+                      <Badge variant="secondary" className="rounded-full px-3 py-1">
+                        +{hiddenTechnologyCount} more
+                      </Badge>
+                    )}
+                  </div>
+                }
+              />
+            )}
+            {htmlSecurity.libraryFingerprints.length > visibleLibraryFingerprints.length && (
+              <StatBox
+                label="Additional versioned libraries"
+                value={
+                  <div className="flex flex-wrap gap-2">
+                    {visibleLibraryFingerprints.map((fingerprint) => (
+                      <TruncatedChip
+                        key={`${fingerprint.packageName}-${fingerprint.version}`}
+                        value={`${fingerprint.packageName} ${fingerprint.version}`}
+                      />
+                    ))}
+                    {hiddenLibraryFingerprintCount > 0 && (
+                      <Badge variant="secondary" className="rounded-full px-3 py-1">
+                        +{hiddenLibraryFingerprintCount} more
+                      </Badge>
+                    )}
+                  </div>
+                }
+              />
+            )}
           </div>
         )}
 

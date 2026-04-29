@@ -10,6 +10,17 @@ export interface AreaScore {
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
+const severeAssessmentCaps: Record<
+  NonNullable<AnalysisResult["assessmentLimitation"]["kind"]>,
+  { default: number; domain: number }
+> = {
+  blocked_edge_response: { default: 59, domain: 78 },
+  auth_required: { default: 59, domain: 78 },
+  rate_limited: { default: 54, domain: 74 },
+  service_unavailable: { default: 35, domain: 72 },
+  other: { default: 59, domain: 74 },
+};
+
 const statusAvailabilityPenalty = (statusCode?: number) => {
   if (!statusCode) return 0;
   if (statusCode >= 500) return 35;
@@ -33,6 +44,15 @@ const statusForScore = (score: number): AreaScore["status"] => {
   if (score >= 85) return "strong";
   if (score >= 65) return "watch";
   return "weak";
+};
+
+const cappedAreaScore = (analysis: AnalysisResult, areaKey: AreaScore["key"], score: number) => {
+  if (!analysis.assessmentLimitation?.limited || !analysis.assessmentLimitation.kind) {
+    return score;
+  }
+
+  const caps = severeAssessmentCaps[analysis.assessmentLimitation.kind];
+  return Math.min(score, areaKey === "domain" ? caps.domain : caps.default);
 };
 
 export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
@@ -71,9 +91,9 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
     redirectPenalty;
 
   const contentPenalty =
-    cspHeaderIssueCount * 10 +
-    analysis.htmlSecurity.issues.length * 8 +
-    cookieIssueCount * 4;
+    cspHeaderIssueCount * 18 +
+    analysis.htmlSecurity.issues.length * 10 +
+    cookieIssueCount * 6;
 
   const domainPenalty =
     analysis.domainSecurity.issues.length * 8 +
@@ -96,34 +116,44 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
     analysis.aiSurface.issues.length * 12 +
     (analysis.aiSurface.detected && !analysis.aiSurface.disclosures.length ? 8 : 0);
 
+  const edgeScore = cappedAreaScore(analysis, "edge", clamp(100 - edgePenalty));
+  const contentScore = cappedAreaScore(analysis, "content", clamp(100 - contentPenalty));
+  const domainScore = cappedAreaScore(analysis, "domain", clamp(100 - domainPenalty));
+  const exposureScore = cappedAreaScore(analysis, "exposure", clamp(100 - exposurePenalty));
+  const apiScore = cappedAreaScore(analysis, "api", clamp(100 - apiPenalty));
+  const trustScore = cappedAreaScore(analysis, "trust", clamp(100 - trustPenalty));
+  const aiScore = cappedAreaScore(analysis, "ai", clamp(100 - aiPenalty));
+
   const areas: AreaScore[] = [
     {
       key: "edge",
       label: "Edge Security",
-      score: clamp(100 - edgePenalty),
-      status: statusForScore(clamp(100 - edgePenalty)),
+      score: edgeScore,
+      status: statusForScore(edgeScore),
       notes: [
         `${missingHeaderCount + warningHeaderCount} header findings`,
         `${analysis.corsSecurity.issues.length} CORS findings`,
         ...(availabilityPenalty ? [`HTTP ${analysis.statusCode} limited assessment`] : []),
+        ...(analysis.assessmentLimitation?.limited ? ["Limited confidence due to restricted page access"] : []),
       ],
     },
     {
       key: "content",
       label: "Content Security",
-      score: clamp(100 - contentPenalty),
-      status: statusForScore(clamp(100 - contentPenalty)),
+      score: contentScore,
+      status: statusForScore(contentScore),
       notes: [
         `${cspHeaderIssueCount} CSP header findings`,
         `${analysis.htmlSecurity.issues.length} page-content findings`,
         `${cookieIssueCount} cookie findings`,
+        ...(analysis.assessmentLimitation?.limited ? ["Page-dependent findings may be incomplete"] : []),
       ],
     },
     {
       key: "domain",
       label: "Domain & Trust",
-      score: clamp(100 - domainPenalty),
-      status: statusForScore(clamp(100 - domainPenalty)),
+      score: domainScore,
+      status: statusForScore(domainScore),
       notes: [
         `${analysis.domainSecurity.issues.length} DNS/mail findings`,
         `${analysis.securityTxt.issues.length} security.txt findings`,
@@ -133,40 +163,44 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
     {
       key: "exposure",
       label: "Exposure Control",
-      score: clamp(100 - exposurePenalty),
-      status: statusForScore(clamp(100 - exposurePenalty)),
+      score: exposureScore,
+      status: statusForScore(exposureScore),
       notes: [
         `${exposureInterestingCount} interesting exposure responses`,
+        ...(analysis.assessmentLimitation?.limited ? ["Interpret alongside the limited overall assessment"] : []),
       ],
     },
     {
       key: "api",
       label: "API Surface",
-      score: clamp(100 - apiPenalty),
-      status: statusForScore(clamp(100 - apiPenalty)),
+      score: apiScore,
+      status: statusForScore(apiScore),
       notes: [
         `${apiRespondedCount} endpoints responded`,
         `${apiFallbackCount} looked like frontend fallbacks`,
+        ...(analysis.assessmentLimitation?.limited ? ["API visibility may not reflect the normal app surface"] : []),
       ],
     },
     {
       key: "trust",
       label: "Third-Party Trust",
-      score: clamp(100 - trustPenalty),
-      status: statusForScore(clamp(100 - trustPenalty)),
+      score: trustScore,
+      status: statusForScore(trustScore),
       notes: [
         `${analysis.thirdPartyTrust.totalProviders} providers detected`,
         `${analysis.thirdPartyTrust.highRiskProviders} higher-risk providers`,
+        ...(analysis.assessmentLimitation?.limited ? ["Third-party observations come from a limited page read"] : []),
       ],
     },
     {
       key: "ai",
       label: "AI & Automation",
-      score: clamp(100 - aiPenalty),
-      status: statusForScore(clamp(100 - aiPenalty)),
+      score: aiScore,
+      status: statusForScore(aiScore),
       notes: [
         analysis.aiSurface.detected ? "AI or automation signals detected" : "No visible AI surface detected",
         `${analysis.aiSurface.issues.length} AI posture findings`,
+        ...(analysis.assessmentLimitation?.limited ? ["AI surface visibility may be incomplete"] : []),
       ],
     },
   ];

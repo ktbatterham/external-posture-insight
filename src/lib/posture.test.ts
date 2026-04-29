@@ -43,8 +43,8 @@ describe("getAreaScores", () => {
     });
 
     const content = getAreaScores(analysis).find((area) => area.key === "content");
-    expect(content?.score).toBe(90);
-    expect(content?.status).toBe("strong");
+    expect(content?.score).toBe(82);
+    expect(content?.status).toBe("watch");
   });
 
   it("clamps heavily penalized edge score at zero and marks it weak", () => {
@@ -65,11 +65,26 @@ describe("getAreaScores", () => {
   it("penalizes edge security when the target returns a server error", () => {
     const analysis = createAnalysis({
       statusCode: 503,
+      assessmentLimitation: { limited: true, kind: "service_unavailable" },
     });
 
     const edge = getAreaScores(analysis).find((area) => area.key === "edge");
-    expect(edge?.score).toBe(65);
+    expect(edge?.score).toBe(35);
     expect(edge?.notes).toContain("HTTP 503 limited assessment");
+  });
+
+  it("caps page-dependent areas when the assessment is limited by a blocked response", () => {
+    const analysis = createAnalysis({
+      assessmentLimitation: { limited: true, kind: "blocked_edge_response" },
+      htmlSecurity: { issues: [], missingSriScriptUrls: [], passiveLeakSignals: [] },
+    });
+
+    const content = getAreaScores(analysis).find((area) => area.key === "content");
+    const domain = getAreaScores(analysis).find((area) => area.key === "domain");
+
+    expect(content?.score).toBe(59);
+    expect(content?.notes).toContain("Page-dependent findings may be incomplete");
+    expect(domain?.score).toBe(78);
   });
 
   it("applies status thresholds consistently", () => {

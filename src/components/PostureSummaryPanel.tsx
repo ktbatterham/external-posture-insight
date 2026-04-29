@@ -60,7 +60,7 @@ export const PostureSummaryPanel = ({ analysis }: PostureSummaryPanelProps) => {
                   <div
                     className={`h-2 rounded-full ${
                       area.status === "strong"
-                        ? "bg-[#7aa6b6]"
+                        ? "bg-slate-300"
                         : area.status === "watch"
                           ? "bg-[#b56a2c]"
                           : "bg-[#8e5c3b]"

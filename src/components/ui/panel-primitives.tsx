@@ -25,9 +25,9 @@ const statBoxVariants: Record<StatBoxVariant, { container: string; label: string
     value: "text-[#f0dfcf]",
   },
   info: {
-    container: "border-[#4f6676]/35 bg-[#4f6676]/12",
-    label: "text-[#bcd4de]",
-    value: "text-[#ebf2f5]",
+    container: "border-white/10 bg-white/[0.04]",
+    label: "text-slate-400",
+    value: "text-white",
   },
 };
 
@@ -64,7 +64,7 @@ export const StatBox = ({ label, value, note, variant = "default", className }: 
 type StatusAlertVariant = "success" | "warning" | "critical" | "info";
 
 const statusAlertVariants: Record<StatusAlertVariant, string> = {
-  success: "border-[#4f6676]/35 bg-[#4f6676]/12 text-[#edf3f6]",
+  success: "border-white/10 bg-white/[0.04] text-slate-100",
   warning: "border-[#b56a2c]/35 bg-[#b56a2c]/12 text-[#f4dfcd]",
   critical: "border-[#b56a2c]/45 bg-[#3a2a20] text-[#f4dfcd]",
   info: "border-white/10 bg-white/[0.04] text-slate-100",
@@ -100,10 +100,10 @@ type SignalListVariant = "success" | "neutral";
 
 const signalListVariants: Record<SignalListVariant, { container: string; title: string; body: string; icon: string }> = {
   success: {
-    container: "border-[#4f6676]/35 bg-[#4f6676]/12",
-    title: "text-[#bcd4de]",
-    body: "text-[#edf3f6]",
-    icon: "text-[#bcd4de]",
+    container: "border-white/10 bg-white/[0.04]",
+    title: "text-slate-400",
+    body: "text-slate-200",
+    icon: "text-slate-300",
   },
   neutral: {
     container: "border-white/10 bg-white/[0.04]",

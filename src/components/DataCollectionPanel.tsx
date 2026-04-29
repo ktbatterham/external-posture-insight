@@ -13,7 +13,27 @@ export const DataCollectionPanel = ({ htmlSecurity }: DataCollectionPanelProps) 
   const summary = getDataCollectionSummary(htmlSecurity);
 
   if (!summary.totalForms) {
-    return null;
+    return (
+      <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FormInput className="h-5 w-5" />
+            Data Collection Surface
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm leading-6 text-slate-300">
+            No public form collection signals were detected from the fetched page.
+          </p>
+          <div className="grid gap-4 md:grid-cols-4">
+            <StatBox label="Public forms" value={<p className="text-2xl font-semibold">0</p>} />
+            <StatBox label="POST forms" value={<p className="text-2xl font-semibold">0</p>} />
+            <StatBox label="External submit targets" value={<p className="text-2xl font-semibold">0</p>} />
+            <StatBox label="Insecure submits" value={<p className="text-2xl font-semibold">0</p>} />
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

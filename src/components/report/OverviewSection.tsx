@@ -9,27 +9,30 @@ import { sectionTitleClass } from "./ReportSectionHeader";
 
 const trafficLightStyles = {
   strong: {
-    ring: "border-[#7aa6b6]/45",
-    pill: "bg-[#7aa6b6]",
-    text: "text-[#d7e7ee]",
+    ring: "border-white/10",
+    pill: "bg-slate-300",
+    text: "text-slate-100",
+    bar: "from-slate-200 via-slate-300 to-slate-400",
   },
   watch: {
     ring: "border-[#b56a2c]/45",
     pill: "bg-[#b56a2c]",
     text: "text-[#f0d5bc]",
+    bar: "from-[#9d5a28] via-[#b56a2c] to-[#d08a4b]",
   },
   weak: {
     ring: "border-[#8e5c3b]/45",
     pill: "bg-[#8e5c3b]",
     text: "text-[#e2c0a2]",
+    bar: "from-[#74452b] via-[#8e5c3b] to-[#b56a2c]",
   },
 } as const;
 
 const healthcheckStyles = {
   strong: {
-    tile: "border-[#7aa6b6]/35 bg-[#7aa6b6]/12",
-    dot: "bg-[#7aa6b6]",
-    grade: "text-[#d7e7ee]",
+    tile: "border-white/10 bg-white/[0.04]",
+    dot: "bg-slate-300",
+    grade: "text-slate-100",
   },
   watch: {
     tile: "border-[#b56a2c]/35 bg-[#b56a2c]/12",
@@ -85,7 +88,14 @@ export const OverviewSection = ({
   exportReport,
   compact = false,
 }: OverviewSectionProps) => {
+  const isLimitedAssessment = analysisData.assessmentLimitation.limited;
   const healthcheckStyle = healthcheckStyles[healthcheckStatusForGrade(analysisData.grade)];
+  const sortedAreaScores = [...areaScores].sort((left, right) => left.score - right.score);
+  const hasTrainingSurfaceNarrative =
+    analysisData.executiveSummary.overview.toLowerCase().includes("lab or training surface") ||
+    analysisData.executiveSummary.takeaways.some((takeaway) =>
+      takeaway.toLowerCase().includes("lab or training surface"),
+    );
 
   return (
     <div id="overview" className="space-y-6">
@@ -102,14 +112,19 @@ export const OverviewSection = ({
 
       <div className="space-y-4">
         <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(11,18,32,0.95),rgba(16,24,39,0.92))] px-6 py-6 shadow-[0_30px_80px_-48px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.04]">
-          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.7fr_1.55fr] xl:items-start">
+          <div className={`grid gap-4 xl:items-start ${isLimitedAssessment ? "xl:grid-cols-[1fr_1.35fr]" : "xl:grid-cols-[1.15fr_0.7fr_1.55fr]"}`}>
             <div>
               <p className={sectionTitleClass}>Target</p>
               <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{analysisData.host}</p>
               <p className="mt-2 break-all text-sm text-slate-400">{analysisData.finalUrl}</p>
             </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-5 py-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)]">
+            <div className={`rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-5 py-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)] ${isLimitedAssessment ? "xl:max-w-none" : ""}`}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Analyst read</p>
+              {hasTrainingSurfaceNarrative ? (
+                <div className="mt-3 inline-flex items-center rounded-full border border-[#b56a2c]/35 bg-[#b56a2c]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0d5bc]">
+                  Training surface detected
+                </div>
+              ) : null}
               <p className={`mt-3 text-base text-slate-300 ${compact ? "line-clamp-3 leading-7" : "leading-8"}`}>
                 {analysisData.executiveSummary.overview}
               </p>
@@ -141,8 +156,8 @@ export const OverviewSection = ({
           </div>
 
           <div className="mt-5 border-t border-white/10 pt-5">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className={`rounded-[1.5rem] border px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)] ${healthcheckStyle.tile}`}>
+            <div className={`grid gap-4 xl:items-start ${isLimitedAssessment ? "xl:grid-cols-[0.72fr_1.45fr]" : "xl:grid-cols-[0.72fr_1.45fr]"}`}>
+              <div className={`self-start rounded-[1.5rem] border px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)] ${healthcheckStyle.tile}`}>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-white">Healthcheck</p>
                   <span className={`inline-flex h-3 w-3 rounded-full ${healthcheckStyle.dot}`} aria-hidden="true" />
@@ -153,27 +168,69 @@ export const OverviewSection = ({
                     Overall grade
                   </span>
                 </div>
+                <p className="mt-4 text-sm leading-6 text-slate-400">
+                  Overall posture read for this target at the time of the scan.
+                </p>
               </div>
-              {areaScores.map((area) => {
-                const style = trafficLightStyles[area.status];
-                return (
-                  <div
-                    key={area.key}
-                    className={`rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)] ${style.ring}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-white">{area.label}</p>
-                      <span className={`inline-flex h-3 w-3 rounded-full ${style.pill}`} aria-hidden="true" />
+              {isLimitedAssessment ? (
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-white">Assessment constraints</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Directional read only
+                    </p>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Why this result is constrained
+                      </p>
+                      <p className="mt-3 text-base font-semibold leading-7 text-white">
+                        {analysisData.assessmentLimitation.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">
+                        {analysisData.assessmentLimitation.detail}
+                      </p>
                     </div>
-                    <div className="mt-4 flex items-baseline gap-3">
-                      <span className={`text-4xl font-semibold leading-none ${style.text}`}>{area.score}%</span>
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {area.status}
-                      </span>
+                    <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        How to read this
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">
+                        Use this result as a transport and access-control signal, not as a full category-by-category posture verdict.
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)]">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-white">Category scores</p>
+                </div>
+                  <div className="mt-4 space-y-3">
+                    {sortedAreaScores.map((area) => {
+                      const style = trafficLightStyles[area.status];
+                      return (
+                        <div key={area.key} className="grid gap-2 md:grid-cols-[13rem_1fr_auto] md:items-center">
+                          <div className="flex items-center gap-3">
+                            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${style.pill}`} aria-hidden="true" />
+                            <p className="text-sm font-medium text-slate-200">{area.label}</p>
+                          </div>
+                          <div className="relative h-3 overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/[0.05]">
+                            <div
+                              className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${style.bar}`}
+                              style={{ width: `${area.score}%` }}
+                            />
+                          </div>
+                          <div className="flex min-w-[6.25rem] items-baseline justify-end gap-2 text-right">
+                            <span className={`text-lg font-semibold leading-none ${style.text}`}>{area.score}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

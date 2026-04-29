@@ -99,6 +99,52 @@ function formatErrorMessage(error) {
 
   return "Unable to analyze URL.";
 }
+
+function classifyAssessmentFailure(error: unknown) {
+  const detail = formatErrorMessage(error);
+  const message = detail.toLowerCase();
+
+  if (message.includes("timed out")) {
+    return {
+      kind: "service_unavailable" as const,
+      title: "The target did not respond in time.",
+      detail: "The scanner could not complete a trusted response fetch before timing out, so this is only a limited assessment.",
+    };
+  }
+
+  if (
+    message.includes("certificate") ||
+    message.includes("self-signed") ||
+    message.includes("unable to verify") ||
+    message.includes("hostname/ip does not match") ||
+    message.includes("expired")
+  ) {
+    return {
+      kind: "other" as const,
+      title: "TLS certificate validation failed.",
+      detail: `The scanner could not establish a trusted HTTPS connection: ${detail}`,
+    };
+  }
+
+  if (
+    message.includes("econnrefused") ||
+    message.includes("enotfound") ||
+    message.includes("socket hang up") ||
+    message.includes("ehostunreach")
+  ) {
+    return {
+      kind: "service_unavailable" as const,
+      title: "The target could not be reached cleanly.",
+      detail: `The scanner could not obtain a stable response from the target: ${detail}`,
+    };
+  }
+
+  return {
+    kind: "other" as const,
+    title: "The target could not be assessed cleanly.",
+    detail: `The scan did not complete normally: ${detail}`,
+  };
+}
 export function analyzeHtmlDocument(input: string | URL, html: string): HtmlSecurityInfo {
   return analyzeHtmlDocumentFromModule(input, html);
 }
@@ -516,7 +562,174 @@ const emptyApiSurface = () => ({
 export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = {}): Promise<AnalysisResult> {
   const scanMode: ScanMode = options.scanMode || "standard";
   const pageAnalysisEnabled = scanMode === "standard";
-  const result = await analyzeUrlCore(input, { includeCertificate: true });
+  const normalizedInput = normalizeUrl(input);
+  let result;
+
+  try {
+    result = await analyzeUrlCore(normalizedInput, { includeCertificate: true });
+  } catch (error) {
+    const failure = classifyAssessmentFailure(error);
+    const publicSignals = await fetchPublicSignals(normalizedInput.host, { requestText }).catch(() => ({
+      hstsPreload: {
+        status: "unknown" as const,
+        summary: "Public HSTS preload status could not be determined.",
+        sourceUrl: `https://hstspreload.org/api/v2/status?domain=${encodeURIComponent(normalizedInput.host)}`,
+      },
+      issues: [],
+      strengths: [],
+    }));
+    const fallbackHtmlSecurity = analyzeHtmlSecurity(normalizedInput, null);
+    const fallbackIssue = classifyIssueTaxonomy({
+      severity: "warning",
+      area: "transport",
+      title: failure.title,
+      detail: failure.detail,
+      confidence: "high",
+      source: "observed",
+      owasp: ["A02 Cryptographic Failures"],
+      mitre: ["Reconnaissance"],
+    });
+    const domainSecurity = await analyzeDomainSecurity(normalizedInput.host, requestText).catch(() => ({
+      host: normalizedInput.host,
+      mxRecords: [],
+      nsRecords: [],
+      caaRecords: [],
+      dnssec: { enabled: false, dsRecords: [], status: "unknown" as const },
+      spf: null,
+      dmarc: null,
+      emailPolicy: {
+        spf: {
+          status: "missing" as const,
+          allMechanism: null,
+          dnsLookupMechanisms: 0,
+          summary: "SPF could not be evaluated during the limited fallback checks.",
+        },
+        dmarc: {
+          status: "missing" as const,
+          policy: null,
+          subdomainPolicy: null,
+          pct: null,
+          reporting: false,
+          summary: "DMARC could not be evaluated during the limited fallback checks.",
+        },
+      },
+      mtaSts: { dns: null, policyUrl: null, policy: null },
+      issues: [],
+      strengths: [],
+    }));
+
+    const limitedResult: AnalysisResult = {
+      inputUrl: input,
+      normalizedUrl: normalizedInput.toString(),
+      finalUrl: normalizedInput.toString(),
+      host: normalizedInput.host,
+      scannedAt: new Date().toISOString(),
+      responseTimeMs: 0,
+      statusCode: 0,
+      score: 0,
+      grade: "U",
+      summary: "Assessment is limited because the target could not be reached or trusted cleanly.",
+      headers: [],
+      rawHeaders: {},
+      cookies: [],
+      technologies: [],
+      certificate: {
+        available: normalizedInput.protocol === "https:",
+        valid: false,
+        authorized: false,
+        issuer: null,
+        subject: normalizedInput.hostname,
+        validFrom: null,
+        validTo: null,
+        daysRemaining: null,
+        protocol: null,
+        cipher: null,
+        fingerprint: null,
+        subjectAltName: [],
+        issues: [failure.detail],
+      },
+      redirects: [],
+      issues: [fallbackIssue],
+      strengths: [],
+      remediation: [],
+      crawl: emptyCrawlSummary(["limited assessment"]),
+      securityTxt: emptySecurityTxt(normalizedInput),
+      domainSecurity,
+      identityProvider: emptyIdentityProvider(),
+      ctDiscovery: {
+        queriedDomain: normalizedInput.hostname,
+        sourceUrl: `https://crt.sh/?q=%25.${normalizedInput.hostname}&output=json`,
+        subdomains: [],
+        wildcardEntries: [],
+        prioritizedHosts: [],
+        sampledHosts: [],
+        coverageSummary: "Certificate transparency discovery was skipped because the primary assessment could not complete cleanly.",
+        issues: [],
+        strengths: [],
+      },
+      htmlSecurity: fallbackHtmlSecurity,
+      aiSurface: fallbackHtmlSecurity.aiSurface,
+      thirdPartyTrust: {
+        totalProviders: 0,
+        highRiskProviders: 0,
+        providers: [],
+        issues: [],
+        strengths: [],
+        summary: "Third-party trust could not be assessed from a limited scan.",
+      },
+      infrastructure: {
+        host: normalizedInput.hostname,
+        addresses: [],
+        cnameTargets: [],
+        reverseDns: [],
+        providers: [],
+        issues: [],
+        strengths: [],
+        summary: "Infrastructure attribution was not completed because the primary response could not be fetched cleanly.",
+      },
+      executiveSummary: {
+        overview:
+          failure.kind === "service_unavailable"
+            ? "The scanner could not obtain a stable response from the target, so this is only a limited availability read."
+            : "The scanner could not establish a trusted connection to the target, so this is only a limited transport read.",
+        mainRisk:
+          failure.kind === "service_unavailable"
+            ? "Availability or reachability issues prevented a normal posture assessment."
+            : "TLS trust or certificate issues prevented a normal posture assessment.",
+        posture: "weak",
+        takeaways: [
+          failure.detail,
+          domainSecurity.issues.length > 0
+            ? `${domainSecurity.issues.length} domain or mail-hygiene issue${domainSecurity.issues.length === 1 ? "" : "s"} were still detectable without a full page read.`
+            : "No additional DNS or mail-hygiene issues were inferred from the limited fallback checks.",
+          publicSignals.issues.length > 0
+            ? `${publicSignals.issues.length} public trust signal${publicSignals.issues.length === 1 ? " was" : "s were"} still observable.`
+            : "Public preload and trust signals could not materially improve this limited read.",
+        ],
+      },
+      assessmentLimitation: {
+        limited: true,
+        kind: failure.kind,
+        title: failure.title,
+        detail: failure.detail,
+      },
+      exposure: emptyExposure(),
+      corsSecurity: emptyCorsSecurity(),
+      apiSurface: emptyApiSurface(),
+      publicSignals,
+      wafFingerprint: {
+        detected: false,
+        providers: [],
+        edgeSignals: [],
+        issues: [],
+        strengths: [],
+        summary: "Edge-protection fingerprinting was not completed because the primary response could not be fetched cleanly.",
+      },
+    };
+
+    return limitedResult;
+  }
+
   const finalUrl = new URL(result.finalUrl);
   const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson, requestText, {
     sampleHosts: pageAnalysisEnabled,

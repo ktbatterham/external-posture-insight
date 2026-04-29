@@ -121,6 +121,14 @@ export function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pag
       ...$("a[href]").toArray().map((anchor) => normalizeDiscoveredPath($(anchor).attr("href"), finalUrl)),
       ...forms.map((form) => normalizeDiscoveredPath(form.action, finalUrl)),
     ]);
+    const trainingLabMarkers = unique([
+      /(xss game|firing range|vulnweb|testfire|altoro mutual)/i.test(pageTitle || "")
+        ? `Title: ${pageTitle}`
+        : null,
+      ...firstPartyPaths
+        .filter((path) => /(xss|clickjacking|csrf|sql|sqli|mixedcontent|leakedcookie|dom)(?:\/|$|-|_)/i.test(path))
+        .slice(0, 6),
+    ]);
     const insecureResourceUrls = unique(
       [...externalScriptUrls, ...externalStylesheetUrls].filter((url) => url.startsWith("http://")),
     );
@@ -187,6 +195,9 @@ export function analyzeHtmlSecurity(finalUrl: URL, document: { html: string; pag
       if (signal.severity === "warning") {
         issues.push(signal.title);
       }
+    }
+    if (trainingLabMarkers.length) {
+      issues.push("Page content suggests an intentionally vulnerable training or challenge surface.");
     }
     if (firstPartyPaths.length) {
       strengths.push(`Discovered ${firstPartyPaths.length} same-origin navigation paths for low-noise follow-up scans.`);

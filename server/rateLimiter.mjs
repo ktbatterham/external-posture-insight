@@ -46,6 +46,11 @@ function createInMemoryRateLimiter({ windowMs, maxRequests, maxBuckets = 20000 }
 
 function createUpstashRateLimiter({ windowMs, maxRequests, upstashUrl, upstashToken, prefix = DEFAULT_PREFIX, log }) {
   const normalizedBaseUrl = upstashUrl.replace(/\/+$/, "");
+  const fallbackLimiter = createInMemoryRateLimiter({
+    windowMs,
+    maxRequests,
+    maxBuckets: 5000,
+  });
 
   return {
     backend: "upstash",
@@ -89,14 +94,11 @@ function createUpstashRateLimiter({ windowMs, maxRequests, upstashUrl, upstashTo
           log("error", "rate_limit_backend_error", {
             backend: "upstash",
             message: error instanceof Error ? error.message : String(error),
+            fallbackBackend: fallbackLimiter.backend,
           });
         }
 
-        // Fail open to preserve API availability if the limiter backend is briefly unavailable.
-        return {
-          limited: false,
-          retryAfterSeconds,
-        };
+        return fallbackLimiter.check(clientId);
       }
     },
   };

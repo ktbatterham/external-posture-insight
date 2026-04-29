@@ -13,6 +13,7 @@ import { EvidenceSection } from "@/components/report/EvidenceSection";
 import { OverviewSection } from "@/components/report/OverviewSection";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { TaxonomySummaryPanel } from "@/components/TaxonomySummaryPanel";
+import { PriorityActionsPanel } from "@/components/PriorityActionsPanel";
 import { RemediationPanel } from "@/components/RemediationPanel";
 import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
 import { PublicSignalsPanel } from "@/components/PublicSignalsPanel";
@@ -67,6 +68,7 @@ type ReportWorkspaceSectionKey =
   | "findings-top"
   | "findings-themes"
   | "findings-actions"
+  | "findings-remediation"
   | "trust-domain"
   | "trust-signals"
   | "trust-edge"
@@ -477,6 +479,13 @@ const Index = () => {
           eyebrow: "Risks",
           title: "Priority actions",
           summary: "What to fix first.",
+          content: <PriorityActionsPanel analysis={analysisData} />,
+        },
+        {
+          key: "findings-remediation" as const,
+          eyebrow: "Risks",
+          title: "Fix snippets",
+          summary: "Implementation examples by platform.",
           content: <RemediationPanel remediation={analysisData.remediation} />,
         },
         {

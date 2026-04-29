@@ -33,6 +33,39 @@ type RequestTextFn = (targetUrl: URL, extraHeaders?: Record<string, string>) => 
 
 const ctCache = new Map<string, CtCacheEntry>();
 
+const formatCtLookupFailure = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return {
+      coverageSummary: "Public certificate-transparency coverage is temporarily unavailable for this domain.",
+      issue: "Public certificate-transparency coverage could not be retrieved cleanly.",
+    };
+  }
+
+  const message = error.message.toLowerCase();
+  if (message.includes("timed out")) {
+    return {
+      coverageSummary: "Public certificate-transparency coverage did not return in time for this domain.",
+      issue: "The public certificate-transparency source timed out before returning coverage data.",
+    };
+  }
+
+  if (
+    message.includes("not valid json") ||
+    message.includes("unexpected token") ||
+    message.includes("<html")
+  ) {
+    return {
+      coverageSummary: "Public certificate-transparency coverage is temporarily unavailable for this domain.",
+      issue: "The public certificate-transparency source returned an unreadable response.",
+    };
+  }
+
+  return {
+    coverageSummary: "Public certificate-transparency coverage is temporarily unavailable for this domain.",
+    issue: "The public certificate-transparency source could not be queried cleanly.",
+  };
+};
+
 const toDiscoveryDomain = (host: string) => {
   const normalized = host.replace(/\.$/, "").toLowerCase();
   const labels = normalized.split(".").filter(Boolean);
@@ -403,6 +436,7 @@ export const fetchCtDiscovery = async (
 
     return value;
   } catch (error) {
+    const fallback = formatCtLookupFailure(error);
     return {
       queriedDomain,
       sourceUrl,
@@ -410,8 +444,8 @@ export const fetchCtDiscovery = async (
       wildcardEntries: [],
       prioritizedHosts: [],
       sampledHosts: [],
-      coverageSummary: `CT discovery could not be completed for ${queriedDomain}.`,
-      issues: [error instanceof Error ? `Certificate transparency lookup failed: ${error.message}` : "Certificate transparency lookup failed."],
+      coverageSummary: fallback.coverageSummary,
+      issues: [fallback.issue],
       strengths: [],
     };
   }

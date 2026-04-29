@@ -10,7 +10,7 @@ interface ExposurePanelProps {
 }
 
 const findingStyles = {
-  safe: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  safe: "bg-white/[0.08] text-slate-100",
   interesting: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
   blocked: "bg-white/[0.08] text-slate-100",
   exposed: "bg-[#b56a2c]/16 text-[#f0d5bc]",

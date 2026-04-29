@@ -21,7 +21,7 @@ const statusIcons = {
 
 export const HeadersTable = ({ headers }: HeadersTableProps) => {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="border-white/10 hover:bg-transparent">
@@ -44,7 +44,7 @@ export const HeadersTable = ({ headers }: HeadersTableProps) => {
                 </Badge>
               </TableCell>
               <TableCell className="space-y-2">
-                <code className="block rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2 text-xs text-slate-200">
+                <code className="block whitespace-pre-wrap break-all rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2 text-xs text-slate-200">
                   {header.value ?? "Not returned by the origin"}
                 </code>
                 <p className="text-xs text-slate-400">{header.summary}</p>

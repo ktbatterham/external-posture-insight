@@ -16,10 +16,10 @@ const sourceLabel = {
 } as const;
 
 const categoryClass = {
-  cloud: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  cloud: "bg-white/[0.08] text-slate-100",
   cdn: "bg-white/[0.08] text-slate-100",
   edge: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
-  paas: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  paas: "bg-white/[0.08] text-slate-100",
   hosting: "bg-[#b56a2c]/18 text-[#f0d5bc]",
 } as const;
 

@@ -53,81 +53,60 @@ export const MonitoredTargetsPanel = ({
 
   if (embedded) {
     return (
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xl font-semibold text-slate-50">
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-lg font-semibold text-slate-50">
               <BellDot className="h-5 w-5 text-[#d89a63]" />
               Monitoring
             </div>
-            <p className="max-w-xl text-sm leading-6 text-slate-400">
-              Browser-local watchlist. Saved targets persist here, but due scans do not run after the tab closes.
+            <p className="max-w-xl text-sm leading-5 text-slate-400">
+              Browser-local watchlist with compact drift tracking.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className={buttonClass} disabled={!currentUrl || busy} onClick={onAddDaily}>
-              Monitor Daily
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Button variant="outline" className={`h-9 px-3 text-xs ${buttonClass}`} disabled={!currentUrl || busy} onClick={onAddDaily}>
+              Daily
             </Button>
-            <Button variant="outline" className={buttonClass} disabled={!currentUrl || busy} onClick={onAddWeekly}>
-              Monitor Weekly
+            <Button variant="outline" className={`h-9 px-3 text-xs ${buttonClass}`} disabled={!currentUrl || busy} onClick={onAddWeekly}>
+              Weekly
             </Button>
             <Button
-              className="rounded-2xl bg-[#b56a2c] text-[#f8efe7] hover:bg-[#c07a3f]"
+              className="h-9 rounded-2xl bg-[#b56a2c] px-3 text-xs text-[#f8efe7] hover:bg-[#c07a3f]"
               disabled={!targets.some((target) => target.due) || busy}
               onClick={onRunDue}
             >
-              Run Due Scans
+              Run due
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))_minmax(0,1.25fr)]">
-          <div className="rounded-[1.1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
+        <div className="grid gap-3 md:grid-cols-[repeat(3,minmax(0,1fr))]">
+          <div className="rounded-[1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-400">
               <BellDot className="h-4 w-4" />
               Monitored
             </div>
             <div className="mt-2 text-2xl font-semibold text-slate-50">{monitoredCount}</div>
           </div>
-          <div className="rounded-[1.1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
+          <div className="rounded-[1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-400">
               <Clock3 className="h-4 w-4" />
               Due now
             </div>
             <div className="mt-2 text-2xl font-semibold text-slate-50">{dueCount}</div>
           </div>
-          <div className="rounded-[1.1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-slate-400">Save current site</p>
-                {!currentUrl ? <p className="mt-1 text-xs text-slate-500">Run or reopen a scan first.</p> : null}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  className={`h-9 px-3 text-xs ${buttonClass}`}
-                  disabled={!currentUrl || busy}
-                  onClick={onAddDaily}
-                >
-                  Daily
-                </Button>
-                <Button
-                  variant="outline"
-                  className={`h-9 px-3 text-xs ${buttonClass}`}
-                  disabled={!currentUrl || busy}
-                  onClick={onAddWeekly}
-                >
-                  Weekly
-                </Button>
-              </div>
-            </div>
+          <div className="rounded-[1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
+            <p className="text-sm font-medium text-slate-400">Current site</p>
+            <p className="mt-2 text-sm font-semibold text-slate-100">{currentUrl ? "Ready to save" : "No active site"}</p>
+            {!currentUrl ? <p className="mt-1 text-xs text-slate-500">Run or reopen a scan first.</p> : null}
           </div>
         </div>
 
         {targets.length ? (
           <div className="grid gap-3 xl:grid-cols-2">
             {targets.map((target) => (
-              <div key={target.url} className="rounded-[1.1rem] border border-white/10 bg-slate-950/45 p-4 shadow-sm">
+              <div key={target.url} className="rounded-[1rem] border border-white/10 bg-slate-950/45 p-3.5 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -150,7 +129,7 @@ export const MonitoredTargetsPanel = ({
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className={`h-9 px-3 text-xs ${buttonClass}`}
+                      className={`h-8 px-3 text-xs ${buttonClass}`}
                       disabled={busy}
                       onClick={() => onRunTarget(target.url)}
                     >
@@ -159,7 +138,7 @@ export const MonitoredTargetsPanel = ({
                     </Button>
                     <Button
                       variant="outline"
-                      className={`h-9 px-3 text-xs ${buttonClass}`}
+                      className={`h-8 px-3 text-xs ${buttonClass}`}
                       disabled={busy}
                       onClick={() => onRemove(target.url)}
                     >

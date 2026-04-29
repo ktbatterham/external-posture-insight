@@ -7,7 +7,7 @@ interface ExecutiveSummaryPanelProps {
 }
 
 const postureStyles = {
-  strong: "border-[#4f6676]/35 bg-[#4f6676]/12 text-[#edf3f6]",
+  strong: "border-white/10 bg-white/[0.04] text-slate-100",
   mixed: "border-[#8e5c3b]/30 bg-[#8e5c3b]/12 text-[#f0dfcf]",
   weak: "border-[#b56a2c]/35 bg-[#3a2a20] text-[#f4dfcd]",
 } as const;

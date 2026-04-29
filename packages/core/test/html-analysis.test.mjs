@@ -83,3 +83,19 @@ test("detectAssessmentLimitation treats server errors as unavailable posture rea
   assert.equal(limitation.kind, "service_unavailable");
   assert.match(limitation.detail, /HTTP 503/);
 });
+
+test("flags explicit vulnerable training or challenge page markers from title and paths", () => {
+  const htmlSecurity = analyzeHtmlDocument(
+    "https://public-firing-range.appspot.com/",
+    `<!doctype html><html><head><title>Firing Range</title></head><body>
+      <a href="/xss/index.html">XSS</a>
+      <a href="/clickjacking/index.html">Clickjacking</a>
+    </body></html>`,
+  );
+
+  assert.equal(
+    htmlSecurity.issues.includes("Page content suggests an intentionally vulnerable training or challenge surface."),
+    true,
+  );
+  assert.equal(htmlSecurity.strengths.some((item) => item.includes("Challenge-style page markers were visible")), false);
+});

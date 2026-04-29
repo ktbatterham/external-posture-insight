@@ -79,6 +79,7 @@ const ABUSE_ALERT_THRESHOLD = (() => {
 const upstashRestUrl = (process.env.UPSTASH_REDIS_REST_URL || "").trim();
 const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const abuseSignalBuckets = new Map();
+const exposeDetailedHealth = !isProduction;
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -361,11 +362,14 @@ const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host}`);
 
   if (requestUrl.pathname === "/api/health") {
-    sendJson(response, 200, {
+    const payload = {
       ok: true,
       now: new Date().toISOString(),
-      deploymentMode,
-      rateLimit: {
+    };
+
+    if (exposeDetailedHealth) {
+      payload.deploymentMode = deploymentMode;
+      payload.rateLimit = {
         backend: targetRateLimiter.backend,
         distributed: targetRateLimiter.distributed,
         requester: {
@@ -376,22 +380,24 @@ const server = http.createServer(async (request, response) => {
           maxRequests: TARGET_RATE_LIMIT_MAX_REQUESTS,
           windowMs: TARGET_RATE_LIMIT_WINDOW_MS,
         },
-      },
-      abuseAlerting: {
+      };
+      payload.abuseAlerting = {
         threshold: ABUSE_ALERT_THRESHOLD,
         windowMs: ABUSE_ALERT_WINDOW_MS,
-      },
-    });
+      };
+    }
+
+    sendJson(response, 200, payload);
     return;
   }
 
   if (requestUrl.pathname === "/api/analyze") {
-    if (request.method !== "GET" && request.method !== "HEAD") {
+    if (request.method !== "GET") {
       response.writeHead(405, {
         "Content-Type": "application/json; charset=utf-8",
-        "Allow": "GET, HEAD",
+        "Allow": "GET",
       });
-      response.end(JSON.stringify({ error: "Method not allowed. Use GET or HEAD." }));
+      response.end(JSON.stringify({ error: "Method not allowed. Use GET." }));
       return;
     }
 

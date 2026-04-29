@@ -9,7 +9,7 @@ interface ThirdPartyTrustPanelProps {
 }
 
 const riskStyles = {
-  low: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  low: "bg-white/[0.08] text-slate-100",
   medium: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
   high: "bg-[#b56a2c]/18 text-[#f0d5bc]",
 } as const;

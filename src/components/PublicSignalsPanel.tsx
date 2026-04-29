@@ -8,8 +8,8 @@ interface PublicSignalsPanelProps {
 }
 
 const statusStyles = {
-  preloaded: "bg-[#4f6676]/18 text-[#d9e4ea]",
-  pending: "bg-[#4f6676]/18 text-[#d9e4ea]",
+  preloaded: "bg-white/[0.08] text-slate-100",
+  pending: "bg-white/[0.08] text-slate-100",
   eligible: "bg-[#8e5c3b]/14 text-[#f0d5bc]",
   not_preloaded: "bg-white/[0.08] text-slate-200",
   unknown: "bg-white/[0.08] text-slate-200",
