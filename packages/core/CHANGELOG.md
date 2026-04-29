@@ -6,6 +6,21 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-29
+
+### Added
+- Added structured limited-read handling for blocked, timeout, and TLS-validation failures so constrained scans return an explicit `U` posture result instead of crashing or overclaiming confidence.
+- Added passive training or challenge-surface narrative detection so lab-style targets are called out in executive summaries without polluting posture scoring.
+- Added `Client code signals` to summarize framework, vendor, API/config, and version-hint intelligence from visible client-side assets.
+
+### Changed
+- Recalibrated posture scoring again so weak public targets spread more honestly across grades, with stronger penalties for missing browser-layer controls and breadth-of-weakness across categories.
+- Tightened executive summary wording so browser hardening, transport/access limits, and constrained reads drive the main visible risk more consistently.
+- Cleaned certificate-transparency fallback messaging so unreadable public-source responses produce calm narrative output instead of raw parser errors.
+- Improved exposure and API probe handling so repeated server-side errors on sensitive or API-style paths are surfaced as review-worthy signals.
+- Hardened the server boundary by making `/api/analyze` `GET`-only, returning minimal `/api/health` output in production, and degrading distributed rate limiting into a safer local fallback.
+- Expanded deterministic coverage for scoring, CT fallback, and server hardening behavior.
+
 ## [0.7.0] - 2026-04-25
 
 ### Added

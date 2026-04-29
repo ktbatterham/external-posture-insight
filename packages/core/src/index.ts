@@ -499,7 +499,7 @@ const emptyCrawlSummary = (sources: string[] = []) => ({
   discoverySources: sources,
 });
 
-const emptySecurityTxt = (finalUrl: URL) => ({
+const emptySecurityTxt = () => ({
   status: "missing" as const,
   url: null,
   contact: [],
@@ -653,7 +653,7 @@ export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = 
       strengths: [],
       remediation: [],
       crawl: emptyCrawlSummary(["limited assessment"]),
-      securityTxt: emptySecurityTxt(normalizedInput),
+      securityTxt: emptySecurityTxt(),
       domainSecurity,
       identityProvider: emptyIdentityProvider(),
       ctDiscovery: {
@@ -804,7 +804,7 @@ export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = 
     issues: [...result.issues, ...buildLibraryRiskIssues(libraryRiskSignals).map(classifyIssueTaxonomy)],
     technologies,
     crawl: pageAnalysisEnabled ? await crawlRelatedPages(result, discovery) : emptyCrawlSummary(discovery.sources),
-    securityTxt: pageAnalysisEnabled ? await fetchSecurityTxt(finalUrl, requestText) : emptySecurityTxt(finalUrl),
+    securityTxt: pageAnalysisEnabled ? await fetchSecurityTxt(finalUrl, requestText) : emptySecurityTxt(),
     domainSecurity: await analyzeDomainSecurity(result.host, requestText),
     identityProvider,
     ctDiscovery,

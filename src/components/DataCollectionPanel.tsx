@@ -1,5 +1,4 @@
 import { FormInput, ShieldAlert } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatBox, StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { getDataCollectionSummary } from "@/lib/passiveSurface";
