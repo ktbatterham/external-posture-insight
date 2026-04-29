@@ -3,7 +3,6 @@ import { Clock3, Layers3, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
 import { UrlForm } from "@/components/UrlForm";
-import { Card, CardContent } from "@/components/ui/card";
 import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
 import { getAreaScores } from "@/lib/posture";
 import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
