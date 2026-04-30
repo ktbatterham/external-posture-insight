@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
+import { EmptyState, StatusAlert, TruncatedChip } from "@/components/ui/panel-primitives";
 import { HtmlSecurityInfo } from "@/types/analysis";
 import { Cpu, ShieldAlert } from "lucide-react";
 
@@ -10,7 +10,21 @@ interface ClientExposurePanelProps {
 
 export const ClientExposurePanel = ({ htmlSecurity }: ClientExposurePanelProps) => {
   if (!htmlSecurity.clientExposureSignals.length) {
-    return null;
+    return (
+      <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cpu className="h-5 w-5" />
+            Client Config & API Exposure
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No obvious client-side config leaks or public API exposure clues were detected from the fetched page.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

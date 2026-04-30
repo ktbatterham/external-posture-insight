@@ -3,7 +3,7 @@ import { Copy, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CodeBlock } from "@/components/ui/panel-primitives";
+import { CodeBlock, EmptyState } from "@/components/ui/panel-primitives";
 import { RemediationSnippet } from "@/types/analysis";
 
 interface RemediationPanelProps {
@@ -22,7 +22,21 @@ export const RemediationPanel = ({ remediation }: RemediationPanelProps) => {
   const [selected, setSelected] = useState<RemediationSnippet["platform"]>(remediation[0]?.platform ?? "nginx");
 
   if (!remediation.length) {
-    return null;
+    return (
+      <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Fix Snippets
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No ready-made fix snippets are available for the currently visible posture issues on this target.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   const active = remediation.find((item) => item.platform === selected) ?? remediation[0];

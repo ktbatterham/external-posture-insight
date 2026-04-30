@@ -1,5 +1,6 @@
 import { ListTodo } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/panel-primitives";
 import { AnalysisResult } from "@/types/analysis";
 import { getPriorityActions } from "@/lib/priorities";
 
@@ -26,7 +27,21 @@ export const PriorityActionsPanel = ({ analysis }: PriorityActionsPanelProps) =>
   const actions = getPriorityActions(analysis);
 
   if (!actions.length) {
-    return null;
+    return (
+      <Card className="rounded-[1.75rem] border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <ListTodo className="h-5 w-5 text-[#d89a63]" />
+            Priority Actions for This Target
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No target-side actions are being prioritized from the currently visible public evidence.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
