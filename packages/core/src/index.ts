@@ -814,7 +814,7 @@ export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = 
     infrastructure,
     wafFingerprint,
     exposure: pageAnalysisEnabled
-      ? await analyzeExposure(finalUrl, {
+      ? await analyzeExposure(finalUrl, htmlDocument, {
           exposureProbes: EXPOSURE_PROBES,
           requestOnce,
           requestText,
@@ -822,6 +822,7 @@ export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = 
           headerValue,
           formatErrorMessage,
           isAccessDeniedHtml,
+          classifyHtmlApiFallback,
         })
       : emptyExposure(),
     corsSecurity: pageAnalysisEnabled

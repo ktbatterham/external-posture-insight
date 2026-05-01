@@ -139,15 +139,26 @@ export const fetchPublicSignals = async (
 
 export const analyzeExposure = async (
   finalUrl: URL,
+  homepageContext: HomepageContext | null | undefined,
   deps: Pick<
     SurfaceDeps,
-    "exposureProbes" | "requestOnce" | "requestText" | "fetchWithRedirects" | "headerValue" | "formatErrorMessage" | "isAccessDeniedHtml"
+    | "exposureProbes"
+    | "requestOnce"
+    | "requestText"
+    | "fetchWithRedirects"
+    | "headerValue"
+    | "formatErrorMessage"
+    | "isAccessDeniedHtml"
+    | "classifyHtmlApiFallback"
   >,
 ): Promise<ExposureSummary> => {
   const probes: ExposureSummary["probes"] = [];
   const issues: string[] = [];
   const strengths: string[] = [];
   let sawErrorProbe = false;
+  let sawFrontendFallback = false;
+  const homepageSignature = homepageContext?.signature || "";
+  const homepageTitle = homepageContext?.pageTitle || null;
 
   for (const probe of deps.exposureProbes) {
     const probeUrl = new URL(probe.path, finalUrl.origin);
@@ -162,8 +173,10 @@ export const analyzeExposure = async (
       } else {
         response = await deps.requestOnce(probeUrl, "HEAD");
         if (response.statusCode === 405) {
-          response = await deps.requestOnce(probeUrl, "GET");
+          response = await deps.requestText(probeUrl);
         } else if (response.statusCode === 401 || response.statusCode === 403) {
+          response = await deps.requestText(probeUrl);
+        } else if (response.statusCode >= 200 && response.statusCode < 300) {
           response = await deps.requestText(probeUrl);
         }
       }
@@ -189,9 +202,29 @@ export const analyzeExposure = async (
           detail = "Discovery file not found.";
         }
       } else if (response.statusCode >= 200 && response.statusCode < 300) {
-        finding = "exposed";
-        detail = "Sensitive path returned a successful response.";
-        issues.push(`${probe.label} may be exposed at ${probe.path}.`);
+        const contentType = deps.headerValue(response.headers, "content-type") || "";
+        const looksLikeFrontendFallback =
+          "body" in response &&
+          typeof response.body === "string" &&
+          contentType.includes("text/html") &&
+          deps.classifyHtmlApiFallback(
+            probe.path,
+            finalUrl,
+            resolvedUrl,
+            response.body,
+            homepageSignature,
+            homepageTitle,
+          );
+
+        if (looksLikeFrontendFallback) {
+          finding = "interesting";
+          detail = "Path appears to return the site's standard frontend shell rather than sensitive file contents.";
+          sawFrontendFallback = true;
+        } else {
+          finding = "exposed";
+          detail = "Sensitive path returned a successful response.";
+          issues.push(`${probe.label} may be exposed at ${probe.path}.`);
+        }
       } else if (response.statusCode === 401 || response.statusCode === 403) {
         const contentType = deps.headerValue(response.headers, "content-type") || "";
         const blockedByGenericRules =
@@ -242,6 +275,9 @@ export const analyzeExposure = async (
 
   if (!issues.length && !sawErrorProbe) {
     strengths.push("No obvious high-signal sensitive files were openly exposed in the limited probe set.");
+  }
+  if (sawFrontendFallback) {
+    strengths.push("Some sensitive-looking paths appear to return the standard frontend shell rather than exposed file contents.");
   }
 
   return { probes, issues, strengths };

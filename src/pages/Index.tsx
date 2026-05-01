@@ -3,153 +3,27 @@ import { Clock3, Layers3, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { MonitoredTargetView, MonitoredTargetsPanel } from "@/components/MonitoredTargetsPanel";
 import { UrlForm } from "@/components/UrlForm";
-import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
+import { AnalysisResult, HistoryDiff } from "@/types/analysis";
 import { getAreaScores } from "@/lib/posture";
 import { buildHtmlReport, buildMarkdownReport } from "@/lib/reportExport";
 import { readBrowserStorage, writeBrowserStorage } from "@/lib/browserStorage";
-import { buildHistoryDiff, snapshotFromAnalysis } from "../../packages/core/src/historyDiff";
-import { EvidenceSection } from "@/components/report/EvidenceSection";
-import { OverviewSection } from "@/components/report/OverviewSection";
-import { FindingsPanel } from "@/components/FindingsPanel";
-import { TaxonomySummaryPanel } from "@/components/TaxonomySummaryPanel";
-import { PriorityActionsPanel } from "@/components/PriorityActionsPanel";
-import { RemediationPanel } from "@/components/RemediationPanel";
-import { DomainSecurityPanel } from "@/components/DomainSecurityPanel";
-import { PublicSignalsPanel } from "@/components/PublicSignalsPanel";
-import { DisclosureTrustPanel } from "@/components/DisclosureTrustPanel";
-import { IdentityProviderPanel } from "@/components/IdentityProviderPanel";
-import { InfrastructurePanel } from "@/components/InfrastructurePanel";
-import { WafFingerprintPanel } from "@/components/WafFingerprintPanel";
-import { CtDiscoveryPanel } from "@/components/CtDiscoveryPanel";
-import { HtmlSecurityPanel } from "@/components/HtmlSecurityPanel";
-import { ClientExposurePanel } from "@/components/ClientExposurePanel";
-import { AiSurfacePanel } from "@/components/AiSurfacePanel";
-import { ThirdPartyTrustPanel } from "@/components/ThirdPartyTrustPanel";
-import { AuthSurfacePanel } from "@/components/AuthSurfacePanel";
-import { DataCollectionPanel } from "@/components/DataCollectionPanel";
-import { ExposurePanel } from "@/components/ExposurePanel";
-import { CorsSecurityPanel } from "@/components/CorsSecurityPanel";
-import { ApiSurfacePanel } from "@/components/ApiSurfacePanel";
-
-const RECENT_SCANS_KEY = "secure-header-insight:recent-scans";
-const HISTORY_KEY = "secure-header-insight:history";
-const MONITORED_TARGETS_KEY = "secure-header-insight:monitored-targets";
-const STORAGE_SCHEMA_VERSION = 1;
-const MONITORED_TARGET_LIMIT = 12;
-
-interface RecentScan {
-  url: string;
-  grade: string;
-  scannedAt: string;
-}
-
-interface MonitoredTarget {
-  url: string;
-  label: string;
-  cadence: "daily" | "weekly";
-  addedAt: string;
-  lastScannedAt: string | null;
-}
-
-interface StoredHistoryAreaScore {
-  key: string;
-  label: string;
-  score: number;
-  status: "strong" | "watch" | "weak";
-}
-
-type StoredHistorySnapshot = HistorySnapshot & {
-  areaScores?: StoredHistoryAreaScore[];
-};
-
-type ReportWorkspaceSectionKey =
-  | "overview"
-  | "findings-top"
-  | "findings-themes"
-  | "findings-actions"
-  | "findings-remediation"
-  | "trust-domain"
-  | "trust-signals"
-  | "trust-edge"
-  | "client-page"
-  | "client-surface"
-  | "client-auth"
-  | "exposure-checks"
-  | "exposure-api"
-  | "evidence";
-
-const buildRecentScans = (current: RecentScan[], scan: RecentScan) =>
-  [scan, ...current.filter((item) => item.url !== scan.url)].slice(0, 6);
-
-const syncMonitoredTargetFromAnalysis = (targets: MonitoredTarget[], payload: AnalysisResult) => {
-  let changed = false;
-  const next = targets.map((target) => {
-    const matchesTarget =
-      target.url === payload.finalUrl || target.url === payload.normalizedUrl || target.label === payload.host;
-    if (!matchesTarget) {
-      return target;
-    }
-
-    const updatedTarget = {
-      ...target,
-      url: payload.finalUrl,
-      label: payload.host,
-      lastScannedAt: payload.scannedAt,
-    };
-
-    if (
-      updatedTarget.url !== target.url ||
-      updatedTarget.label !== target.label ||
-      updatedTarget.lastScannedAt !== target.lastScannedAt
-    ) {
-      changed = true;
-    }
-
-    return updatedTarget;
-  });
-
-  return changed ? next : targets;
-};
-
-const cadenceMs: Record<MonitoredTarget["cadence"], number> = {
-  daily: 24 * 60 * 60 * 1000,
-  weekly: 7 * 24 * 60 * 60 * 1000,
-};
-
-const toMonitoredTargetView = (target: MonitoredTarget): MonitoredTargetView => {
-  const baseTime = target.lastScannedAt ? new Date(target.lastScannedAt).getTime() : new Date(target.addedAt).getTime();
-  const nextDueAt = new Date(baseTime + cadenceMs[target.cadence]).toISOString();
-  return {
-    ...target,
-    nextDueAt,
-    due: Date.now() >= new Date(nextDueAt).getTime(),
-  };
-};
-
-const saveHistorySnapshot = (
-  current: Record<string, StoredHistorySnapshot[]>,
-  analysis: AnalysisResult,
-  areaScores: StoredHistoryAreaScore[],
-) => {
-  const key = analysis.host;
-  const snapshot: StoredHistorySnapshot = {
-    ...snapshotFromAnalysis(analysis),
-    areaScores,
-  };
-  const nextForHost = [snapshot, ...(current[key] || [])].slice(0, 10);
-  const next = { ...current, [key]: nextForHost };
-  return { next, nextForHost };
-};
-
-const downloadFile = (filename: string, content: BlobPart, type: string) => {
-  const blob = new Blob([content], { type });
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(objectUrl);
-};
+import { buildReportWorkspaceSections, ReportWorkspaceSectionKey } from "@/lib/reportWorkspace";
+import {
+  buildHistoryState,
+  buildRecentScans,
+  downloadFile,
+  HISTORY_KEY,
+  MONITORED_TARGET_LIMIT,
+  MONITORED_TARGETS_KEY,
+  MonitoredTarget,
+  RECENT_SCANS_KEY,
+  RecentScan,
+  saveHistorySnapshot,
+  STORAGE_SCHEMA_VERSION,
+  StoredHistorySnapshot,
+  syncMonitoredTargetFromAnalysis,
+  toMonitoredTargetView,
+} from "@/lib/scanWorkspace";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -211,8 +85,9 @@ const Index = () => {
       historyByHostRef.current = next;
       void writeBrowserStorage(HISTORY_KEY, next, STORAGE_SCHEMA_VERSION);
       if (setAsCurrent) {
-        setHistory(nextForHost);
-        setHistoryDiff(buildHistoryDiff(nextForHost));
+        const historyState = buildHistoryState(nextForHost);
+        setHistory(historyState.history);
+        setHistoryDiff(historyState.diff);
       }
       setMonitoredTargets((current) => {
         const next = syncMonitoredTargetFromAnalysis(current, payload);
@@ -439,150 +314,16 @@ const Index = () => {
   const monitoredViews = monitoredTargets.map(toMonitoredTargetView);
 
   const reportSections = analysisData
-    ? [
-        {
-          key: "overview" as const,
-          eyebrow: "Healthcheck",
-          title: "At a glance",
-          summary: "Score, priorities, exports, and monitoring.",
-          content: (
-            <OverviewSection
-              analysisData={analysisData}
-              historyDiff={historyDiff}
-              history={history}
-              areaScores={areaScores}
-              exportPdf={exportPdf}
-              exportMarkdown={exportMarkdown}
-              exportHtml={exportHtml}
-              exportReport={exportReport}
-              compact
-            />
-          ),
-        },
-        {
-          key: "findings-top" as const,
-          eyebrow: "Risks",
-          title: "Top findings",
-          summary: "Strengths and highest-priority issues.",
-          content: <FindingsPanel issues={analysisData.issues} strengths={analysisData.strengths} />,
-        },
-        {
-          key: "findings-themes" as const,
-          eyebrow: "Risks",
-          title: "Risk themes",
-          summary: "OWASP and MITRE reads.",
-          content: <TaxonomySummaryPanel analysis={analysisData} />,
-        },
-        {
-          key: "findings-actions" as const,
-          eyebrow: "Risks",
-          title: "Priority actions",
-          summary: "What to fix first.",
-          content: <PriorityActionsPanel analysis={analysisData} />,
-        },
-        {
-          key: "findings-remediation" as const,
-          eyebrow: "Risks",
-          title: "Fix snippets",
-          summary: "Implementation examples by platform.",
-          content: <RemediationPanel remediation={analysisData.remediation} />,
-        },
-        {
-          key: "trust-domain" as const,
-          eyebrow: "Trust",
-          title: "Domain & email",
-          summary: "Mail and DNS foundation.",
-          content: <DomainSecurityPanel domainSecurity={analysisData.domainSecurity} />,
-        },
-        {
-          key: "trust-signals" as const,
-          eyebrow: "Trust",
-          title: "Trust signals",
-          summary: "Disclosure and public signals.",
-          content: (
-            <div className="space-y-8">
-              <PublicSignalsPanel publicSignals={analysisData.publicSignals} />
-              <DisclosureTrustPanel analysis={analysisData} />
-            </div>
-          ),
-        },
-        {
-          key: "trust-edge" as const,
-          eyebrow: "Trust",
-          title: "Identity & edge",
-          summary: "Identity, infra, WAF, and CT.",
-          content: (
-            <div className="space-y-8">
-              <IdentityProviderPanel identityProvider={analysisData.identityProvider} />
-              <InfrastructurePanel infrastructure={analysisData.infrastructure} />
-              <WafFingerprintPanel wafFingerprint={analysisData.wafFingerprint} />
-              <CtDiscoveryPanel ctDiscovery={analysisData.ctDiscovery} />
-            </div>
-          ),
-        },
-        {
-          key: "client-page" as const,
-          eyebrow: "Client",
-          title: "Page security",
-          summary: "HTML and browser-facing posture.",
-          content: (
-            <div className="space-y-8">
-              <HtmlSecurityPanel htmlSecurity={analysisData.htmlSecurity} />
-              <ClientExposurePanel htmlSecurity={analysisData.htmlSecurity} />
-            </div>
-          ),
-        },
-        {
-          key: "client-surface" as const,
-          eyebrow: "Client",
-          title: "Third-party & AI",
-          summary: "Suppliers and AI surface.",
-          content: (
-            <div className="space-y-8">
-              <AiSurfacePanel aiSurface={analysisData.aiSurface} />
-              <ThirdPartyTrustPanel thirdPartyTrust={analysisData.thirdPartyTrust} />
-            </div>
-          ),
-        },
-        {
-          key: "client-auth" as const,
-          eyebrow: "Client",
-          title: "Auth & collection",
-          summary: "Auth paths and collection clues.",
-          content: (
-            <div className="space-y-8">
-              <AuthSurfacePanel htmlSecurity={analysisData.htmlSecurity} />
-              <DataCollectionPanel htmlSecurity={analysisData.htmlSecurity} />
-            </div>
-          ),
-        },
-        {
-          key: "exposure-checks" as const,
-          eyebrow: "Exposure",
-          title: "Exposure checks",
-          summary: "Low-noise path probes.",
-          content: <ExposurePanel exposure={analysisData.exposure} />,
-        },
-        {
-          key: "exposure-api" as const,
-          eyebrow: "Exposure",
-          title: "API & CORS",
-          summary: "API hints and cross-origin posture.",
-          content: (
-            <div className="space-y-8">
-              <CorsSecurityPanel corsSecurity={analysisData.corsSecurity} />
-              <ApiSurfacePanel apiSurface={analysisData.apiSurface} />
-            </div>
-          ),
-        },
-        {
-          key: "evidence" as const,
-          eyebrow: "Evidence",
-          title: "Raw evidence and history",
-          summary: "Headers, redirects, certs, cookies, and history.",
-          content: <EvidenceSection analysisData={analysisData} history={history} historyDiff={historyDiff} compact />,
-        },
-      ]
+    ? buildReportWorkspaceSections({
+        analysisData,
+        historyDiff,
+        history,
+        areaScores,
+        exportPdf,
+        exportMarkdown,
+        exportHtml,
+        exportReport,
+      })
     : [];
 
   const activeSection = reportSections.find((section) => section.key === activeReportSection) ?? reportSections[0];
