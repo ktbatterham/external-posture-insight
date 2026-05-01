@@ -112,6 +112,29 @@ npm start
 
 `npm start` serves the API and the built frontend from the same Node process.
 
+## Railway deployment
+
+This repo now includes [`railway.toml`](/Users/keith/Documents/Playground/secure-header-insight/railway.toml) so Railway can:
+
+- build with `npm run build`
+- start with `npm run start`
+- health check the service at `/api/health`
+
+Recommended environment variables for a first single-instance deployment:
+
+```sh
+NODE_ENV=production
+ALLOW_UNAUTHENTICATED=true
+DEPLOYMENT_MODE=single-instance
+TRUST_PROXY=true
+```
+
+Notes:
+
+- `ALLOW_UNAUTHENTICATED=true` is required if you want the browser app to call the scanner API directly without a private server-side API key.
+- If you later scale beyond one instance, switch to `DEPLOYMENT_MODE=multi-instance` and configure Upstash-backed rate limiting.
+- Run `npm run -s check:deploy` before promoting a public deployment.
+
 ## Public deployment guardrails
 
 - In production, startup is blocked unless either `API_KEY` is set or `ALLOW_UNAUTHENTICATED=true` is explicitly set.

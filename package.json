@@ -22,7 +22,7 @@
     "test:server": "npm run build:core && node --test server/test/*.test.mjs",
     "test:app:unit": "vitest run src/lib/*.test.ts",
     "preview": "vite preview",
-    "start": "npm run build:core && node server/index.mjs"
+    "start": "node server/index.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
