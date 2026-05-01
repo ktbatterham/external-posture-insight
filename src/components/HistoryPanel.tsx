@@ -1,6 +1,7 @@
 import { History, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/panel-primitives";
 import { HistoryDiff, HistorySnapshot } from "@/types/analysis";
 
 interface HistoryPanelProps {
@@ -10,7 +11,21 @@ interface HistoryPanelProps {
 
 export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
   if (!history.length) {
-    return null;
+    return (
+      <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Scan History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No prior saved scans are available for this target yet, so change-over-time comparison is not available.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   const trendPoints = [...history].slice(0, 8).reverse();

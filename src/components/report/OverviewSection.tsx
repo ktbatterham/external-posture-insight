@@ -91,6 +91,11 @@ export const OverviewSection = ({
   const isLimitedAssessment = analysisData.assessmentLimitation.limited;
   const healthcheckStyle = healthcheckStyles[healthcheckStatusForGrade(analysisData.grade)];
   const sortedAreaScores = [...areaScores].sort((left, right) => left.score - right.score);
+  const limitedReadLabel =
+    analysisData.assessmentLimitation.kind === "blocked_edge_response" ||
+    analysisData.assessmentLimitation.kind === "auth_required"
+      ? "Blocked read"
+      : "Limited read";
   const hasTrainingSurfaceNarrative =
     analysisData.executiveSummary.overview.toLowerCase().includes("lab or training surface") ||
     analysisData.executiveSummary.takeaways.some((takeaway) =>
@@ -165,11 +170,13 @@ export const OverviewSection = ({
                 <div className="mt-4 flex items-baseline gap-3">
                   <span className={`text-4xl font-semibold leading-none ${healthcheckStyle.grade}`}>{analysisData.grade}</span>
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Overall grade
+                    {isLimitedAssessment ? "Read status" : "Overall grade"}
                   </span>
                 </div>
                 <p className="mt-4 text-sm leading-6 text-slate-400">
-                  Overall posture read for this target at the time of the scan.
+                  {isLimitedAssessment
+                    ? `${limitedReadLabel} only. Public posture visibility was constrained during this scan, so this result should be read directionally rather than as a full target verdict.`
+                    : "Overall posture read for this target at the time of the scan."}
                 </p>
               </div>
               {isLimitedAssessment ? (

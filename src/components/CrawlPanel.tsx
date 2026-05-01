@@ -1,7 +1,7 @@
 import { GitCompareArrows, Route } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatBox } from "@/components/ui/panel-primitives";
+import { EmptyState, StatBox } from "@/components/ui/panel-primitives";
 import { getHttpStatusDetails } from "@/lib/httpStatus";
 import { CrawlSummary } from "@/types/analysis";
 
@@ -21,7 +21,21 @@ const gradeStyles: Record<string, string> = {
 
 export const CrawlPanel = ({ crawl }: CrawlPanelProps) => {
   if (!crawl.pages.length) {
-    return null;
+    return (
+      <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Route className="h-5 w-5" />
+            Multi-Page Crawl
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No additional same-origin pages were collected for comparative crawl analysis during this scan.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

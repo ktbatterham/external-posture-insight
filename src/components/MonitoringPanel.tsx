@@ -1,6 +1,6 @@
 import { BellRing, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusAlert } from "@/components/ui/panel-primitives";
+import { EmptyState, StatusAlert } from "@/components/ui/panel-primitives";
 import { AnalysisResult, HistoryDiff, HistorySnapshot } from "@/types/analysis";
 import { getMonitoringAlerts } from "@/lib/priorities";
 import { getAreaScores } from "@/lib/posture";
@@ -67,7 +67,21 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
   })();
 
   if (!alerts.length && scoreSeries.length === 0) {
-    return null;
+    return (
+      <Card className="rounded-[1.75rem] border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <BellRing className="h-5 w-5 text-[#d89a63]" />
+            Monitoring
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No saved history or monitoring alerts are available for this target yet, so change-over-time tracking has not started.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

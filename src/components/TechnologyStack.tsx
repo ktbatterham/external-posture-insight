@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/panel-primitives";
 import { Cloud, Code2, Globe, Network, Server, Shield } from "lucide-react";
 import { TechnologyResult } from "@/types/analysis";
 
@@ -40,7 +41,21 @@ const confidenceStyles = {
 
 export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
   if (!technologies.length) {
-    return null;
+    return (
+      <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-slate-50">
+            <Globe className="h-5 w-5" />
+            Detected Stack
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState>
+            No confident framework, platform, or client-side stack signals were detected from the fetched assets.
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
   }
 
   const grouped = technologies.reduce<Record<string, TechnologyResult[]>>((acc, tech) => {
