@@ -59,6 +59,10 @@ const OWASP_EXPLAINERS: Record<
     summary: "Most visible issues are hardening or configuration gaps rather than evidence of an application-specific exploit path.",
     whyItMatters: "This is often the fastest class of weakness to improve and usually gives the biggest posture lift for the least engineering effort.",
   },
+  "A06 Vulnerable and Outdated Components": {
+    summary: "Visible client-side libraries or dependency clues suggest a component hygiene issue that deserves version and advisory review.",
+    whyItMatters: "Publicly fingerprintable outdated components can turn passive surface intelligence into very actionable attacker guidance.",
+  },
   "A07 Identification and Authentication Failures": {
     summary: "Session, cookie, and authentication-adjacent behavior is more exposed or weaker than ideal.",
     whyItMatters: "Authentication posture shapes how much confidence you can place in session integrity and user-boundary controls.",

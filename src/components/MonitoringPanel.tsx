@@ -23,6 +23,80 @@ const variantMap = {
   info: "info",
 } as const;
 
+const formatSignedDelta = (value: number | null) => {
+  if (value === null) {
+    return "0";
+  }
+
+  return `${value > 0 ? "+" : ""}${value}`;
+};
+
+const getChangeLead = (diff: HistoryDiff | null) => {
+  if (!diff) {
+    return {
+      eyebrow: "No comparison yet",
+      title: "Saved monitoring starts after the next scan.",
+      detail: "Once this target has at least two local snapshots, SecURL will call out regressions, improvements, and neutral churn here.",
+      tone: "neutral" as const,
+    };
+  }
+
+  const statusCodeDelta = diff.statusCodeDelta;
+  const hasRegression =
+    (diff.scoreDelta ?? 0) < 0 ||
+    diff.newIssues.length > 0 ||
+    (statusCodeDelta?.from !== null &&
+      statusCodeDelta?.to !== null &&
+      statusCodeDelta?.from !== statusCodeDelta?.to &&
+      (statusCodeDelta?.to ?? 0) >= 400);
+  const hasImprovement = (diff.scoreDelta ?? 0) > 0 || diff.resolvedIssues.length > 0;
+  const hasSurfaceChange =
+    diff.headerChanges.length > 0 ||
+    diff.newThirdPartyProviders.length > 0 ||
+    diff.wafProviderChanges.newProviders.length > 0 ||
+    diff.identityProviderChange !== null;
+
+  if (hasRegression) {
+    return {
+      eyebrow: "Regression detected",
+      title: "This target looks weaker than the previous saved snapshot.",
+      detail:
+        diff.newIssues.length > 0
+          ? `${diff.newIssues.length} new finding${diff.newIssues.length === 1 ? "" : "s"} appeared, so this read deserves a fresh look first.`
+          : `The score moved ${formatSignedDelta(diff.scoreDelta)} since the last saved scan.`,
+      tone: "warning" as const,
+    };
+  }
+
+  if (hasImprovement) {
+    return {
+      eyebrow: "Improvement observed",
+      title: "The latest read looks healthier than the previous saved snapshot.",
+      detail:
+        diff.resolvedIssues.length > 0
+          ? `${diff.resolvedIssues.length} finding${diff.resolvedIssues.length === 1 ? "" : "s"} no longer appear in this scan.`
+          : `The score moved ${formatSignedDelta(diff.scoreDelta)} since the last saved scan.`,
+      tone: "info" as const,
+    };
+  }
+
+  if (hasSurfaceChange) {
+    return {
+      eyebrow: "Surface shifted",
+      title: "The overall posture is steady, but the visible surface has moved.",
+      detail: "Headers, providers, or identity signals changed without creating a clear score swing.",
+      tone: "info" as const,
+    };
+  }
+
+  return {
+    eyebrow: "Little changed",
+    title: "The latest saved snapshot is broadly in line with the last one.",
+    detail: "No meaningful regressions or improvements stood out in this comparison window.",
+    tone: "neutral" as const,
+  };
+};
+
 export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProps) => {
   const alerts = getMonitoringAlerts(analysis, diff);
   const scoreSeries = history
@@ -33,6 +107,7 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
   const firstScore = scoreSeries[0] ?? analysis.score;
   const trendDelta = latestScore - firstScore;
   const trendDirection = trendDelta > 1 ? "up" : trendDelta < -1 ? "down" : "flat";
+  const changeLead = getChangeLead(diff);
 
   const currentAreaScores = getAreaScores(analysis);
   const previousAreaScores = history[1]?.areaScores ?? null;
@@ -75,13 +150,13 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
             Monitoring
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <EmptyState>
+      <CardContent>
+        <EmptyState>
             No saved history or monitoring alerts are available for this target yet, so change-over-time tracking has not started.
-          </EmptyState>
-        </CardContent>
-      </Card>
-    );
+        </EmptyState>
+      </CardContent>
+    </Card>
+  );
   }
 
   return (
@@ -93,63 +168,77 @@ export const MonitoringPanel = ({ analysis, diff, history }: MonitoringPanelProp
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {diff ? (
-          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Since last scan</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Compact change summary against the previous saved snapshot.</p>
-              </div>
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Delta board</p>
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-2xl">
+              <p
+                className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+                  changeLead.tone === "warning"
+                    ? "text-[#d89a63]"
+                    : changeLead.tone === "info"
+                      ? "text-[#cdd7e6]"
+                      : "text-slate-400"
+                }`}
+              >
+                {changeLead.eyebrow}
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-50">{changeLead.title}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{changeLead.detail}</p>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+            {diff ? (
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Since last scan</p>
+            ) : null}
+          </div>
+
+          {diff ? (
+            <>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score</p>
                 <p className="mt-3 text-3xl font-semibold text-white">
-                  {diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}
-                  {diff.scoreDelta ?? 0}
+                  {formatSignedDelta(diff.scoreDelta)}
                 </p>
                 <p className="mt-2 text-xs text-slate-400">
                   {diff.previousScore !== null ? `From ${diff.previousScore}` : "No prior score"}
                 </p>
-              </div>
-              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                </div>
+                <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">New findings</p>
                 <p className="mt-3 text-3xl font-semibold text-white">{diff.newIssues.length}</p>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
                   {diff.newIssues[0] ?? "No new findings"}
                 </p>
-              </div>
-              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                </div>
+                <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resolved</p>
                 <p className="mt-3 text-3xl font-semibold text-white">{diff.resolvedIssues.length}</p>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
                   {diff.resolvedIssues[0] ?? "No resolved findings"}
                 </p>
-              </div>
-              <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                </div>
+                <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Header changes</p>
                 <p className="mt-3 text-3xl font-semibold text-white">{diff.headerChanges.length}</p>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
                   {diff.headerChanges[0]?.label ?? "No header movement"}
                 </p>
+                </div>
               </div>
-            </div>
-            {areaDeltas.length ? (
-              <div className="mt-4 grid gap-2 md:grid-cols-2">
-                {areaDeltas.map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2 text-sm text-slate-300"
-                  >
-                    <span className="font-medium text-white">{item.label}</span>: {item.delta > 0 ? "+" : ""}
-                    {item.delta}
+              {areaDeltas.length ? (
+                <div className="mt-4 rounded-[1.15rem] border border-white/10 bg-slate-950/35 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Most moved areas</p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {areaDeltas.map((item) => (
+                      <div key={item.label} className="text-sm text-slate-300">
+                        <span className="font-medium text-white">{item.label}</span>: {formatSignedDelta(item.delta)}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
 
         <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
           <div className="flex items-center justify-between gap-3">

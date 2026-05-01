@@ -37,6 +37,10 @@
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
+    },
+    "./history-diff": {
+      "types": "./dist/historyDiff.d.ts",
+      "default": "./dist/historyDiff.js"
     }
   },
   "files": [

@@ -40,6 +40,9 @@ export const RemediationPanel = ({ remediation }: RemediationPanelProps) => {
   }
 
   const active = remediation.find((item) => item.platform === selected) ?? remediation[0];
+  if (!active) {
+    return null;
+  }
 
   const copySnippet = async () => {
     await navigator.clipboard.writeText(active.snippet);

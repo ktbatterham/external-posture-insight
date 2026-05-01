@@ -40,7 +40,9 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
       return `${x},${y}`;
     })
     .join(" ");
-  const trendDelta = trendPoints.length > 1 ? trendPoints.at(-1)!.score - trendPoints[0].score : 0;
+  const latestTrendPoint = trendPoints.at(-1);
+  const firstTrendPoint = trendPoints[0];
+  const trendDelta = trendPoints.length > 1 && latestTrendPoint && firstTrendPoint ? latestTrendPoint.score - firstTrendPoint.score : 0;
   const trendLabel = trendDelta >= 5 ? "Improving" : trendDelta <= -5 ? "Degrading" : "Stable";
   const trendStroke = trendDelta > 0 ? "#7aa6b6" : trendDelta < 0 ? "#b56a2c" : "#94a3b8";
 

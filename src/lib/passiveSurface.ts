@@ -91,7 +91,7 @@ export const getAuthSurfaceSummary = (htmlSecurity: HtmlSecurityInfo): AuthSurfa
   }
   if (externalPasswordForms.length) {
     summary += " At least one password form submits to a different origin and deserves confirmation.";
-  } else if (insecurePasswordForms.length) {
+  } else if (insecurePasswordForms) {
     summary += " At least one password form submits insecurely and should be reviewed quickly.";
   }
 
@@ -125,7 +125,7 @@ export const getDataCollectionSummary = (htmlSecurity: HtmlSecurityInfo): DataCo
 
   if (externalForms.length) {
     summary += " Some form submissions leave the current origin and should be intentional.";
-  } else if (insecureForms.length) {
+  } else if (insecureForms) {
     summary += " At least one form appears to submit insecurely.";
   }
 

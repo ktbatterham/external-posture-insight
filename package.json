@@ -12,6 +12,7 @@
     "dev:server": "npm run build:core && node server/index.mjs",
     "build:core": "tsc -p packages/core/tsconfig.json",
     "typecheck:core:strict": "tsc -p packages/core/tsconfig.strict.json",
+    "typecheck:architecture:strict": "tsc -p tsconfig.architecture-strict.json",
     "build": "npm run build:core && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

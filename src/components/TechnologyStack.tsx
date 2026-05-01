@@ -73,7 +73,7 @@ export const TechnologyStack = ({ technologies }: TechnologyStackProps) => {
       </CardHeader>
       <CardContent className="space-y-6">
         {categoryOrder.filter((category) => grouped[category]?.length).map((category) => {
-          const items = grouped[category];
+          const items = grouped[category] ?? [];
           const config = categoryConfig[category as keyof typeof categoryConfig];
           return (
             <div key={category} className="space-y-3">
