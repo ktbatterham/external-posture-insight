@@ -41,13 +41,14 @@ const getChangeLead = (diff: HistoryDiff | null) => {
     };
   }
 
+  const statusCodeDelta = diff.statusCodeDelta;
   const hasRegression =
     (diff.scoreDelta ?? 0) < 0 ||
     diff.newIssues.length > 0 ||
-    (diff.statusCodeDelta?.from !== null &&
-      diff.statusCodeDelta?.to !== null &&
-      diff.statusCodeDelta.from !== diff.statusCodeDelta.to &&
-      diff.statusCodeDelta.to >= 400);
+    (statusCodeDelta?.from !== null &&
+      statusCodeDelta?.to !== null &&
+      statusCodeDelta?.from !== statusCodeDelta?.to &&
+      (statusCodeDelta?.to ?? 0) >= 400);
   const hasImprovement = (diff.scoreDelta ?? 0) > 0 || diff.resolvedIssues.length > 0;
   const hasSurfaceChange =
     diff.headerChanges.length > 0 ||

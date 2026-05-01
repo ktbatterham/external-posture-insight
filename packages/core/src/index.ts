@@ -48,6 +48,26 @@ import { analyzeWafFingerprint } from "./wafFingerprint.js";
 import type { AnalysisResult, AnalyzeTargetOptions, HtmlSecurityInfo } from "./types.js";
 
 type ScanMode = NonNullable<AnalyzeTargetOptions["scanMode"]>;
+type CoreScanResult = Awaited<ReturnType<typeof analyzeUrlCore>>;
+type CtDiscoveryResult = Awaited<ReturnType<typeof fetchCtDiscovery>>;
+type DiscoveryResult = Awaited<ReturnType<typeof collectDiscoveryPaths>>;
+type EnrichedAnalysisResult = Omit<AnalysisResult, "executiveSummary">;
+
+const emptyCertificate = () => ({
+  available: false,
+  valid: false,
+  authorized: false,
+  issuer: null,
+  subject: null,
+  validFrom: null,
+  validTo: null,
+  daysRemaining: null,
+  protocol: null,
+  cipher: null,
+  fingerprint: null,
+  subjectAltName: [],
+  issues: [],
+});
 
 function normalizeUrl(input) {
   let candidate = input.trim();
@@ -230,23 +250,7 @@ async function analyzeUrlCore(input: string | URL, options: AnalyzeTargetOptions
       throw error;
     }
   }
-  const certificate = includeCertificate
-    ? await scanTls(requestData.finalUrl)
-    : {
-        available: false,
-        valid: false,
-        authorized: false,
-        issuer: null,
-        subject: null,
-        validFrom: null,
-        validTo: null,
-        daysRemaining: null,
-        protocol: null,
-        cipher: null,
-        fingerprint: null,
-        subjectAltName: [],
-        issues: [],
-      };
+  const certificate = includeCertificate ? await scanTls(requestData.finalUrl) : emptyCertificate();
   const rawHeaders = buildRawHeaders(requestData.response.headers);
   const { headers: headerResults, issues: headerIssues, strengths } = analyzeHeaders(
     requestData.response.headers,
@@ -315,8 +319,8 @@ async function analyzeUrlCore(input: string | URL, options: AnalyzeTargetOptions
       : grade === "A"
         ? "Strong setup with a few remaining improvements."
         : grade === "B"
-          ? "Reasonably protected, but several headers or cookie controls can be improved."
-          : "Security posture needs work before this would count as well hardened.";
+        ? "Reasonably protected, but several headers or cookie controls can be improved."
+        : "Security posture needs work before this would count as well hardened.";
 
   return {
     inputUrl: input instanceof URL ? input.toString() : input,
@@ -344,6 +348,288 @@ async function analyzeUrlCore(input: string | URL, options: AnalyzeTargetOptions
       title: null,
       detail: null,
     },
+  };
+}
+
+async function analyzeHtmlSecuritySignals(finalUrl: URL, pageAnalysisEnabled: boolean) {
+  let htmlDocument = null;
+  if (pageAnalysisEnabled) {
+    try {
+      htmlDocument = await fetchHtmlDocument(finalUrl);
+    } catch {
+      htmlDocument = null;
+    }
+  }
+
+  const emptyHtmlSecurity = analyzeHtmlSecurity(finalUrl, null);
+  const baseHtmlSecurity = pageAnalysisEnabled
+    ? analyzeHtmlSecurity(finalUrl, htmlDocument)
+    : {
+        ...emptyHtmlSecurity,
+        issues: [],
+        aiSurface: {
+          ...emptyHtmlSecurity.aiSurface,
+          issues: [],
+        },
+      };
+
+  const libraryRiskSignals = pageAnalysisEnabled
+    ? await fetchLibraryRiskSignals(baseHtmlSecurity.libraryFingerprints)
+    : [];
+
+  const htmlSecurity = {
+    ...baseHtmlSecurity,
+    libraryRiskSignals,
+    issues: [
+      ...baseHtmlSecurity.issues,
+      ...libraryRiskSignals.map(
+        (signal) =>
+          `${signal.packageName} ${signal.version} matched ${signal.vulnerabilities.length} OSV advisor${signal.vulnerabilities.length === 1 ? "y" : "ies"} from public script references.`,
+      ),
+    ],
+    strengths:
+      baseHtmlSecurity.libraryFingerprints.length > 0 && libraryRiskSignals.length === 0
+        ? [...baseHtmlSecurity.strengths, "No OSV advisory matches were found for the explicitly versioned client libraries detected on the fetched page."]
+        : baseHtmlSecurity.strengths,
+  };
+
+  return { htmlDocument, htmlSecurity };
+}
+
+async function buildLimitedResult(input: string, normalizedInput: URL, failure: ReturnType<typeof classifyAssessmentFailure>): Promise<AnalysisResult> {
+  const publicSignals = await fetchPublicSignals(normalizedInput.host, { requestText }).catch(() => ({
+    hstsPreload: {
+      status: "unknown" as const,
+      summary: "Public HSTS preload status could not be determined.",
+      sourceUrl: `https://hstspreload.org/api/v2/status?domain=${encodeURIComponent(normalizedInput.host)}`,
+    },
+    issues: [],
+    strengths: [],
+  }));
+  const fallbackHtmlSecurity = analyzeHtmlSecurity(normalizedInput, null);
+  const fallbackIssue = classifyIssueTaxonomy({
+    severity: "warning",
+    area: "transport",
+    title: failure.title,
+    detail: failure.detail,
+    confidence: "high",
+    source: "observed",
+    owasp: ["A02 Cryptographic Failures"],
+    mitre: ["Reconnaissance"],
+  });
+  const domainSecurity = await analyzeDomainSecurity(normalizedInput.host, requestText).catch(() => ({
+    host: normalizedInput.host,
+    mxRecords: [],
+    nsRecords: [],
+    caaRecords: [],
+    dnssec: { enabled: false, dsRecords: [], status: "unknown" as const },
+    spf: null,
+    dmarc: null,
+    emailPolicy: {
+      spf: {
+        status: "missing" as const,
+        allMechanism: null,
+        dnsLookupMechanisms: 0,
+        summary: "SPF could not be evaluated during the limited fallback checks.",
+      },
+      dmarc: {
+        status: "missing" as const,
+        policy: null,
+        subdomainPolicy: null,
+        pct: null,
+        reporting: false,
+        summary: "DMARC could not be evaluated during the limited fallback checks.",
+      },
+    },
+    mtaSts: { dns: null, policyUrl: null, policy: null },
+    issues: [],
+    strengths: [],
+  }));
+
+  return {
+    inputUrl: input,
+    normalizedUrl: normalizedInput.toString(),
+    finalUrl: normalizedInput.toString(),
+    host: normalizedInput.host,
+    scannedAt: new Date().toISOString(),
+    responseTimeMs: 0,
+    statusCode: 0,
+    score: 0,
+    grade: "U",
+    summary: "Assessment is limited because the target could not be reached or trusted cleanly.",
+    headers: [],
+    rawHeaders: {},
+    cookies: [],
+    technologies: [],
+    certificate: {
+      ...emptyCertificate(),
+      available: normalizedInput.protocol === "https:",
+      subject: normalizedInput.hostname,
+      issues: [failure.detail],
+    },
+    redirects: [],
+    issues: [fallbackIssue],
+    strengths: [],
+    remediation: [],
+    crawl: emptyCrawlSummary(["limited assessment"]),
+    securityTxt: emptySecurityTxt(),
+    domainSecurity,
+    identityProvider: emptyIdentityProvider(),
+    ctDiscovery: {
+      queriedDomain: normalizedInput.hostname,
+      sourceUrl: `https://crt.sh/?q=%25.${normalizedInput.hostname}&output=json`,
+      subdomains: [],
+      wildcardEntries: [],
+      prioritizedHosts: [],
+      sampledHosts: [],
+      coverageSummary: "Certificate transparency discovery was skipped because the primary assessment could not complete cleanly.",
+      issues: [],
+      strengths: [],
+    },
+    htmlSecurity: fallbackHtmlSecurity,
+    aiSurface: fallbackHtmlSecurity.aiSurface,
+    thirdPartyTrust: {
+      totalProviders: 0,
+      highRiskProviders: 0,
+      providers: [],
+      issues: [],
+      strengths: [],
+      summary: "Third-party trust could not be assessed from a limited scan.",
+    },
+    infrastructure: {
+      host: normalizedInput.hostname,
+      addresses: [],
+      cnameTargets: [],
+      reverseDns: [],
+      providers: [],
+      issues: [],
+      strengths: [],
+      summary: "Infrastructure attribution was not completed because the primary response could not be fetched cleanly.",
+    },
+    executiveSummary: {
+      overview:
+        failure.kind === "service_unavailable"
+          ? "The scanner could not obtain a stable response from the target, so this is only a limited availability read."
+          : "The scanner could not establish a trusted connection to the target, so this is only a limited transport read.",
+      mainRisk:
+        failure.kind === "service_unavailable"
+          ? "Availability or reachability issues prevented a normal posture assessment."
+          : "TLS trust or certificate issues prevented a normal posture assessment.",
+      posture: "weak",
+      takeaways: [
+        failure.detail,
+        domainSecurity.issues.length > 0
+          ? `${domainSecurity.issues.length} domain or mail-hygiene issue${domainSecurity.issues.length === 1 ? "" : "s"} were still detectable without a full page read.`
+          : "No additional DNS or mail-hygiene issues were inferred from the limited fallback checks.",
+        publicSignals.issues.length > 0
+          ? `${publicSignals.issues.length} public trust signal${publicSignals.issues.length === 1 ? " was" : "s were"} still observable.`
+          : "Public preload and trust signals could not materially improve this limited read.",
+      ],
+    },
+    assessmentLimitation: {
+      limited: true,
+      kind: failure.kind,
+      title: failure.title,
+      detail: failure.detail,
+    },
+    exposure: emptyExposure(),
+    corsSecurity: emptyCorsSecurity(),
+    apiSurface: emptyApiSurface(),
+    publicSignals,
+    wafFingerprint: {
+      detected: false,
+      providers: [],
+      edgeSignals: [],
+      issues: [],
+      strengths: [],
+      summary: "Edge-protection fingerprinting was not completed because the primary response could not be fetched cleanly.",
+    },
+  };
+}
+
+async function enrichCoreResult(
+  result: CoreScanResult,
+  pageAnalysisEnabled: boolean,
+): Promise<EnrichedAnalysisResult> {
+  const finalUrl = new URL(result.finalUrl);
+  const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson, requestText, {
+    sampleHosts: pageAnalysisEnabled,
+  });
+  const { htmlDocument, htmlSecurity } = await analyzeHtmlSecuritySignals(finalUrl, pageAnalysisEnabled);
+  const discovery = pageAnalysisEnabled
+    ? await collectDiscoveryPaths(finalUrl, htmlSecurity)
+    : { paths: [], sources: ["quiet mode"] };
+  const publicSignals = await fetchPublicSignals(result.host, { requestText });
+  const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
+  const technologies = mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies);
+  const infrastructure = await analyzeInfrastructure(finalUrl, result.rawHeaders, technologies);
+  const ctDiscovery: CtDiscoveryResult = await ctDiscoveryPromise;
+  const identityProvider = pageAnalysisEnabled
+    ? await analyzeIdentityProvider(
+        finalUrl,
+        result.redirects,
+        htmlSecurity,
+        htmlDocument?.html || null,
+        requestJson,
+        ctDiscovery,
+      )
+    : emptyIdentityProvider();
+  const wafFingerprint = analyzeWafFingerprint(
+    finalUrl,
+    result.rawHeaders,
+    htmlDocument?.html || null,
+    result.redirects,
+  );
+  const assessmentLimitation = detectAssessmentLimitation(
+    result.statusCode,
+    result.rawHeaders,
+    htmlDocument?.html || null,
+  );
+
+  return {
+    ...result,
+    issues: [...result.issues, ...buildLibraryRiskIssues(htmlSecurity.libraryRiskSignals).map(classifyIssueTaxonomy)],
+    technologies,
+    crawl: pageAnalysisEnabled ? await crawlRelatedPages(result, discovery) : emptyCrawlSummary(discovery.sources),
+    securityTxt: pageAnalysisEnabled ? await fetchSecurityTxt(finalUrl, requestText) : emptySecurityTxt(),
+    domainSecurity: await analyzeDomainSecurity(result.host, requestText),
+    identityProvider,
+    ctDiscovery,
+    htmlSecurity,
+    aiSurface: htmlSecurity.aiSurface,
+    thirdPartyTrust,
+    infrastructure,
+    wafFingerprint,
+    exposure: pageAnalysisEnabled
+      ? await analyzeExposure(finalUrl, htmlDocument, {
+          exposureProbes: EXPOSURE_PROBES,
+          requestOnce,
+          requestText,
+          fetchWithRedirects,
+          headerValue,
+          formatErrorMessage,
+          isAccessDeniedHtml,
+          classifyHtmlApiFallback,
+        })
+      : emptyExposure(),
+    corsSecurity: pageAnalysisEnabled
+      ? await analyzeCorsSecurity(finalUrl, result.rawHeaders, {
+          requestWithHeaders,
+          headerValue,
+        })
+      : emptyCorsSecurity(),
+    apiSurface: pageAnalysisEnabled
+      ? await analyzeApiSurface(finalUrl, htmlDocument, {
+          apiSurfaceProbes: API_SURFACE_PROBES,
+          requestText,
+          fetchWithRedirects,
+          headerValue,
+          isAccessDeniedHtml,
+          classifyHtmlApiFallback,
+        })
+      : emptyApiSurface(),
+    publicSignals,
+    assessmentLimitation,
   };
 }
 
@@ -563,287 +849,17 @@ export async function analyzeUrl(input: string, options: AnalyzeTargetOptions = 
   const scanMode: ScanMode = options.scanMode || "standard";
   const pageAnalysisEnabled = scanMode === "standard";
   const normalizedInput = normalizeUrl(input);
-  let result;
+  let result: CoreScanResult;
 
   try {
     result = await analyzeUrlCore(normalizedInput, { includeCertificate: true });
   } catch (error) {
     const failure = classifyAssessmentFailure(error);
-    const publicSignals = await fetchPublicSignals(normalizedInput.host, { requestText }).catch(() => ({
-      hstsPreload: {
-        status: "unknown" as const,
-        summary: "Public HSTS preload status could not be determined.",
-        sourceUrl: `https://hstspreload.org/api/v2/status?domain=${encodeURIComponent(normalizedInput.host)}`,
-      },
-      issues: [],
-      strengths: [],
-    }));
-    const fallbackHtmlSecurity = analyzeHtmlSecurity(normalizedInput, null);
-    const fallbackIssue = classifyIssueTaxonomy({
-      severity: "warning",
-      area: "transport",
-      title: failure.title,
-      detail: failure.detail,
-      confidence: "high",
-      source: "observed",
-      owasp: ["A02 Cryptographic Failures"],
-      mitre: ["Reconnaissance"],
-    });
-    const domainSecurity = await analyzeDomainSecurity(normalizedInput.host, requestText).catch(() => ({
-      host: normalizedInput.host,
-      mxRecords: [],
-      nsRecords: [],
-      caaRecords: [],
-      dnssec: { enabled: false, dsRecords: [], status: "unknown" as const },
-      spf: null,
-      dmarc: null,
-      emailPolicy: {
-        spf: {
-          status: "missing" as const,
-          allMechanism: null,
-          dnsLookupMechanisms: 0,
-          summary: "SPF could not be evaluated during the limited fallback checks.",
-        },
-        dmarc: {
-          status: "missing" as const,
-          policy: null,
-          subdomainPolicy: null,
-          pct: null,
-          reporting: false,
-          summary: "DMARC could not be evaluated during the limited fallback checks.",
-        },
-      },
-      mtaSts: { dns: null, policyUrl: null, policy: null },
-      issues: [],
-      strengths: [],
-    }));
-
-    const limitedResult: AnalysisResult = {
-      inputUrl: input,
-      normalizedUrl: normalizedInput.toString(),
-      finalUrl: normalizedInput.toString(),
-      host: normalizedInput.host,
-      scannedAt: new Date().toISOString(),
-      responseTimeMs: 0,
-      statusCode: 0,
-      score: 0,
-      grade: "U",
-      summary: "Assessment is limited because the target could not be reached or trusted cleanly.",
-      headers: [],
-      rawHeaders: {},
-      cookies: [],
-      technologies: [],
-      certificate: {
-        available: normalizedInput.protocol === "https:",
-        valid: false,
-        authorized: false,
-        issuer: null,
-        subject: normalizedInput.hostname,
-        validFrom: null,
-        validTo: null,
-        daysRemaining: null,
-        protocol: null,
-        cipher: null,
-        fingerprint: null,
-        subjectAltName: [],
-        issues: [failure.detail],
-      },
-      redirects: [],
-      issues: [fallbackIssue],
-      strengths: [],
-      remediation: [],
-      crawl: emptyCrawlSummary(["limited assessment"]),
-      securityTxt: emptySecurityTxt(),
-      domainSecurity,
-      identityProvider: emptyIdentityProvider(),
-      ctDiscovery: {
-        queriedDomain: normalizedInput.hostname,
-        sourceUrl: `https://crt.sh/?q=%25.${normalizedInput.hostname}&output=json`,
-        subdomains: [],
-        wildcardEntries: [],
-        prioritizedHosts: [],
-        sampledHosts: [],
-        coverageSummary: "Certificate transparency discovery was skipped because the primary assessment could not complete cleanly.",
-        issues: [],
-        strengths: [],
-      },
-      htmlSecurity: fallbackHtmlSecurity,
-      aiSurface: fallbackHtmlSecurity.aiSurface,
-      thirdPartyTrust: {
-        totalProviders: 0,
-        highRiskProviders: 0,
-        providers: [],
-        issues: [],
-        strengths: [],
-        summary: "Third-party trust could not be assessed from a limited scan.",
-      },
-      infrastructure: {
-        host: normalizedInput.hostname,
-        addresses: [],
-        cnameTargets: [],
-        reverseDns: [],
-        providers: [],
-        issues: [],
-        strengths: [],
-        summary: "Infrastructure attribution was not completed because the primary response could not be fetched cleanly.",
-      },
-      executiveSummary: {
-        overview:
-          failure.kind === "service_unavailable"
-            ? "The scanner could not obtain a stable response from the target, so this is only a limited availability read."
-            : "The scanner could not establish a trusted connection to the target, so this is only a limited transport read.",
-        mainRisk:
-          failure.kind === "service_unavailable"
-            ? "Availability or reachability issues prevented a normal posture assessment."
-            : "TLS trust or certificate issues prevented a normal posture assessment.",
-        posture: "weak",
-        takeaways: [
-          failure.detail,
-          domainSecurity.issues.length > 0
-            ? `${domainSecurity.issues.length} domain or mail-hygiene issue${domainSecurity.issues.length === 1 ? "" : "s"} were still detectable without a full page read.`
-            : "No additional DNS or mail-hygiene issues were inferred from the limited fallback checks.",
-          publicSignals.issues.length > 0
-            ? `${publicSignals.issues.length} public trust signal${publicSignals.issues.length === 1 ? " was" : "s were"} still observable.`
-            : "Public preload and trust signals could not materially improve this limited read.",
-        ],
-      },
-      assessmentLimitation: {
-        limited: true,
-        kind: failure.kind,
-        title: failure.title,
-        detail: failure.detail,
-      },
-      exposure: emptyExposure(),
-      corsSecurity: emptyCorsSecurity(),
-      apiSurface: emptyApiSurface(),
-      publicSignals,
-      wafFingerprint: {
-        detected: false,
-        providers: [],
-        edgeSignals: [],
-        issues: [],
-        strengths: [],
-        summary: "Edge-protection fingerprinting was not completed because the primary response could not be fetched cleanly.",
-      },
-    };
-
-    return limitedResult;
+    return buildLimitedResult(input, normalizedInput, failure);
   }
 
-  const finalUrl = new URL(result.finalUrl);
-  const ctDiscoveryPromise = fetchCtDiscovery(result.host, requestJson, requestText, {
-    sampleHosts: pageAnalysisEnabled,
-  });
-  let htmlDocument = null;
-  if (pageAnalysisEnabled) {
-    try {
-      htmlDocument = await fetchHtmlDocument(finalUrl);
-    } catch {
-      htmlDocument = null;
-    }
-  }
-  const baseHtmlSecurity = pageAnalysisEnabled
-    ? analyzeHtmlSecurity(finalUrl, htmlDocument)
-    : {
-        ...analyzeHtmlSecurity(finalUrl, null),
-        issues: [],
-        aiSurface: {
-          ...analyzeHtmlSecurity(finalUrl, null).aiSurface,
-          issues: [],
-        },
-      };
-  const libraryRiskSignals = pageAnalysisEnabled
-    ? await fetchLibraryRiskSignals(baseHtmlSecurity.libraryFingerprints)
-    : [];
-  const htmlSecurity = {
-    ...baseHtmlSecurity,
-    libraryRiskSignals,
-    issues: [
-      ...baseHtmlSecurity.issues,
-      ...libraryRiskSignals.map(
-        (signal) =>
-          `${signal.packageName} ${signal.version} matched ${signal.vulnerabilities.length} OSV advisor${signal.vulnerabilities.length === 1 ? "y" : "ies"} from public script references.`,
-      ),
-    ],
-    strengths:
-      baseHtmlSecurity.libraryFingerprints.length > 0 && libraryRiskSignals.length === 0
-        ? [...baseHtmlSecurity.strengths, "No OSV advisory matches were found for the explicitly versioned client libraries detected on the fetched page."]
-        : baseHtmlSecurity.strengths,
-  };
-  const discovery = pageAnalysisEnabled
-    ? await collectDiscoveryPaths(finalUrl, htmlSecurity)
-    : { paths: [], sources: ["quiet mode"] };
-  const publicSignals = await fetchPublicSignals(result.host, { requestText });
-  const thirdPartyTrust = analyzeThirdPartyTrust(finalUrl, htmlSecurity, htmlSecurity.aiSurface);
-  const technologies = mergeTechnologies(result.technologies, htmlSecurity.detectedTechnologies);
-  const infrastructure = await analyzeInfrastructure(finalUrl, result.rawHeaders, technologies);
-  const ctDiscovery = await ctDiscoveryPromise;
-  const identityProvider = pageAnalysisEnabled
-    ? await analyzeIdentityProvider(
-        finalUrl,
-        result.redirects,
-        htmlSecurity,
-        htmlDocument?.html || null,
-        requestJson,
-        ctDiscovery,
-      )
-    : emptyIdentityProvider();
-  const wafFingerprint = analyzeWafFingerprint(
-    finalUrl,
-    result.rawHeaders,
-    htmlDocument?.html || null,
-    result.redirects,
-  );
-  const assessmentLimitation = detectAssessmentLimitation(
-    result.statusCode,
-    result.rawHeaders,
-    htmlDocument?.html || null,
-  );
-  const enrichedResult = {
-    ...result,
-    issues: [...result.issues, ...buildLibraryRiskIssues(libraryRiskSignals).map(classifyIssueTaxonomy)],
-    technologies,
-    crawl: pageAnalysisEnabled ? await crawlRelatedPages(result, discovery) : emptyCrawlSummary(discovery.sources),
-    securityTxt: pageAnalysisEnabled ? await fetchSecurityTxt(finalUrl, requestText) : emptySecurityTxt(),
-    domainSecurity: await analyzeDomainSecurity(result.host, requestText),
-    identityProvider,
-    ctDiscovery,
-    htmlSecurity,
-    aiSurface: htmlSecurity.aiSurface,
-    thirdPartyTrust,
-    infrastructure,
-    wafFingerprint,
-    exposure: pageAnalysisEnabled
-      ? await analyzeExposure(finalUrl, htmlDocument, {
-          exposureProbes: EXPOSURE_PROBES,
-          requestOnce,
-          requestText,
-          fetchWithRedirects,
-          headerValue,
-          formatErrorMessage,
-          isAccessDeniedHtml,
-          classifyHtmlApiFallback,
-        })
-      : emptyExposure(),
-    corsSecurity: pageAnalysisEnabled
-      ? await analyzeCorsSecurity(finalUrl, result.rawHeaders, {
-          requestWithHeaders,
-          headerValue,
-        })
-      : emptyCorsSecurity(),
-    apiSurface: pageAnalysisEnabled
-      ? await analyzeApiSurface(finalUrl, htmlDocument, {
-          apiSurfaceProbes: API_SURFACE_PROBES,
-          requestText,
-          fetchWithRedirects,
-          headerValue,
-          isAccessDeniedHtml,
-          classifyHtmlApiFallback,
-        })
-      : emptyApiSurface(),
-    publicSignals,
-    assessmentLimitation,
-  };
+  const enrichedResult = await enrichCoreResult(result, pageAnalysisEnabled);
+  const assessmentLimitation = enrichedResult.assessmentLimitation;
   const postureScore = scorePostureAnalysis(enrichedResult);
   const scoredResult = {
     ...enrichedResult,
@@ -869,4 +885,4 @@ export {
   isLocalHostname,
   isPrivateAddress,
 } from "./network-validation.js";
-export type { AnalysisResult, AnalyzeTargetOptions, HistoryDiff, HistorySnapshot, HtmlSecurityInfo } from "./types";
+export type * from "./types.js";
