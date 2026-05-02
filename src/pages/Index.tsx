@@ -57,10 +57,10 @@ const Index = () => {
                 </div>
                 <div className="space-y-4">
                   <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl lg:text-6xl">
-                    Public attack surface, quietly mapped.
+                    Public posture, quietly interpreted.
                   </h1>
                   <p className="max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">
-                    Passive-first URL and domain posture analysis with a fast healthcheck up front and supporting evidence when you need to go deeper.
+                    SecURL is posture-first: a passive, low-noise read of headers, TLS, redirects, cookies, trust signals, and visible client code, with a fast healthcheck up front and evidence when you need to go deeper.
                   </p>
                 </div>
               </div>
@@ -76,7 +76,7 @@ const Index = () => {
                 {[
                   "Headers, redirects, TLS, cookies, and browser isolation controls with confidence-labeled findings.",
                   "DNS and email posture, security.txt, HSTS preload signals, and passive page-risk analysis.",
-                  "Detected stack, AI surface, exposure checks, exports, and browser-local monitoring targets.",
+                  "Posture-first output: quieter than broad reconnaissance, clearer than raw scanner noise.",
                 ].map((item, index) => (
                   <div
                     key={item}
