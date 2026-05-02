@@ -220,6 +220,94 @@ test("health endpoint returns minimal readiness data in production mode", async 
   }
 });
 
+test("telemetry endpoint returns aggregate page-load and failure counters", async () => {
+  const server = await startServer();
+
+  try {
+    const pageResponse = await fetch(server.baseUrl);
+    assert.equal(pageResponse.status, 200);
+
+    const badAnalyze = await fetch(
+      `${server.baseUrl}/api/analyze?url=${encodeURIComponent("https://user:pass@example.com")}`,
+    );
+    assert.equal(badAnalyze.status, 400);
+
+    const telemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const payload = await telemetryResponse.json();
+
+    assert.equal(telemetryResponse.status, 200);
+    assert.equal(payload.persistence, "memory");
+    assert.equal(payload.pageLoads, 1);
+    assert.equal(payload.scans.requested, 0);
+    assert.equal(payload.scans.completed, 0);
+    assert.equal(payload.failures.classes.invalid_target_credentials, 1);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("scan resources start empty and return 404 for unknown ids", async () => {
+  const server = await startServer();
+
+  try {
+    const listResponse = await fetch(`${server.baseUrl}/api/scans`);
+    const listPayload = await listResponse.json();
+
+    assert.equal(listResponse.status, 200);
+    assert.deepEqual(listPayload.scans, []);
+
+    const missingResponse = await fetch(`${server.baseUrl}/api/scans/not-a-real-scan`);
+    const missingPayload = await missingResponse.json();
+
+    assert.equal(missingResponse.status, 404);
+    assert.match(missingPayload.error, /Scan not found/i);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("scan resources reject invalid json bodies", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await fetch(`${server.baseUrl}/api/scans`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: "{broken",
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.match(payload.error, /valid json/i);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("scan resources return a sanitized error for invalid targets", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await fetch(`${server.baseUrl}/api/scans`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: "https://user:pass@example.com",
+      }),
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.match(payload.error, /embedded credentials/i);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("analyze endpoint returns a sanitized error for invalid targets", async () => {
   const server = await startServer();
 

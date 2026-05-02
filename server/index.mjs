@@ -6,6 +6,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath, URL } from "node:url";
 import { createRateLimiter } from "./rateLimiter.mjs";
+import { createScanStore } from "./scanStore.mjs";
+import { classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
 import {
   analyzeUrl,
   formatErrorMessage,
@@ -80,6 +82,8 @@ const upstashRestUrl = (process.env.UPSTASH_REDIS_REST_URL || "").trim();
 const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const abuseSignalBuckets = new Map();
 const exposeDetailedHealth = !isProduction;
+const telemetry = createTelemetryTracker();
+const scanStore = createScanStore();
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -234,6 +238,16 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function sendMethodNotAllowed(response, allowedMethods) {
+  response.writeHead(405, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Allow": allowedMethods.join(", "),
+  });
+  response.end(JSON.stringify({
+    error: `Method not allowed. Use ${allowedMethods.join(" or ")}.`,
+  }));
+}
+
 function sendRateLimited(response, retryAfterSeconds, message = "Too many analysis requests from this client. Please try again later.") {
   response.writeHead(429, {
     "Content-Type": "application/json; charset=utf-8",
@@ -243,6 +257,122 @@ function sendRateLimited(response, retryAfterSeconds, message = "Too many analys
   response.end(JSON.stringify({
     error: message,
   }));
+}
+
+function getRequestedScanMode(input) {
+  return input === "quiet" ? "quiet" : "standard";
+}
+
+function normalizeScanErrorMessage(error) {
+  return error instanceof Error && error.message
+    ? error.message
+    : "Unable to complete the scan for this target.";
+}
+
+function readJsonBody(request, { maxBytes = 32 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    let raw = "";
+    let size = 0;
+
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      size += Buffer.byteLength(chunk);
+      if (size > maxBytes) {
+        reject(new Error("Request body is too large."));
+        request.destroy();
+        return;
+      }
+      raw += chunk;
+    });
+    request.on("end", () => {
+      if (!raw.trim()) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        reject(new Error("Request body must be valid JSON."));
+      }
+    });
+    request.on("error", reject);
+  });
+}
+
+async function runScanAnalysis({ validatedTarget, mode, clientIp, requesterScope }) {
+  telemetry.recordScanRequested({ mode });
+  log("info", "analysis_requested", {
+    clientIp,
+    requesterScope,
+    target: validatedTarget.toString(),
+    mode,
+  });
+  const result = await analyzeUrl(validatedTarget.toString(), { scanMode: mode });
+  telemetry.recordScanCompleted(result);
+  return result;
+}
+
+async function checkTargetQuota({ requesterScope, target, clientIp, requestPath, response }) {
+  const targetHost = parseTargetHostForQuota(target);
+  if (!targetHost) {
+    return { ok: true };
+  }
+
+  const targetScope = `${requesterScope}:${targetHost}`;
+  const targetRateLimitState = await targetRateLimiter.check(targetScope);
+  if (!targetRateLimitState.limited) {
+    return { ok: true };
+  }
+
+  telemetry.recordTargetRateLimited();
+  telemetry.recordFailure("target_rate_limited");
+  recordAbuseSignal("target_quota_exceeded", {
+    clientIp,
+    requesterScope,
+    targetHost,
+    path: requestPath,
+  });
+  sendRateLimited(
+    response,
+    targetRateLimitState.retryAfterSeconds,
+    "Too many analysis requests for this target from this client. Please try again later.",
+  );
+  return { ok: false };
+}
+
+async function authorizeAnalysisRequest({ request, response, requestPath }) {
+  const clientIp = getClientIp(request) || "unknown";
+  const presentedApiKey = getPresentedApiKey(request);
+  const requesterScope = getRequesterScope(clientIp, presentedApiKey);
+
+  if (apiKey && presentedApiKey !== apiKey) {
+    telemetry.recordAuthRejected();
+    telemetry.recordFailure("auth_rejected");
+    recordAbuseSignal("api_key_rejected", {
+      clientIp,
+      path: requestPath,
+    });
+    sendJson(response, 401, {
+      error: "A valid API key is required to analyze targets from this deployment.",
+    });
+    return null;
+  }
+
+  const rateLimitState = await rateLimiter.check(requesterScope);
+  if (rateLimitState.limited) {
+    telemetry.recordRequesterRateLimited();
+    telemetry.recordFailure("requester_rate_limited");
+    recordAbuseSignal("rate_limit_exceeded", {
+      clientIp,
+      requesterScope,
+      path: requestPath,
+    });
+    sendRateLimited(response, rateLimitState.retryAfterSeconds);
+    return null;
+  }
+
+  return { clientIp, requesterScope };
 }
 
 const rateLimiter = createRateLimiter({
@@ -338,6 +468,10 @@ function serveStatic(requestPath, method, response) {
     return;
   }
 
+  if (method === "GET" && path.basename(preferredPath) === "index.html") {
+    telemetry.recordPageLoad();
+  }
+
   const connectSources = ["'self'"];
   if (!isProduction) {
     connectSources.push("http://127.0.0.1:8787", "http://localhost:8787");
@@ -391,76 +525,153 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === "/api/telemetry") {
+    sendJson(response, 200, telemetry.snapshot());
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/scans" && request.method === "GET") {
+    const scans = scanStore.listScans({
+      limit: Number(requestUrl.searchParams.get("limit") || 20),
+    });
+    sendJson(response, 200, {
+      scans,
+    });
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/scans" && request.method === "POST") {
+    const authState = await authorizeAnalysisRequest({
+      request,
+      response,
+      requestPath: requestUrl.pathname,
+    });
+    if (!authState) {
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(request);
+      const target = typeof body.url === "string" ? body.url : "";
+      const mode = getRequestedScanMode(body.mode);
+
+      const targetQuota = await checkTargetQuota({
+        requesterScope: authState.requesterScope,
+        target,
+        clientIp: authState.clientIp,
+        requestPath: requestUrl.pathname,
+        response,
+      });
+      if (!targetQuota.ok) {
+        return;
+      }
+
+      const validatedTarget = await assertPublicHttpUrl(target);
+      const scan = scanStore.createScan({
+        url: validatedTarget.toString(),
+        mode,
+        requesterScope: authState.requesterScope,
+        clientIp: authState.clientIp,
+      });
+
+      sendJson(response, 202, {
+        scan: scanStore.getScan(scan.id).summary,
+      });
+
+      queueMicrotask(async () => {
+        scanStore.markRunning(scan.id);
+        try {
+          const result = await runScanAnalysis({
+            validatedTarget,
+            mode,
+            clientIp: authState.clientIp,
+            requesterScope: authState.requesterScope,
+          });
+          scanStore.markCompleted(scan.id, result);
+        } catch (error) {
+          const failureClass = classifyScanFailure(error);
+          telemetry.recordFailure(failureClass);
+          scanStore.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
+          log("warn", "scan_resource_failed", {
+            message: formatErrorMessage(error),
+            clientIp: authState.clientIp,
+            target: validatedTarget.toString(),
+            scanId: scan.id,
+          });
+        }
+      });
+    } catch (error) {
+      telemetry.recordFailure(classifyScanFailure(error));
+      sendJson(response, 400, {
+        error: normalizeScanErrorMessage(error),
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith("/api/scans/")) {
+    if (request.method !== "GET") {
+      sendMethodNotAllowed(response, ["GET"]);
+      return;
+    }
+
+    const scanId = requestUrl.pathname.slice("/api/scans/".length);
+    const scan = scanStore.getScan(scanId);
+    if (!scan) {
+      sendJson(response, 404, {
+        error: "Scan not found.",
+      });
+      return;
+    }
+
+    sendJson(response, 200, {
+      scan,
+    });
+    return;
+  }
+
   if (requestUrl.pathname === "/api/analyze") {
     if (request.method !== "GET") {
-      response.writeHead(405, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Allow": "GET",
-      });
-      response.end(JSON.stringify({ error: "Method not allowed. Use GET." }));
+      sendMethodNotAllowed(response, ["GET"]);
       return;
     }
 
-    const clientIp = getClientIp(request) || "unknown";
-    const presentedApiKey = getPresentedApiKey(request);
-    const requesterScope = getRequesterScope(clientIp, presentedApiKey);
-    if (apiKey && presentedApiKey !== apiKey) {
-      recordAbuseSignal("api_key_rejected", {
-        clientIp,
-        path: requestUrl.pathname,
-      });
-      sendJson(response, 401, {
-        error: "A valid API key is required to analyze targets from this deployment.",
-      });
-      return;
-    }
-
-    const rateLimitState = await rateLimiter.check(requesterScope);
-    if (rateLimitState.limited) {
-      recordAbuseSignal("rate_limit_exceeded", {
-        clientIp,
-        requesterScope,
-        path: requestUrl.pathname,
-      });
-      sendRateLimited(response, rateLimitState.retryAfterSeconds);
+    const authState = await authorizeAnalysisRequest({
+      request,
+      response,
+      requestPath: requestUrl.pathname,
+    });
+    if (!authState) {
       return;
     }
 
     try {
       const target = requestUrl.searchParams.get("url") || "";
-      const targetHost = parseTargetHostForQuota(target);
-      if (targetHost) {
-        const targetScope = `${requesterScope}:${targetHost}`;
-        const targetRateLimitState = await targetRateLimiter.check(targetScope);
-        if (targetRateLimitState.limited) {
-          recordAbuseSignal("target_quota_exceeded", {
-            clientIp,
-            requesterScope,
-            targetHost,
-            path: requestUrl.pathname,
-          });
-          sendRateLimited(
-            response,
-            targetRateLimitState.retryAfterSeconds,
-            "Too many analysis requests for this target from this client. Please try again later.",
-          );
-          return;
-        }
+      const mode = getRequestedScanMode(requestUrl.searchParams.get("mode"));
+      const targetQuota = await checkTargetQuota({
+        requesterScope: authState.requesterScope,
+        target,
+        clientIp: authState.clientIp,
+        requestPath: requestUrl.pathname,
+        response,
+      });
+      if (!targetQuota.ok) {
+        return;
       }
 
       const validatedTarget = await assertPublicHttpUrl(target);
-      log("info", "analysis_requested", {
-        clientIp,
-        requesterScope,
-        target: validatedTarget.toString(),
+      const result = await runScanAnalysis({
+        validatedTarget,
+        mode,
+        clientIp: authState.clientIp,
+        requesterScope: authState.requesterScope,
       });
-      const mode = requestUrl.searchParams.get("mode") === "quiet" ? "quiet" : "standard";
-      const result = await analyzeUrl(validatedTarget.toString(), { scanMode: mode });
       sendJson(response, 200, result);
     } catch (error) {
+      telemetry.recordFailure(classifyScanFailure(error));
       log("warn", "analysis_failed", {
         message: formatErrorMessage(error),
-        clientIp,
+        clientIp: authState.clientIp,
         target: requestUrl.searchParams.get("url") || "",
       });
       sendJson(response, 400, {

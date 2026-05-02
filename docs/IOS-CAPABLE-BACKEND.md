@@ -1,0 +1,197 @@
+# iOS-Capable Backend Plan
+
+SecURL does not need an iOS app yet, but the backend should be able to support one cleanly when we are ready.
+
+This document defines the service boundary we are moving toward so web, future mobile clients, and background monitoring can share the same server-owned scan model.
+
+## Why This Shift Matters
+
+The current browser app is built around a helper endpoint:
+
+- `GET /api/analyze?url=...`
+
+That works for a single-page web app, but it does not give us:
+
+- server-owned history across devices
+- async scan jobs
+- user ownership of scans
+- durable monitoring targets
+- mobile-friendly summary/detail responses
+- a credible auth story for multiple users
+
+## Current Transitional State
+
+As of the first `0.8.3` backend step, the server now has:
+
+- `GET /api/telemetry`
+- `GET /api/scans`
+- `POST /api/scans`
+- `GET /api/scans/:id`
+
+These scan resources are intentionally **in-memory** for now. They are not the final storage model, but they establish the API shape we want to grow into.
+
+## Target Service Model
+
+### Scan lifecycle
+
+Every scan should become a first-class server resource with a lifecycle:
+
+- `queued`
+- `running`
+- `completed`
+- `failed`
+
+### Target endpoints
+
+Phase 1:
+
+- `POST /api/scans`
+- `GET /api/scans`
+- `GET /api/scans/:id`
+
+Phase 2:
+
+- `GET /api/scans/:id/summary`
+- `GET /api/scans/:id/findings`
+- `GET /api/scans/:id/evidence`
+- `GET /api/scans/:id/history`
+
+Phase 3:
+
+- `POST /api/monitoring-targets`
+- `GET /api/monitoring-targets`
+- `GET /api/monitoring-targets/:id`
+
+## Resource Shape
+
+### Scan summary
+
+This is the payload shape mobile and list views should prefer.
+
+```json
+{
+  "id": "uuid",
+  "status": "completed",
+  "url": "https://example.com",
+  "mode": "standard",
+  "requestedAt": "2026-05-02T10:00:00.000Z",
+  "startedAt": "2026-05-02T10:00:01.000Z",
+  "completedAt": "2026-05-02T10:00:07.000Z",
+  "score": 74,
+  "grade": "C",
+  "limited": false,
+  "limitedKind": null,
+  "title": "Example title",
+  "mainRisk": "Browser hardening gaps are the main visible risk.",
+  "findingsCount": 6
+}
+```
+
+### Full scan resource
+
+This should eventually be shaped like:
+
+```json
+{
+  "scan": {
+    "id": "uuid",
+    "status": "completed",
+    "summary": {},
+    "result": {}
+  }
+}
+```
+
+The `result` payload can remain rich for now, but the long-term goal is to split it into focused DTOs for:
+
+- summary
+- findings
+- evidence
+- history
+
+## Persistence Roadmap
+
+The in-memory store is only a stepping stone. The durable version should store:
+
+- users
+- scans
+- scan summaries
+- monitoring targets
+- comparison history
+- telemetry aggregates
+
+Recommended first tables/documents:
+
+- `users`
+- `scans`
+- `scan_summaries`
+- `monitoring_targets`
+- `scan_events`
+
+## Auth Roadmap
+
+The current shared API key model is not suitable for a multi-user client platform.
+
+Minimum future requirements:
+
+- per-user auth
+- bearer tokens or session-backed API auth
+- ownership checks on scans and monitoring targets
+- rate limits keyed by user as well as IP
+
+## Response Shaping for Mobile
+
+The `AnalysisResult` object is rich but too large to treat as the only client contract. We should progressively add smaller DTOs for:
+
+- `ScanSummary`
+- `ScanFinding`
+- `ScanEvidenceSection`
+- `ScanHistoryEntry`
+- `MonitoringTarget`
+
+This will help both iOS and the web app.
+
+## Operational Requirements Before 0.9.0
+
+- distributed rate limiting by default in public multi-instance mode
+- bounded concurrency for queued scans
+- durable scan storage
+- auth for user-owned resources
+- telemetry that survives restarts
+
+## Suggested Release Path
+
+### 0.8.3
+
+- telemetry foundation
+- in-memory scan resources
+
+### 0.8.4
+
+- persistence design
+- database schema draft
+- stored scan records
+
+### 0.8.5
+
+- async queue semantics
+- concurrency limiting
+- better scan status transitions
+
+### 0.8.6
+
+- server-owned monitoring targets
+- shared history across clients
+
+### 0.8.7
+
+- auth and ownership
+
+### 0.8.8
+
+- mobile-friendly DTOs and response shaping
+
+### 0.9.0
+
+- backend is genuinely client-platform capable
+
