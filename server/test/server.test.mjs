@@ -308,6 +308,59 @@ test("scan resources return a sanitized error for invalid targets", async () => 
   }
 });
 
+test("scan detail endpoints return summary, findings, and evidence payloads", async () => {
+  const server = await startServer();
+
+  try {
+    const createResponse = await fetch(`${server.baseUrl}/api/scans`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: "https://example.com",
+      }),
+    });
+    const createdPayload = await createResponse.json();
+    assert.equal(createResponse.status, 202);
+
+    const scanId = createdPayload.scan.id;
+
+    let scanPayload = null;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await fetch(`${server.baseUrl}/api/scans/${scanId}`);
+      scanPayload = await response.json();
+      if (scanPayload.scan.status === "completed" || scanPayload.scan.status === "failed") {
+        break;
+      }
+      await wait(100);
+    }
+
+    assert.equal(scanPayload.scan.status, "completed");
+
+    const summaryResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/summary`);
+    const findingsResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/findings`);
+    const evidenceResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/evidence`);
+
+    const summaryPayload = await summaryResponse.json();
+    const findingsPayload = await findingsResponse.json();
+    const evidencePayload = await evidenceResponse.json();
+
+    assert.equal(summaryResponse.status, 200);
+    assert.equal(summaryPayload.summary.id, scanId);
+    assert.equal(findingsResponse.status, 200);
+    assert.ok(Array.isArray(findingsPayload.findings));
+    assert.ok(Array.isArray(findingsPayload.strengths));
+    assert.ok(Array.isArray(findingsPayload.priorityActions));
+    assert.equal(evidenceResponse.status, 200);
+    assert.ok(Array.isArray(evidencePayload.evidence.headers));
+    assert.ok(Array.isArray(evidencePayload.evidence.cookies));
+    assert.ok(Array.isArray(evidencePayload.evidence.redirects));
+  } finally {
+    await server.stop();
+  }
+});
+
 test("analyze endpoint returns a sanitized error for invalid targets", async () => {
   const server = await startServer();
 

@@ -6,7 +6,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath, URL } from "node:url";
 import { createRateLimiter } from "./rateLimiter.mjs";
-import { createScanStore } from "./scanStore.mjs";
+import { buildScanEvidencePayload, buildScanFindingsPayload, buildScanSummaryPayload } from "./scanDtos.mjs";
+import { createInMemoryScanRepository } from "./scanRepository.mjs";
 import { classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
 import {
   analyzeUrl,
@@ -83,7 +84,7 @@ const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const abuseSignalBuckets = new Map();
 const exposeDetailedHealth = !isProduction;
 const telemetry = createTelemetryTracker();
-const scanStore = createScanStore();
+const scanRepository = createInMemoryScanRepository();
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -261,6 +262,17 @@ function sendRateLimited(response, retryAfterSeconds, message = "Too many analys
 
 function getRequestedScanMode(input) {
   return input === "quiet" ? "quiet" : "standard";
+}
+
+function parseScanResourcePath(requestPath) {
+  const match = requestPath.match(/^\/api\/scans\/([^/]+)(?:\/([^/]+))?$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    scanId: match[1],
+    resource: match[2] || null,
+  };
 }
 
 function normalizeScanErrorMessage(error) {
@@ -531,7 +543,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/scans" && request.method === "GET") {
-    const scans = scanStore.listScans({
+    const scans = scanRepository.listScans({
       limit: Number(requestUrl.searchParams.get("limit") || 20),
     });
     sendJson(response, 200, {
@@ -567,7 +579,7 @@ const server = http.createServer(async (request, response) => {
       }
 
       const validatedTarget = await assertPublicHttpUrl(target);
-      const scan = scanStore.createScan({
+      const scan = scanRepository.createScan({
         url: validatedTarget.toString(),
         mode,
         requesterScope: authState.requesterScope,
@@ -575,11 +587,11 @@ const server = http.createServer(async (request, response) => {
       });
 
       sendJson(response, 202, {
-        scan: scanStore.getScan(scan.id).summary,
+        scan: scanRepository.getScan(scan.id).summary,
       });
 
       queueMicrotask(async () => {
-        scanStore.markRunning(scan.id);
+        scanRepository.markRunning(scan.id);
         try {
           const result = await runScanAnalysis({
             validatedTarget,
@@ -587,11 +599,11 @@ const server = http.createServer(async (request, response) => {
             clientIp: authState.clientIp,
             requesterScope: authState.requesterScope,
           });
-          scanStore.markCompleted(scan.id, result);
+          scanRepository.markCompleted(scan.id, result);
         } catch (error) {
           const failureClass = classifyScanFailure(error);
           telemetry.recordFailure(failureClass);
-          scanStore.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
+          scanRepository.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
           log("warn", "scan_resource_failed", {
             message: formatErrorMessage(error),
             clientIp: authState.clientIp,
@@ -615,8 +627,16 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const scanId = requestUrl.pathname.slice("/api/scans/".length);
-    const scan = scanStore.getScan(scanId);
+    const parsed = parseScanResourcePath(requestUrl.pathname);
+    if (!parsed) {
+      sendJson(response, 404, {
+        error: "Scan not found.",
+      });
+      return;
+    }
+
+    const { scanId, resource } = parsed;
+    const scan = scanRepository.getScan(scanId);
     if (!scan) {
       sendJson(response, 404, {
         error: "Scan not found.",
@@ -624,8 +644,30 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    sendJson(response, 200, {
-      scan,
+    if (!resource) {
+      sendJson(response, 200, {
+        scan,
+      });
+      return;
+    }
+
+    if (resource === "summary") {
+      sendJson(response, 200, buildScanSummaryPayload(scan));
+      return;
+    }
+
+    if (resource === "findings") {
+      sendJson(response, 200, buildScanFindingsPayload(scan));
+      return;
+    }
+
+    if (resource === "evidence") {
+      sendJson(response, 200, buildScanEvidencePayload(scan));
+      return;
+    }
+
+    sendJson(response, 404, {
+      error: "Scan resource not found.",
     });
     return;
   }

@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 
-function buildScanSummary(scan) {
+export function buildScanSummary(scan) {
   const result = scan.result;
   const limitation = result?.assessmentLimitation;
-  const findingsCount = Array.isArray(result?.findings) ? result.findings.length : 0;
+  const findingsCount = Array.isArray(result?.issues) ? result.issues.length : 0;
 
   return {
     id: scan.id,
@@ -15,7 +15,7 @@ function buildScanSummary(scan) {
     completedAt: scan.completedAt,
     failureClass: scan.failureClass,
     error: scan.error,
-    score: result?.securityScore ?? null,
+    score: result?.score ?? null,
     grade: result?.grade ?? null,
     limited: limitation?.limited ?? false,
     limitedKind: limitation?.kind ?? null,
@@ -25,7 +25,36 @@ function buildScanSummary(scan) {
   };
 }
 
-export function createScanStore({ maxEntries = 200 } = {}) {
+export function buildPersistedScanRecord(scan) {
+  return {
+    id: scan.id,
+    ownerId: scan.ownerId ?? null,
+    status: scan.status,
+    url: scan.url,
+    mode: scan.mode,
+    requestedAt: scan.requestedAt,
+    startedAt: scan.startedAt,
+    completedAt: scan.completedAt,
+    requesterScope: scan.requesterScope,
+    clientIp: scan.clientIp,
+    failureClass: scan.failureClass,
+    error: scan.error,
+    summary: buildScanSummary(scan),
+    result: scan.result,
+  };
+}
+
+function enrichScan(scan) {
+  if (!scan) {
+    return null;
+  }
+  return {
+    ...scan,
+    summary: buildScanSummary(scan),
+  };
+}
+
+export function createInMemoryScanRepository({ maxEntries = 200 } = {}) {
   const scans = new Map();
   const order = [];
 
@@ -45,9 +74,11 @@ export function createScanStore({ maxEntries = 200 } = {}) {
   };
 
   return {
-    createScan({ url, mode, requesterScope, clientIp }) {
+    kind: "memory",
+    createScan({ url, mode, requesterScope, clientIp, ownerId = null }) {
       const scan = {
         id: crypto.randomUUID(),
+        ownerId,
         status: "queued",
         url,
         mode,
@@ -62,7 +93,7 @@ export function createScanStore({ maxEntries = 200 } = {}) {
       };
       scans.set(scan.id, scan);
       touchOrder(scan.id);
-      return scan;
+      return enrichScan(scan);
     },
     markRunning(id) {
       const scan = scans.get(id);
@@ -72,7 +103,7 @@ export function createScanStore({ maxEntries = 200 } = {}) {
       scan.status = "running";
       scan.startedAt = new Date().toISOString();
       touchOrder(id);
-      return scan;
+      return enrichScan(scan);
     },
     markCompleted(id, result) {
       const scan = scans.get(id);
@@ -83,7 +114,7 @@ export function createScanStore({ maxEntries = 200 } = {}) {
       scan.completedAt = new Date().toISOString();
       scan.result = result;
       touchOrder(id);
-      return scan;
+      return enrichScan(scan);
     },
     markFailed(id, failureClass, message) {
       const scan = scans.get(id);
@@ -95,20 +126,23 @@ export function createScanStore({ maxEntries = 200 } = {}) {
       scan.failureClass = failureClass;
       scan.error = message;
       touchOrder(id);
-      return scan;
+      return enrichScan(scan);
     },
     getScan(id) {
-      const scan = scans.get(id);
-      if (!scan) {
-        return null;
-      }
-      return {
-        ...scan,
-        summary: buildScanSummary(scan),
-      };
+      return enrichScan(scans.get(id));
     },
     listScans({ limit = 20 } = {}) {
-      return order.slice(0, Math.max(1, limit)).map((id) => buildScanSummary(scans.get(id))).filter(Boolean);
+      return order
+        .slice(0, Math.max(1, limit))
+        .map((id) => enrichScan(scans.get(id))?.summary)
+        .filter(Boolean);
+    },
+    listPersistedRecords({ limit = 20 } = {}) {
+      return order
+        .slice(0, Math.max(1, limit))
+        .map((id) => scans.get(id))
+        .filter(Boolean)
+        .map((scan) => buildPersistedScanRecord(scan));
     },
   };
 }
