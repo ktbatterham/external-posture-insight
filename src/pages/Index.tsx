@@ -5,6 +5,9 @@ import { buildReportWorkspaceSections } from "@/lib/reportWorkspace";
 import { useScanWorkspace } from "@/hooks/useScanWorkspace";
 
 const Index = () => {
+  const appVersionLabel = __APP_VERSION__ && __APP_VERSION__ !== "0.0.0" ? `app ${__APP_VERSION__}` : null;
+  const buildLabel = `build ${__BUILD_SHA__}`;
+  const coreLabel = `core ${__CORE_VERSION__}`;
   const {
     isLoading,
     analysisData,
@@ -51,16 +54,29 @@ const Index = () => {
           <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
             <div className="space-y-6">
               <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#b56a2c]/25 bg-[#b56a2c]/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#f0d5bc]">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  SecURL
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#b56a2c]/25 bg-[#b56a2c]/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#f0d5bc]">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    SecURL
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-[11px] font-medium tracking-[0.16em] text-slate-400">
+                    <span>{coreLabel}</span>
+                    <span className="text-slate-600">/</span>
+                    <span>{buildLabel}</span>
+                    {appVersionLabel ? (
+                      <>
+                        <span className="text-slate-600">/</span>
+                        <span>{appVersionLabel}</span>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="space-y-4">
                   <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl lg:text-6xl">
-                    Public attack surface, quietly mapped.
+                    Public posture, quietly interpreted.
                   </h1>
                   <p className="max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">
-                    Passive-first URL and domain posture analysis with a fast healthcheck up front and supporting evidence when you need to go deeper.
+                    SecURL is posture-first: a passive, low-noise read of headers, TLS, redirects, cookies, trust signals, and visible client code, with a fast healthcheck up front and evidence when you need to go deeper.
                   </p>
                 </div>
               </div>
@@ -76,7 +92,7 @@ const Index = () => {
                 {[
                   "Headers, redirects, TLS, cookies, and browser isolation controls with confidence-labeled findings.",
                   "DNS and email posture, security.txt, HSTS preload signals, and passive page-risk analysis.",
-                  "Detected stack, AI surface, exposure checks, exports, and browser-local monitoring targets.",
+                  "Posture-first output: quieter than broad reconnaissance, clearer than raw scanner noise.",
                 ].map((item, index) => (
                   <div
                     key={item}

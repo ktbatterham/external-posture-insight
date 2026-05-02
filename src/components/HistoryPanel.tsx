@@ -1,4 +1,4 @@
-import { History, TrendingDown, TrendingUp } from "lucide-react";
+import { History, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/panel-primitives";
@@ -9,13 +9,109 @@ interface HistoryPanelProps {
   diff: HistoryDiff | null;
 }
 
+const formatSignedDelta = (value: number | null) => {
+  if (value === null) {
+    return "0";
+  }
+
+  return `${value > 0 ? "+" : ""}${value}`;
+};
+
+const compactList = (items: string[], empty: string) => {
+  if (!items.length) {
+    return empty;
+  }
+
+  if (items.length === 1) {
+    return items[0];
+  }
+
+  return `${items[0]} (+${items.length - 1} more)`;
+};
+
+const getTrendState = (delta: number) => {
+  if (delta >= 5) {
+    return {
+      label: "Improving",
+      icon: TrendingUp,
+      iconClassName: "text-[#d89a63]",
+      stroke: "#d89a63",
+      detail: "Scores have moved upward across saved scans.",
+    };
+  }
+
+  if (delta <= -5) {
+    return {
+      label: "Degrading",
+      icon: TrendingDown,
+      iconClassName: "text-[#d89a63]",
+      stroke: "#c78455",
+      detail: "Recent saved scans have trended weaker.",
+    };
+  }
+
+  return {
+    label: "Stable",
+    icon: Minus,
+    iconClassName: "text-slate-400",
+    stroke: "#94a3b8",
+    detail: "Recent saved scans are broadly flat.",
+  };
+};
+
+const getHistoryLead = (diff: HistoryDiff | null, trendDelta: number, trendCount: number) => {
+  if (!diff) {
+    return {
+      eyebrow: "Saved snapshots",
+      title:
+        trendCount > 1
+          ? "This target has a usable history trail even without a current side-by-side diff."
+          : "The first saved snapshot is in place. The next scan will unlock a comparison read.",
+      detail:
+        trendCount > 1
+          ? `The score trend is ${trendDelta > 0 ? "up" : trendDelta < 0 ? "down" : "flat"} across ${trendCount} saved scans.`
+          : "Save another scan for this target to get regressions, improvements, and summary deltas here.",
+    };
+  }
+
+  const scoreDelta = diff.scoreDelta ?? 0;
+
+  if (scoreDelta < 0 || diff.newIssues.length > 0) {
+    return {
+      eyebrow: "History shows regression",
+      title: "The latest snapshot looks weaker than the previous saved scan.",
+      detail:
+        diff.newIssues.length > 0
+          ? compactList(diff.newIssues, "New findings appeared.")
+          : `The score moved ${formatSignedDelta(diff.scoreDelta)} from the last saved baseline.`,
+    };
+  }
+
+  if (scoreDelta > 0 || diff.resolvedIssues.length > 0) {
+    return {
+      eyebrow: "History shows improvement",
+      title: "The latest snapshot looks healthier than the previous saved scan.",
+      detail:
+        diff.resolvedIssues.length > 0
+          ? compactList(diff.resolvedIssues, "Resolved findings no longer appear.")
+          : `The score moved ${formatSignedDelta(diff.scoreDelta)} from the last saved baseline.`,
+    };
+  }
+
+  return {
+    eyebrow: "History is steady",
+    title: "The latest saved snapshot is broadly in line with the previous one.",
+    detail: diff.summary[0] ?? "No meaningful regressions or improvements stood out in the latest comparison.",
+  };
+};
+
 export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
   if (!history.length) {
     return (
       <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
+            <History className="h-5 w-5 text-[#d89a63]" />
             Scan History
           </CardTitle>
         </CardHeader>
@@ -33,6 +129,14 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
   const minScore = Math.min(...trendScores);
   const maxScore = Math.max(...trendScores);
   const range = Math.max(maxScore - minScore, 1);
+  const latestTrendPoint = trendPoints.at(-1);
+  const firstTrendPoint = trendPoints[0];
+  const trendDelta =
+    trendPoints.length > 1 && latestTrendPoint && firstTrendPoint ? latestTrendPoint.score - firstTrendPoint.score : 0;
+  const trendState = getTrendState(trendDelta);
+  const lead = getHistoryLead(diff, trendDelta, trendPoints.length);
+  const TrendIcon = trendState.icon;
+
   const sparkline = trendPoints
     .map((snapshot, index) => {
       const x = trendPoints.length === 1 ? 0 : (index / (trendPoints.length - 1)) * 100;
@@ -40,206 +144,162 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
       return `${x},${y}`;
     })
     .join(" ");
-  const latestTrendPoint = trendPoints.at(-1);
-  const firstTrendPoint = trendPoints[0];
-  const trendDelta = trendPoints.length > 1 && latestTrendPoint && firstTrendPoint ? latestTrendPoint.score - firstTrendPoint.score : 0;
-  const trendLabel = trendDelta >= 5 ? "Improving" : trendDelta <= -5 ? "Degrading" : "Stable";
-  const trendStroke = trendDelta > 0 ? "#7aa6b6" : trendDelta < 0 ? "#b56a2c" : "#94a3b8";
+
+  const supportingChanges = [
+    {
+      label: "New findings",
+      value: diff?.newIssues.length ?? 0,
+      detail: compactList(diff?.newIssues ?? [], "No new findings"),
+    },
+    {
+      label: "Resolved",
+      value: diff?.resolvedIssues.length ?? 0,
+      detail: compactList(diff?.resolvedIssues ?? [], "No resolved findings"),
+    },
+    {
+      label: "Header changes",
+      value: diff?.headerChanges.length ?? 0,
+      detail: diff?.headerChanges[0]?.label ?? "No header movement",
+    },
+  ];
+
+  const movementSummary = [
+    {
+      label: "Third-party providers",
+      detail: diff
+        ? compactList(
+            [
+              ...diff.newThirdPartyProviders.map((provider) => `New: ${provider}`),
+              ...diff.removedThirdPartyProviders.map((provider) => `Removed: ${provider}`),
+            ],
+            "No provider movement"
+          )
+        : "No side-by-side comparison yet",
+    },
+    {
+      label: "Identity / WAF",
+      detail: diff
+        ? compactList(
+            [
+              ...(diff.identityProviderChange
+                ? [`IdP: ${diff.identityProviderChange.from ?? "none"} -> ${diff.identityProviderChange.to ?? "none"}`]
+                : []),
+              ...diff.wafProviderChanges.newProviders.map((provider) => `New WAF: ${provider}`),
+              ...diff.wafProviderChanges.removedProviders.map((provider) => `Removed WAF: ${provider}`),
+            ],
+            "No identity or WAF movement"
+          )
+        : "No side-by-side comparison yet",
+    },
+    {
+      label: "CT / AI surface",
+      detail: diff
+        ? compactList(
+            [
+              ...diff.ctPriorityHostChanges.newHosts.map((host) => `New CT host: ${host}`),
+              ...diff.newAiVendors.map((vendor) => `New AI vendor: ${vendor}`),
+              ...diff.removedAiVendors.map((vendor) => `Removed AI vendor: ${vendor}`),
+            ],
+            "No CT or AI surface movement"
+          )
+        : "No side-by-side comparison yet",
+    },
+    {
+      label: "Transport",
+      detail: diff
+        ? `HTTP ${diff.statusCodeDelta?.from ?? "unknown"} -> ${diff.statusCodeDelta?.to ?? "unknown"}; cert days ${diff.certificateDaysRemainingDelta?.from ?? "unknown"} -> ${diff.certificateDaysRemainingDelta?.to ?? "unknown"}`
+        : "No side-by-side comparison yet",
+    },
+  ];
 
   return (
     <Card className="border-white/10 bg-white/[0.04] shadow-[0_24px_60px_-36px_rgba(0,0,0,0.65)]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <History className="h-5 w-5" />
+          <History className="h-5 w-5 text-[#d89a63]" />
           Scan History
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
-        {diff && diff.previousScore !== null ? (
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Score change</p>
-              <div className="mt-2 flex items-center gap-2">
-                {diff.scoreDelta !== null && diff.scoreDelta >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-[#bcd4de]" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-[#d89a63]" />
-                )}
-                <span className="text-lg font-semibold text-slate-50">
-                  {diff.scoreDelta !== null && diff.scoreDelta > 0 ? "+" : ""}
-                  {diff.scoreDelta ?? 0}
-                </span>
-                <span className="text-sm text-slate-400">
-                  from {diff.previousGrade} / {diff.previousScore}
-                </span>
-              </div>
+      <CardContent className="space-y-4">
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d89a63]">{lead.eyebrow}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-50">{lead.title}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{lead.detail}</p>
             </div>
-            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Issue delta</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Badge variant="secondary" className="bg-[#b56a2c]/14 text-[#f0d5bc]">
-                  {diff.newIssues.length} new
-                </Badge>
-                <Badge variant="secondary" className="bg-[#4f6676]/14 text-[#d6e5ec]">
-                  {diff.resolvedIssues.length} resolved
-                </Badge>
-                <Badge variant="secondary" className="bg-[#9b774f]/14 text-[#f0d5bc]">
-                  {diff.headerChanges.length} header changes
-                </Badge>
+            <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+                <TrendIcon className={`h-4 w-4 ${trendState.iconClassName}`} />
+                {trendState.label}
               </div>
-            </div>
-            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Score trend</p>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-lg font-semibold text-slate-50">{trendLabel}</p>
-                  <p className="text-sm text-slate-400">
-                    {trendDelta > 0 ? "+" : ""}
-                    {trendDelta} over {trendPoints.length} saved scan{trendPoints.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <svg viewBox="0 0 100 40" className="h-10 w-28 overflow-visible">
-                  <polyline
-                    fill="none"
-                    stroke={trendStroke}
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points={sparkline
-                      .split(" ")
-                      .map((point) => {
-                        const [x, y] = point.split(",");
-                        return `${x},${Number(y) * 0.4}`;
-                      })
-                      .join(" ")}
-                  />
-                </svg>
-              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-400">{trendState.detail}</p>
             </div>
           </div>
-        ) : trendPoints.length > 1 ? (
-          <div className="grid gap-4 md:grid-cols-1">
-            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Score trend</p>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-lg font-semibold text-slate-50">{trendLabel}</p>
-                  <p className="text-sm text-slate-400">
-                    {trendDelta > 0 ? "+" : ""}
-                    {trendDelta} over {trendPoints.length} saved scan{trendPoints.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <svg viewBox="0 0 100 40" className="h-10 w-28 overflow-visible">
-                  <polyline
-                    fill="none"
-                    stroke={trendStroke}
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points={sparkline
-                      .split(" ")
-                      .map((point) => {
-                        const [x, y] = point.split(",");
-                        return `${x},${Number(y) * 0.4}`;
-                      })
-                      .join(" ")}
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
-        {diff && (
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-[1.35rem] border border-[#b56a2c]/35 bg-[#b56a2c]/12 p-4">
-              <p className="text-sm font-semibold text-[#f0d5bc]">New issues</p>
-              <div className="mt-3 space-y-2 text-sm text-[#f4dfcd]">
-                {diff.newIssues.length ? diff.newIssues.map((issue) => <p key={issue}>{issue}</p>) : <p>None</p>}
-              </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Score change</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{diff ? formatSignedDelta(diff.scoreDelta) : "—"}</p>
+              <p className="mt-2 text-xs text-slate-400">
+                {diff?.previousScore !== null && diff?.previousScore !== undefined
+                  ? `From ${diff.previousGrade} / ${diff.previousScore}`
+                  : `Across ${trendPoints.length} saved scan${trendPoints.length === 1 ? "" : "s"}`}
+              </p>
             </div>
-            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
-              <p className="text-sm font-semibold text-[#d6e5ec]">Resolved issues</p>
-              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
-                {diff.resolvedIssues.length ? diff.resolvedIssues.map((issue) => <p key={issue}>{issue}</p>) : <p>None</p>}
-              </div>
-            </div>
-            <div className="rounded-[1.35rem] border border-[#9b774f]/35 bg-[#9b774f]/10 p-4">
-              <p className="text-sm font-semibold text-[#f0d5bc]">Header changes</p>
-              <div className="mt-3 space-y-2 text-sm text-[#f4dfcd]">
-                {diff.headerChanges.length ? diff.headerChanges.map((change) => (
-                  <p key={`${change.label}-${change.from}-${change.to}`}>
-                    {change.label}: {change.from} {"->"} {change.to}
-                  </p>
-                )) : <p>None</p>}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {diff && (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
-              <p className="text-sm font-semibold text-[#d6e5ec]">Third-party changes</p>
-              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
-                {diff.newThirdPartyProviders.length
-                  ? diff.newThirdPartyProviders.map((provider) => <p key={`new-third-party-${provider}`}>New: {provider}</p>)
-                  : <p>No new providers</p>}
-                {diff.removedThirdPartyProviders.length
-                  ? diff.removedThirdPartyProviders.map((provider) => <p key={`old-third-party-${provider}`}>Removed: {provider}</p>)
-                  : null}
+            {supportingChanges.map((item) => (
+              <div key={item.label} className="rounded-[1.15rem] border border-white/10 bg-slate-950/45 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                <p className="mt-3 text-3xl font-semibold text-white">{diff ? item.value : "—"}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{item.detail}</p>
               </div>
-            </div>
-            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
-              <p className="text-sm font-semibold text-[#d6e5ec]">Identity / WAF</p>
-              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
-                {diff.identityProviderChange ? (
-                  <p>
-                    IdP: {diff.identityProviderChange.from ?? "none"} {"->"} {diff.identityProviderChange.to ?? "none"}
-                  </p>
-                ) : (
-                  <p>No IdP change</p>
-                )}
-                {diff.wafProviderChanges.newProviders.length
-                  ? diff.wafProviderChanges.newProviders.map((provider) => <p key={`new-waf-${provider}`}>New WAF: {provider}</p>)
-                  : null}
-                {diff.wafProviderChanges.removedProviders.length
-                  ? diff.wafProviderChanges.removedProviders.map((provider) => <p key={`old-waf-${provider}`}>Removed WAF: {provider}</p>)
-                  : null}
-                {!diff.wafProviderChanges.newProviders.length && !diff.wafProviderChanges.removedProviders.length ? <p>No WAF change</p> : null}
-              </div>
-            </div>
-            <div className="rounded-[1.35rem] border border-[#4f6676]/35 bg-[#4f6676]/12 p-4">
-              <p className="text-sm font-semibold text-[#d6e5ec]">CT / AI changes</p>
-              <div className="mt-3 space-y-2 text-sm text-[#edf3f6]">
-                {diff.ctPriorityHostChanges.newHosts.length
-                  ? diff.ctPriorityHostChanges.newHosts.map((host) => <p key={`new-ct-${host}`}>New CT host: {host}</p>)
-                  : <p>No new CT priority hosts</p>}
-                {diff.newAiVendors.length
-                  ? diff.newAiVendors.map((vendor) => <p key={`new-ai-${vendor}`}>New AI vendor: {vendor}</p>)
-                  : null}
-                {diff.removedAiVendors.length
-                  ? diff.removedAiVendors.map((vendor) => <p key={`old-ai-${vendor}`}>Removed AI vendor: {vendor}</p>)
-                  : null}
-              </div>
-            </div>
-            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-sm font-semibold text-slate-100">Transport delta</p>
-              <div className="mt-3 space-y-2 text-sm text-slate-200">
-                <p>
-                  HTTP: {diff.statusCodeDelta?.from ?? "unknown"} {"->"} {diff.statusCodeDelta?.to ?? "unknown"}
-                </p>
-                <p>
-                  Cert days: {diff.certificateDaysRemainingDelta?.from ?? "unknown"} {"->"} {diff.certificateDaysRemainingDelta?.to ?? "unknown"}
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+
+        <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Trend window</p>
+              <p className="mt-2 text-sm text-slate-300">
+                {trendPoints.length > 1
+                  ? `${trendState.label} over ${trendPoints.length} saved scans.`
+                  : "Only one saved scan is available so far."}
+              </p>
+            </div>
+            {trendPoints.length > 1 ? (
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <TrendIcon className={`h-4 w-4 ${trendState.iconClassName}`} />
+                <span>{formatSignedDelta(trendDelta)}</span>
+              </div>
+            ) : null}
+          </div>
+          {trendPoints.length > 1 ? (
+            <div className="mt-4 rounded-[1.15rem] border border-white/10 bg-slate-950/35 px-4 py-4">
+              <svg viewBox="0 0 100 40" className="h-12 w-full overflow-visible">
+                <polyline
+                  fill="none"
+                  stroke={trendState.stroke}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={sparkline
+                    .split(" ")
+                    .map((point) => {
+                      const [x, y] = point.split(",");
+                      return `${x},${Number(y) * 0.4}`;
+                    })
+                    .join(" ")}
+                />
+              </svg>
+            </div>
+          ) : null}
+        </div>
 
         {diff?.summary.length ? (
-          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-sm font-semibold text-slate-100">What changed</p>
+          <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] p-4 shadow-[0_18px_40px_-28px_rgba(0,0,0,0.7)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Change summary</p>
             <div className="mt-3 space-y-2 text-sm text-slate-300">
               {diff.summary.map((item) => (
                 <p key={item}>{item}</p>
@@ -248,16 +308,29 @@ export const HistoryPanel = ({ history, diff }: HistoryPanelProps) => {
           </div>
         ) : null}
 
+        <div className="grid gap-3 xl:grid-cols-2">
+          {movementSummary.map((item) => (
+            <div key={item.label} className="rounded-[1.15rem] border border-white/10 bg-slate-950/35 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+
         <div className="grid gap-3">
           {history.map((snapshot) => (
-            <div key={`${snapshot.scannedAt}-${snapshot.finalUrl}`} className="rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4">
+            <div key={`${snapshot.scannedAt}-${snapshot.finalUrl}`} className="rounded-[1.15rem] border border-white/10 bg-slate-950/35 px-4 py-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-50" title={snapshot.finalUrl}>{snapshot.finalUrl}</p>
+                  <p className="truncate text-sm font-semibold text-slate-50" title={snapshot.finalUrl}>
+                    {snapshot.finalUrl}
+                  </p>
                   <p className="text-xs text-slate-400">{new Date(snapshot.scannedAt).toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-white/[0.1] text-slate-100">{snapshot.grade}</Badge>
+                  <Badge variant="secondary" className="bg-white/[0.1] text-slate-100">
+                    {snapshot.grade}
+                  </Badge>
                   <span className="text-sm font-semibold text-slate-200">{snapshot.score}/100</span>
                 </div>
               </div>

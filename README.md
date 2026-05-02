@@ -8,6 +8,8 @@ External Posture Insight is a low-noise external posture analysis app for public
 
 It is built for passive-first posture review: the kind of quick external read you can run before noisy scanners, sales calls, supplier reviews, monitoring checks, or deeper authorized testing.
 
+In short: Shodan finds things. SecURL interprets them quietly.
+
 ## Published package
 
 The reusable scanner core is now published on npm:
@@ -61,6 +63,30 @@ epi scan example.com
 - SARIF export for CI and security tooling ingestion
 - JSON, Markdown, and HTML report export
 - Recent scan history in the browser
+
+## Why not Shodan?
+
+Shodan is excellent at internet-scale discovery. It answers questions like:
+
+- what is exposed on the public internet?
+- which ports, banners, devices, and services are visible?
+- where else does this software or infrastructure pattern appear?
+
+SecURL is aimed at a different job:
+
+- quiet, target-specific posture reads without broad reconnaissance noise
+- browser-facing assessment of headers, redirects, cookies, TLS, and visible client code
+- executive summaries and ranked actions that a real stakeholder can read quickly
+- constrained-read handling when a site is blocked, rate-limited, or edge-gated
+- drift comparison so teams can see what changed since the last scan
+
+The simplest distinction is:
+
+- Shodan is discovery-first.
+- SecURL is posture-first.
+
+If you want to inventory the whole internet, use Shodan.
+If you want a low-noise, explainable read of a specific public target, use SecURL.
 
 ## What it can and cannot do
 
@@ -148,6 +174,81 @@ See:
 - [`docs/OWASP-MITRE-SELF-REVIEW.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/OWASP-MITRE-SELF-REVIEW.md)
 - [`docs/ABUSE-ALERTING.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/ABUSE-ALERTING.md)
 - [`docs/REVERSE-PROXY-VERIFICATION.md`](/Users/keith/Documents/Playground/secure-header-insight/docs/REVERSE-PROXY-VERIFICATION.md)
+
+## Roadmap
+
+The current release train is deliberately incremental. The aim is to improve trust, observability, and operational maturity without overstuffing single releases.
+
+### 0.8.2
+
+Monitoring and drift clarity
+
+- refine `Since last scan`
+- improve regression vs improvement wording
+- slim monitoring controls and history surfaces
+- make change summaries faster to read
+
+### 0.8.3
+
+Telemetry and product visibility
+
+- add first-party usage counters
+- distinguish page loads, scans, limited reads, and failures
+- add a lightweight internal usage or ops view
+- stop relying on raw Railway logs for product insight
+
+### 0.8.4
+
+Public-beta hardening
+
+- tighten production defaults
+- improve deployment and runtime validation
+- review rate limiting for public exposure
+- reduce operational sharp edges on Railway
+
+### 0.8.5
+
+Batching and scan behavior
+
+- add concurrency limiting
+- make repeated and batch scans bounded and polite
+- improve graceful degradation on upstream failures
+- tighten scan orchestration under load
+
+### 0.8.6
+
+Detection quality pass
+
+- recheck platform-hosted targets
+- reduce remaining false positives
+- improve infrastructure and provider confidence wording
+- keep score, narrative, and action alignment strong
+
+### 0.8.7
+
+Test and type confidence
+
+- expand mocked integration coverage
+- grow architecture strictness scope
+- add more regression tests for limited reads, SPA fallback, and drift
+- strengthen release confidence for public changes
+
+### 0.8.8
+
+Docs and operator readiness
+
+- refresh README and screenshots to match the current product
+- document deployment and runtime expectations
+- document telemetry, limits, and public-beta cautions
+- clarify the package/app story for new users
+
+### 0.9.0
+
+Operational maturity release
+
+- concurrency, telemetry, drift, and deployment posture all feel deliberate
+- public beta is safer and more observable
+- engineering confidence is high enough that `1.0.0` becomes a product-contract milestone, not a stabilization scramble
 
 ## Notes
 
