@@ -6,6 +6,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath, URL } from "node:url";
 import { createRateLimiter } from "./rateLimiter.mjs";
+import { buildScanEvidencePayload, buildScanFindingsPayload, buildScanSummaryPayload } from "./scanDtos.mjs";
 import { createScanStore } from "./scanStore.mjs";
 import { classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
 import {
@@ -261,6 +262,17 @@ function sendRateLimited(response, retryAfterSeconds, message = "Too many analys
 
 function getRequestedScanMode(input) {
   return input === "quiet" ? "quiet" : "standard";
+}
+
+function parseScanResourcePath(requestPath) {
+  const match = requestPath.match(/^\/api\/scans\/([^/]+)(?:\/([^/]+))?$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    scanId: match[1],
+    resource: match[2] || null,
+  };
 }
 
 function normalizeScanErrorMessage(error) {
@@ -615,7 +627,15 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const scanId = requestUrl.pathname.slice("/api/scans/".length);
+    const parsed = parseScanResourcePath(requestUrl.pathname);
+    if (!parsed) {
+      sendJson(response, 404, {
+        error: "Scan not found.",
+      });
+      return;
+    }
+
+    const { scanId, resource } = parsed;
     const scan = scanStore.getScan(scanId);
     if (!scan) {
       sendJson(response, 404, {
@@ -624,8 +644,30 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    sendJson(response, 200, {
-      scan,
+    if (!resource) {
+      sendJson(response, 200, {
+        scan,
+      });
+      return;
+    }
+
+    if (resource === "summary") {
+      sendJson(response, 200, buildScanSummaryPayload(scan));
+      return;
+    }
+
+    if (resource === "findings") {
+      sendJson(response, 200, buildScanFindingsPayload(scan));
+      return;
+    }
+
+    if (resource === "evidence") {
+      sendJson(response, 200, buildScanEvidencePayload(scan));
+      return;
+    }
+
+    sendJson(response, 404, {
+      error: "Scan resource not found.",
     });
     return;
   }
