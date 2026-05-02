@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath, URL } from "node:url";
 import { createRateLimiter } from "./rateLimiter.mjs";
 import { buildScanEvidencePayload, buildScanFindingsPayload, buildScanSummaryPayload } from "./scanDtos.mjs";
-import { createScanStore } from "./scanStore.mjs";
+import { createInMemoryScanRepository } from "./scanRepository.mjs";
 import { classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
 import {
   analyzeUrl,
@@ -84,7 +84,7 @@ const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const abuseSignalBuckets = new Map();
 const exposeDetailedHealth = !isProduction;
 const telemetry = createTelemetryTracker();
-const scanStore = createScanStore();
+const scanRepository = createInMemoryScanRepository();
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -543,7 +543,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/scans" && request.method === "GET") {
-    const scans = scanStore.listScans({
+    const scans = scanRepository.listScans({
       limit: Number(requestUrl.searchParams.get("limit") || 20),
     });
     sendJson(response, 200, {
@@ -579,7 +579,7 @@ const server = http.createServer(async (request, response) => {
       }
 
       const validatedTarget = await assertPublicHttpUrl(target);
-      const scan = scanStore.createScan({
+      const scan = scanRepository.createScan({
         url: validatedTarget.toString(),
         mode,
         requesterScope: authState.requesterScope,
@@ -587,11 +587,11 @@ const server = http.createServer(async (request, response) => {
       });
 
       sendJson(response, 202, {
-        scan: scanStore.getScan(scan.id).summary,
+        scan: scanRepository.getScan(scan.id).summary,
       });
 
       queueMicrotask(async () => {
-        scanStore.markRunning(scan.id);
+        scanRepository.markRunning(scan.id);
         try {
           const result = await runScanAnalysis({
             validatedTarget,
@@ -599,11 +599,11 @@ const server = http.createServer(async (request, response) => {
             clientIp: authState.clientIp,
             requesterScope: authState.requesterScope,
           });
-          scanStore.markCompleted(scan.id, result);
+          scanRepository.markCompleted(scan.id, result);
         } catch (error) {
           const failureClass = classifyScanFailure(error);
           telemetry.recordFailure(failureClass);
-          scanStore.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
+          scanRepository.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
           log("warn", "scan_resource_failed", {
             message: formatErrorMessage(error),
             clientIp: authState.clientIp,
@@ -636,7 +636,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     const { scanId, resource } = parsed;
-    const scan = scanStore.getScan(scanId);
+    const scan = scanRepository.getScan(scanId);
     if (!scan) {
       sendJson(response, 404, {
         error: "Scan not found.",

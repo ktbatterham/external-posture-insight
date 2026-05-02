@@ -128,6 +128,70 @@ Recommended first tables/documents:
 - `monitoring_targets`
 - `scan_events`
 
+### Repository boundary
+
+The server should not talk directly to one hard-coded storage strategy.
+
+Instead, it should depend on a repository contract that can be backed by:
+
+- in-memory storage for local development
+- Postgres for Railway/public deployments
+- a future queue or worker-backed scan orchestrator
+
+Current repository responsibilities:
+
+- `createScan`
+- `markRunning`
+- `markCompleted`
+- `markFailed`
+- `getScan`
+- `listScans`
+
+Current persisted-record shape:
+
+```json
+{
+  "id": "uuid",
+  "ownerId": null,
+  "status": "completed",
+  "url": "https://example.com",
+  "mode": "standard",
+  "requestedAt": "2026-05-02T10:00:00.000Z",
+  "startedAt": "2026-05-02T10:00:01.000Z",
+  "completedAt": "2026-05-02T10:00:07.000Z",
+  "requesterScope": "ip:203.0.113.10",
+  "clientIp": "203.0.113.10",
+  "failureClass": null,
+  "error": null,
+  "summary": {},
+  "result": {}
+}
+```
+
+That record is intentionally simple: it lets us persist the current service model first, then normalize tables further once auth and ownership arrive.
+
+### First Postgres shape
+
+Suggested first cut:
+
+- `scans`
+  - `id uuid primary key`
+  - `owner_id uuid null`
+  - `status text not null`
+  - `url text not null`
+  - `mode text not null`
+  - `requested_at timestamptz not null`
+  - `started_at timestamptz null`
+  - `completed_at timestamptz null`
+  - `requester_scope text not null`
+  - `client_ip text not null`
+  - `failure_class text null`
+  - `error text null`
+  - `summary jsonb not null`
+  - `result jsonb null`
+
+This is not the final ideal relational model. It is the fastest safe step toward durability.
+
 ## Auth Roadmap
 
 The current shared API key model is not suitable for a multi-user client platform.
@@ -194,4 +258,3 @@ This will help both iOS and the web app.
 ### 0.9.0
 
 - backend is genuinely client-platform capable
-
