@@ -13,6 +13,17 @@ const rootPackageVersion = readJsonVersion(path.resolve(__dirname, "./package.js
 const corePackageVersion = readJsonVersion(path.resolve(__dirname, "./packages/core/package.json"));
 
 const resolveBuildSha = () => {
+  const envSha =
+    process.env.RAILWAY_GIT_COMMIT_SHA ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    process.env.SOURCE_COMMIT ||
+    process.env.COMMIT_SHA;
+
+  if (envSha) {
+    return envSha.slice(0, 7);
+  }
+
   try {
     return execSync("git rev-parse --short HEAD", { cwd: __dirname, stdio: ["ignore", "pipe", "ignore"] })
       .toString()

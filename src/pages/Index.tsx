@@ -6,7 +6,19 @@ import { useScanWorkspace } from "@/hooks/useScanWorkspace";
 
 const Index = () => {
   const appVersionLabel = __APP_VERSION__ && __APP_VERSION__ !== "0.0.0" ? `app ${__APP_VERSION__}` : null;
-  const buildLabel = `build ${__BUILD_SHA__}`;
+  const buildDateLabel = (() => {
+    const parsed = new Date(__BUILD_DATE__);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : parsed.toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+  })();
+  const buildLabel = __BUILD_SHA__ !== "unknown" ? `build ${__BUILD_SHA__}` : buildDateLabel ? `built ${buildDateLabel}` : null;
   const coreLabel = `core ${__CORE_VERSION__}`;
   const {
     isLoading,
@@ -61,8 +73,12 @@ const Index = () => {
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-[11px] font-medium tracking-[0.16em] text-slate-400">
                     <span>{coreLabel}</span>
-                    <span className="text-slate-600">/</span>
-                    <span>{buildLabel}</span>
+                    {buildLabel ? (
+                      <>
+                        <span className="text-slate-600">/</span>
+                        <span>{buildLabel}</span>
+                      </>
+                    ) : null}
                     {appVersionLabel ? (
                       <>
                         <span className="text-slate-600">/</span>
