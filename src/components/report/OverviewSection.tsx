@@ -130,7 +130,7 @@ export const OverviewSection = ({
                   Training surface detected
                 </div>
               ) : null}
-              <p className={`mt-3 text-base text-slate-300 ${compact ? "line-clamp-3 leading-7" : "leading-8"}`}>
+              <p className={`mt-3 text-base text-slate-300 ${compact ? "leading-7" : "leading-8"}`}>
                 {analysisData.executiveSummary.overview}
               </p>
             </div>
