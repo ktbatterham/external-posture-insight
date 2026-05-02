@@ -5,6 +5,9 @@ import { buildReportWorkspaceSections } from "@/lib/reportWorkspace";
 import { useScanWorkspace } from "@/hooks/useScanWorkspace";
 
 const Index = () => {
+  const appVersionLabel = __APP_VERSION__ && __APP_VERSION__ !== "0.0.0" ? `app ${__APP_VERSION__}` : null;
+  const buildLabel = `build ${__BUILD_SHA__}`;
+  const coreLabel = `core ${__CORE_VERSION__}`;
   const {
     isLoading,
     analysisData,
@@ -51,9 +54,22 @@ const Index = () => {
           <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
             <div className="space-y-6">
               <div className="space-y-5">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#b56a2c]/25 bg-[#b56a2c]/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#f0d5bc]">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  SecURL
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#b56a2c]/25 bg-[#b56a2c]/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#f0d5bc]">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    SecURL
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-[11px] font-medium tracking-[0.16em] text-slate-400">
+                    <span>{coreLabel}</span>
+                    <span className="text-slate-600">/</span>
+                    <span>{buildLabel}</span>
+                    {appVersionLabel ? (
+                      <>
+                        <span className="text-slate-600">/</span>
+                        <span>{appVersionLabel}</span>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="space-y-4">
                   <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl lg:text-6xl">

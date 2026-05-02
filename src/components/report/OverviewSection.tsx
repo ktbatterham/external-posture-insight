@@ -117,13 +117,13 @@ export const OverviewSection = ({
 
       <div className="space-y-4">
         <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(11,18,32,0.95),rgba(16,24,39,0.92))] px-6 py-6 shadow-[0_30px_80px_-48px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.04]">
-          <div className={`grid gap-4 xl:items-start ${isLimitedAssessment ? "xl:grid-cols-[1fr_1.35fr]" : "xl:grid-cols-[1.15fr_0.7fr_1.55fr]"}`}>
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.95fr] xl:items-start">
             <div>
               <p className={sectionTitleClass}>Target</p>
               <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{analysisData.host}</p>
               <p className="mt-2 break-all text-sm text-slate-400">{analysisData.finalUrl}</p>
             </div>
-            <div className={`rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-5 py-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)] ${isLimitedAssessment ? "xl:max-w-none" : ""}`}>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] px-5 py-5 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.75)]">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Analyst read</p>
               {hasTrainingSurfaceNarrative ? (
                 <div className="mt-3 inline-flex items-center rounded-full border border-[#b56a2c]/35 bg-[#b56a2c]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0d5bc]">
