@@ -64,15 +64,27 @@ export const MonitoredTargetsPanel = ({
               Browser-local watchlist with compact drift tracking.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Button variant="outline" className={`h-9 px-3 text-xs ${buttonClass}`} disabled={!currentUrl || busy} onClick={onAddDaily}>
-              Daily
-            </Button>
-            <Button variant="outline" className={`h-9 px-3 text-xs ${buttonClass}`} disabled={!currentUrl || busy} onClick={onAddWeekly}>
-              Weekly
-            </Button>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div className="inline-flex rounded-2xl border border-white/10 bg-slate-950/45 p-1">
+              <Button
+                variant="ghost"
+                className="h-8 rounded-[0.9rem] px-3 text-xs text-slate-200 hover:bg-white/[0.08] hover:text-white"
+                disabled={!currentUrl || busy}
+                onClick={onAddDaily}
+              >
+                Save daily
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-8 rounded-[0.9rem] px-3 text-xs text-slate-200 hover:bg-white/[0.08] hover:text-white"
+                disabled={!currentUrl || busy}
+                onClick={onAddWeekly}
+              >
+                Save weekly
+              </Button>
+            </div>
             <Button
-              className="h-9 rounded-2xl bg-[#b56a2c] px-3 text-xs text-[#f8efe7] hover:bg-[#c07a3f]"
+              className="h-8 rounded-2xl bg-[#b56a2c] px-3 text-xs text-[#f8efe7] hover:bg-[#c07a3f]"
               disabled={!targets.some((target) => target.due) || busy}
               onClick={onRunDue}
             >
@@ -98,8 +110,10 @@ export const MonitoredTargetsPanel = ({
           </div>
           <div className="rounded-[1rem] border border-white/10 bg-slate-950/45 px-4 py-3">
             <p className="text-sm font-medium text-slate-400">Current site</p>
-            <p className="mt-2 text-sm font-semibold text-slate-100">{currentUrl ? "Ready to save" : "No active site"}</p>
-            {!currentUrl ? <p className="mt-1 text-xs text-slate-500">Run or reopen a scan first.</p> : null}
+            <p className="mt-2 text-sm font-semibold text-slate-100">{currentUrl ? "Ready to add" : "No active site"}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {currentUrl ? "Save it to the watchlist using the controls above." : "Run or reopen a scan first."}
+            </p>
           </div>
         </div>
 
@@ -134,7 +148,7 @@ export const MonitoredTargetsPanel = ({
                       onClick={() => onRunTarget(target.url)}
                     >
                       <Play className="mr-1.5 h-3.5 w-3.5" />
-                      Run
+                      Scan now
                     </Button>
                     <Button
                       variant="outline"
@@ -149,7 +163,11 @@ export const MonitoredTargetsPanel = ({
               </div>
             ))}
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-[1rem] border border-dashed border-white/10 bg-slate-950/35 px-4 py-5 text-sm text-slate-400">
+            No monitored targets yet. Save the current site as a daily or weekly watch target to start drift tracking here.
+          </div>
+        )}
       </div>
     );
   }
