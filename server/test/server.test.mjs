@@ -162,6 +162,20 @@ test("server blocks startup when upstash backend is missing credentials", async 
   assert.match(getStderr(), /UPSTASH_REDIS_REST_URL/i);
 });
 
+test("server blocks startup when postgres scan repository is missing DATABASE_URL", async () => {
+  const { child, getStderr } = createServerProcess({
+    NODE_ENV: "production",
+    PORT: "0",
+    API_KEY: "test-secret",
+    SCAN_REPOSITORY_BACKEND: "postgres",
+    DATABASE_URL: "",
+  });
+
+  const [code] = await once(child, "exit");
+  assert.equal(code, 1);
+  assert.match(getStderr(), /DATABASE_URL/i);
+});
+
 test("analyze endpoint requires API key when configured", async () => {
   const server = await startServer({
     API_KEY: "test-secret",
