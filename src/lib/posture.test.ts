@@ -43,7 +43,7 @@ describe("getAreaScores", () => {
     });
 
     const content = getAreaScores(analysis).find((area) => area.key === "content");
-    expect(content?.score).toBe(82);
+    expect(content?.score).toBe(76);
     expect(content?.status).toBe("watch");
   });
 

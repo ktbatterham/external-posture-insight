@@ -24,6 +24,16 @@ const HEADER_PENALTY: Record<string, { missing: number; warning: number }> = {
   "cross-origin-resource-policy": { missing: 1, warning: 1 },
 };
 
+const AREA_HEADER_PENALTY: Record<string, { missing: number; warning: number }> = {
+  "strict-transport-security": { missing: 12, warning: 5 },
+  "x-frame-options": { missing: 4, warning: 2 },
+  "x-content-type-options": { missing: 5, warning: 2 },
+  "referrer-policy": { missing: 3, warning: 2 },
+  "permissions-policy": { missing: 2, warning: 1 },
+  "cross-origin-opener-policy": { missing: 2, warning: 1 },
+  "cross-origin-resource-policy": { missing: 2, warning: 1 },
+};
+
 const POSTURE_WEIGHTS: Record<PostureAreaKey, number> = {
   edge: 0.25,
   content: 0.2,
@@ -52,6 +62,80 @@ const statusAvailabilityPenalty = (statusCode?: number) => {
   if (statusCode >= 500) return 35;
   if (statusCode === 429) return 20;
   return 0;
+};
+
+const headerPenalty = (header: SecurityHeaderResult, fallback = { missing: 4, warning: 2 }) => {
+  const weights = AREA_HEADER_PENALTY[header.key] || fallback;
+  if (header.status === "missing") return weights.missing;
+  if (header.status === "warning") return weights.warning;
+  return 0;
+};
+
+const contentIssuePenalty = (issue: string) => {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes("source map") || normalized.includes("public token") || normalized.includes("client config")) {
+    return 8;
+  }
+  if (normalized.includes("missing sri")) {
+    return 5;
+  }
+  if (normalized.includes("inline script")) {
+    return 4;
+  }
+  if (normalized.includes("inline style")) {
+    return 2;
+  }
+  return 4;
+};
+
+const domainIssuePenalty = (issue: string) => {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes("dmarc") || normalized.includes("spf")) {
+    return 8;
+  }
+  if (normalized.includes("mx")) {
+    return 6;
+  }
+  if (normalized.includes("mta-sts")) {
+    return 4;
+  }
+  if (normalized.includes("dnssec") || normalized.includes("caa")) {
+    return 3;
+  }
+  return 5;
+};
+
+const publicSignalPenalty = (issue: string) => {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes("hsts preload")) {
+    return 1;
+  }
+  return 3;
+};
+
+const browserControlGapPenalty = (analysis: PostureScoringInput) => {
+  const missingOrWeak = (key: string) =>
+    analysis.headers.some((header) => header.key === key && header.status !== "present");
+  let penalty = 0;
+  if (missingOrWeak("strict-transport-security") && missingOrWeak("content-security-policy")) {
+    penalty += 6;
+  }
+  if (missingOrWeak("x-frame-options") && missingOrWeak("x-content-type-options")) {
+    penalty += 2;
+  }
+  return penalty;
+};
+
+const contextSignalPenalty = (analysis: PostureScoringInput) => {
+  const signalBuckets = [
+    analysis.domainSecurity.issues.length + analysis.securityTxt.issues.length + analysis.publicSignals.issues.length >= 3,
+    analysis.htmlSecurity.issues.length + analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0) >= 3,
+    analysis.exposure.issues.length > 0 || analysis.exposure.probes.some((probe) => probe.finding === "interesting"),
+    analysis.thirdPartyTrust.highRiskProviders > 0 || analysis.thirdPartyTrust.issues.length > 0,
+    analysis.apiSurface.issues.length > 0 || analysis.apiSurface.probes.some((probe) => probe.classification === "interesting"),
+  ].filter(Boolean).length;
+
+  return Math.max(0, signalBuckets - 2) * 3;
 };
 
 const limitedAssessmentScoreCap = (kind: PostureScoringInput["assessmentLimitation"]["kind"]) => {
@@ -192,8 +276,6 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
   const edgeHeaderFindings = analysis.headers.filter(
     (header) => header.key !== "content-security-policy" && header.status !== "present",
   );
-  const missingHeaderCount = edgeHeaderFindings.filter((header) => header.status === "missing").length;
-  const warningHeaderCount = edgeHeaderFindings.filter((header) => header.status === "warning").length;
   const cspHeaderIssueCount = cspHeaderFindings.length;
   const cookieIssueCount = analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0);
   const redirectPenalty = analysis.redirects.length > 1 ? Math.max(analysis.redirects.length - 1, 0) * 2 : 0;
@@ -211,21 +293,20 @@ export function getPostureAreaScores(analysis: PostureScoringInput): PostureArea
   const edgePenalty =
     transportPenalty +
     certificatePenalty +
-    missingHeaderCount * 8 +
-    warningHeaderCount * 4 +
+    edgeHeaderFindings.reduce((total, header) => total + headerPenalty(header), 0) +
     analysis.corsSecurity.issues.length * 8 +
     availabilityPenalty +
     redirectPenalty;
 
   const contentPenalty =
-    cspHeaderIssueCount * 18 +
-    analysis.htmlSecurity.issues.length * 10 +
-    cookieIssueCount * 6;
+    cspHeaderIssueCount * 24 +
+    Math.min(analysis.htmlSecurity.issues.reduce((total, issue) => total + contentIssuePenalty(issue), 0), 24) +
+    Math.min(cookieIssueCount * 4, 16);
 
   const domainPenalty =
-    analysis.domainSecurity.issues.length * 8 +
-    analysis.securityTxt.issues.length * 5 +
-    analysis.publicSignals.issues.length * 4;
+    Math.min(analysis.domainSecurity.issues.reduce((total, issue) => total + domainIssuePenalty(issue), 0), 40) +
+    Math.min(analysis.securityTxt.issues.length * 3, 6) +
+    Math.min(analysis.publicSignals.issues.reduce((total, issue) => total + publicSignalPenalty(issue), 0), 8);
 
   const exposurePenalty =
     analysis.exposure.issues.length * 20 +
@@ -263,11 +344,13 @@ export function scorePostureAnalysis(analysis: PostureScoringInput): { score: nu
   const areaScores = getPostureAreaScores(analysis);
   const weakAreaCount = areaScores.filter((area) => area.score < 65).length;
   const watchAreaCount = areaScores.filter((area) => area.score >= 65 && area.score < 85).length;
-  const breadthPenalty = Math.max(0, weakAreaCount - 1) * 4 + Math.min(watchAreaCount, 2) * 2;
+  const breadthPenalty = Math.max(0, weakAreaCount - 1) * 4 + Math.min(watchAreaCount, 4) * 2;
   const weightedScore = Math.round(
     areaScores.reduce((total, area) => total + area.score * POSTURE_WEIGHTS[area.key], 0),
   );
-  const adjustedScore = clamp(weightedScore - breadthPenalty);
+  const adjustedScore = clamp(
+    weightedScore - breadthPenalty - browserControlGapPenalty(analysis) - contextSignalPenalty(analysis),
+  );
   const score = analysis.assessmentLimitation.limited
     ? Math.min(adjustedScore, limitedAssessmentScoreCap(analysis.assessmentLimitation.kind))
     : adjustedScore;

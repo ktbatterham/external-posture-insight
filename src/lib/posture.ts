@@ -28,6 +28,65 @@ const statusAvailabilityPenalty = (statusCode?: number) => {
   return 0;
 };
 
+const AREA_HEADER_PENALTY: Record<string, { missing: number; warning: number }> = {
+  "strict-transport-security": { missing: 12, warning: 5 },
+  "x-frame-options": { missing: 4, warning: 2 },
+  "x-content-type-options": { missing: 5, warning: 2 },
+  "referrer-policy": { missing: 3, warning: 2 },
+  "permissions-policy": { missing: 2, warning: 1 },
+  "cross-origin-opener-policy": { missing: 2, warning: 1 },
+  "cross-origin-resource-policy": { missing: 2, warning: 1 },
+};
+
+const headerPenalty = (header: AnalysisResult["headers"][number], fallback = { missing: 4, warning: 2 }) => {
+  const weights = AREA_HEADER_PENALTY[header.key] || fallback;
+  if (header.status === "missing") return weights.missing;
+  if (header.status === "warning") return weights.warning;
+  return 0;
+};
+
+const contentIssuePenalty = (issue: string) => {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes("source map") || normalized.includes("public token") || normalized.includes("client config")) {
+    return 8;
+  }
+  if (normalized.includes("missing sri")) {
+    return 5;
+  }
+  if (normalized.includes("inline script")) {
+    return 4;
+  }
+  if (normalized.includes("inline style")) {
+    return 2;
+  }
+  return 4;
+};
+
+const domainIssuePenalty = (issue: string) => {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes("dmarc") || normalized.includes("spf")) {
+    return 8;
+  }
+  if (normalized.includes("mx")) {
+    return 6;
+  }
+  if (normalized.includes("mta-sts")) {
+    return 4;
+  }
+  if (normalized.includes("dnssec") || normalized.includes("caa")) {
+    return 3;
+  }
+  return 5;
+};
+
+const publicSignalPenalty = (issue: string) => {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes("hsts preload")) {
+    return 1;
+  }
+  return 3;
+};
+
 const isHttpsFinalUrl = (finalUrl: string | undefined) => {
   if (!finalUrl) {
     return true;
@@ -62,8 +121,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
   const edgeHeaderFindings = analysis.headers.filter(
     (header) => header.key !== "content-security-policy" && header.status !== "present",
   );
-  const missingHeaderCount = edgeHeaderFindings.filter((header) => header.status === "missing").length;
-  const warningHeaderCount = edgeHeaderFindings.filter((header) => header.status === "warning").length;
+  const edgeHeaderFindingCount = edgeHeaderFindings.length;
   const cspHeaderIssueCount = cspHeaderFindings.length;
   const cookieIssueCount = analysis.cookies.reduce((count, cookie) => count + cookie.issues.length, 0);
   const exposureInterestingCount = analysis.exposure.probes.filter((probe) => probe.finding !== "safe").length;
@@ -84,21 +142,20 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
   const edgePenalty =
     transportPenalty +
     certificatePenalty +
-    missingHeaderCount * 8 +
-    warningHeaderCount * 4 +
+    edgeHeaderFindings.reduce((total, header) => total + headerPenalty(header), 0) +
     analysis.corsSecurity.issues.length * 8 +
     availabilityPenalty +
     redirectPenalty;
 
   const contentPenalty =
-    cspHeaderIssueCount * 18 +
-    analysis.htmlSecurity.issues.length * 10 +
-    cookieIssueCount * 6;
+    cspHeaderIssueCount * 24 +
+    Math.min(analysis.htmlSecurity.issues.reduce((total, issue) => total + contentIssuePenalty(issue), 0), 24) +
+    Math.min(cookieIssueCount * 4, 16);
 
   const domainPenalty =
-    analysis.domainSecurity.issues.length * 8 +
-    analysis.securityTxt.issues.length * 5 +
-    analysis.publicSignals.issues.length * 4;
+    Math.min(analysis.domainSecurity.issues.reduce((total, issue) => total + domainIssuePenalty(issue), 0), 40) +
+    Math.min(analysis.securityTxt.issues.length * 3, 6) +
+    Math.min(analysis.publicSignals.issues.reduce((total, issue) => total + publicSignalPenalty(issue), 0), 8);
 
   const exposurePenalty =
     analysis.exposure.issues.length * 20 +
@@ -131,7 +188,7 @@ export const getAreaScores = (analysis: AnalysisResult): AreaScore[] => {
       score: edgeScore,
       status: statusForScore(edgeScore),
       notes: [
-        `${missingHeaderCount + warningHeaderCount} header findings`,
+        `${edgeHeaderFindingCount} header findings`,
         `${analysis.corsSecurity.issues.length} CORS findings`,
         ...(availabilityPenalty ? [`HTTP ${analysis.statusCode} limited assessment`] : []),
         ...(analysis.assessmentLimitation?.limited ? ["Limited confidence due to restricted page access"] : []),
