@@ -128,11 +128,19 @@ export function createInMemoryScanRepository({ maxEntries = 200 } = {}) {
       touchOrder(id);
       return enrichScan(scan);
     },
-    getScan(id) {
-      return enrichScan(scans.get(id));
+    getScan(id, { requesterScope = null } = {}) {
+      const scan = scans.get(id);
+      if (requesterScope && scan?.requesterScope !== requesterScope) {
+        return null;
+      }
+      return enrichScan(scan);
     },
-    listScans({ limit = 20 } = {}) {
-      return order
+    listScans({ limit = 20, requesterScope = null } = {}) {
+      const scopedOrder = requesterScope
+        ? order.filter((id) => scans.get(id)?.requesterScope === requesterScope)
+        : order;
+
+      return scopedOrder
         .slice(0, Math.max(1, limit))
         .map((id) => enrichScan(scans.get(id))?.summary)
         .filter(Boolean);
@@ -146,4 +154,3 @@ export function createInMemoryScanRepository({ maxEntries = 200 } = {}) {
     },
   };
 }
-

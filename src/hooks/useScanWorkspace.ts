@@ -94,16 +94,48 @@ export const useScanWorkspace = () => {
     });
   };
 
-  const analyzeUrl = async (url: string, setAsCurrent = true) => {
-    const response = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
+  const readJsonResponse = async (response: Response) => {
     const payload = await response.json();
-
     if (!response.ok) {
       throw new Error(payload.error || "Scan failed.");
     }
+    return payload;
+  };
 
-    persistAnalysis(payload, setAsCurrent);
-    return payload as AnalysisResult;
+  const analyzeUrl = async (url: string, setAsCurrent = true) => {
+    const createResponse = await fetch("/api/scans", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
+    const createdPayload = await readJsonResponse(createResponse);
+    const scanId = createdPayload.scan?.id;
+
+    if (!scanId) {
+      throw new Error("Scan did not return a tracking id.");
+    }
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const scanResponse = await fetch(`/api/scans/${encodeURIComponent(scanId)}`);
+      const scanPayload = await readJsonResponse(scanResponse);
+      const scan = scanPayload.scan;
+
+      if (scan?.status === "completed" && scan.result) {
+        const payload = scan.result as AnalysisResult;
+        persistAnalysis(payload, setAsCurrent);
+        return payload;
+      }
+
+      if (scan?.status === "failed") {
+        throw new Error(scan.error || "Scan failed.");
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+
+    throw new Error("Scan is still running. Please try again shortly.");
   };
 
   analyzeUrlRef.current = analyzeUrl;
