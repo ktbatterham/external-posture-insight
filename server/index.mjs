@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath, URL } from "node:url";
 import { createRateLimiter } from "./rateLimiter.mjs";
 import { buildScanEvidencePayload, buildScanFindingsPayload, buildScanSummaryPayload } from "./scanDtos.mjs";
-import { createInMemoryScanRepository } from "./scanRepository.mjs";
+import { createScanRepository } from "./scanRepository.mjs";
 import { classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
 import {
   analyzeUrl,
@@ -36,6 +36,9 @@ const DEFAULT_ABUSE_ALERT_THRESHOLD = 25;
 const RATE_LIMIT_MAX_BUCKETS = 20000;
 const configuredRateLimitBackend = (process.env.RATE_LIMIT_BACKEND || "").trim().toLowerCase();
 const rateLimitBackend = configuredRateLimitBackend || (deploymentMode === "multi-instance" ? "upstash" : "in-memory");
+const configuredScanRepositoryBackend = (process.env.SCAN_REPOSITORY_BACKEND || "").trim().toLowerCase();
+const scanRepositoryBackend = configuredScanRepositoryBackend || "memory";
+const databaseUrl = (process.env.DATABASE_URL || "").trim();
 const RATE_LIMIT_WINDOW_MS = (() => {
   const raw = Number(process.env.RATE_LIMIT_WINDOW_MS || DEFAULT_RATE_LIMIT_WINDOW_MS);
   if (!Number.isFinite(raw) || raw < 1000) {
@@ -84,7 +87,7 @@ const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const abuseSignalBuckets = new Map();
 const exposeDetailedHealth = !isProduction;
 const telemetry = createTelemetryTracker();
-const scanRepository = createInMemoryScanRepository();
+let scanRepository;
 
 const log = (level, event, details = {}) => {
   const payload = {
@@ -543,7 +546,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/scans" && request.method === "GET") {
-    const scans = scanRepository.listScans({
+    const scans = await scanRepository.listScans({
       limit: Number(requestUrl.searchParams.get("limit") || 20),
     });
     sendJson(response, 200, {
@@ -579,7 +582,7 @@ const server = http.createServer(async (request, response) => {
       }
 
       const validatedTarget = await assertPublicHttpUrl(target);
-      const scan = scanRepository.createScan({
+      const scan = await scanRepository.createScan({
         url: validatedTarget.toString(),
         mode,
         requesterScope: authState.requesterScope,
@@ -587,11 +590,11 @@ const server = http.createServer(async (request, response) => {
       });
 
       sendJson(response, 202, {
-        scan: scanRepository.getScan(scan.id).summary,
+        scan: (await scanRepository.getScan(scan.id)).summary,
       });
 
       queueMicrotask(async () => {
-        scanRepository.markRunning(scan.id);
+        await scanRepository.markRunning(scan.id);
         try {
           const result = await runScanAnalysis({
             validatedTarget,
@@ -599,11 +602,11 @@ const server = http.createServer(async (request, response) => {
             clientIp: authState.clientIp,
             requesterScope: authState.requesterScope,
           });
-          scanRepository.markCompleted(scan.id, result);
+          await scanRepository.markCompleted(scan.id, result);
         } catch (error) {
           const failureClass = classifyScanFailure(error);
           telemetry.recordFailure(failureClass);
-          scanRepository.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
+          await scanRepository.markFailed(scan.id, failureClass, normalizeScanErrorMessage(error));
           log("warn", "scan_resource_failed", {
             message: formatErrorMessage(error),
             clientIp: authState.clientIp,
@@ -636,7 +639,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     const { scanId, resource } = parsed;
-    const scan = scanRepository.getScan(scanId);
+    const scan = await scanRepository.getScan(scanId);
     if (!scan) {
       sendJson(response, 404, {
         error: "Scan not found.",
@@ -776,6 +779,26 @@ if (
   process.exit(1);
 }
 
+if (!["memory", "postgres"].includes(scanRepositoryBackend)) {
+  log("error", "server_start_blocked", {
+    reason: "SCAN_REPOSITORY_BACKEND must be 'memory' or 'postgres'.",
+  });
+  process.exit(1);
+}
+
+if (scanRepositoryBackend === "postgres" && !databaseUrl) {
+  log("error", "server_start_blocked", {
+    reason: "SCAN_REPOSITORY_BACKEND=postgres requires DATABASE_URL.",
+  });
+  process.exit(1);
+}
+
+scanRepository = createScanRepository({
+  backend: scanRepositoryBackend,
+  databaseUrl,
+  log: (...args) => log(...args),
+});
+
 server.listen(port, () => {
   log("info", "server_started", {
     port,
@@ -785,6 +808,7 @@ server.listen(port, () => {
     allowUnauthenticated,
     trustProxy,
     deploymentMode,
+    scanRepositoryBackend,
     rateLimitBackend: targetRateLimiter.backend,
     distributedRateLimit: targetRateLimiter.distributed,
     requesterRateLimit: {
