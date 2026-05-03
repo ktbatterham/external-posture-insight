@@ -65,6 +65,7 @@ const TARGET_RATE_LIMIT_MAX_REQUESTS = (() => {
   return Math.floor(raw);
 })();
 const API_KEY_FINGERPRINT_SALT = process.env.API_KEY_FINGERPRINT_SALT || "epi-api-key-fingerprint-v1";
+const SCAN_OWNER_HEADER = "x-scan-owner";
 const ABUSE_ALERT_WINDOW_MS = (() => {
   const raw = Number(process.env.ABUSE_ALERT_WINDOW_MS || DEFAULT_ABUSE_ALERT_WINDOW_MS);
   if (!Number.isFinite(raw) || raw < 1000) {
@@ -183,6 +184,14 @@ function getPresentedApiKey(request) {
   return typeof candidate === "string" ? candidate : "";
 }
 
+function getPresentedScanOwner(request) {
+  const candidate = request.headers[SCAN_OWNER_HEADER];
+  if (Array.isArray(candidate)) {
+    return candidate[0] || "";
+  }
+  return typeof candidate === "string" ? candidate : "";
+}
+
 function tokenFingerprint(token) {
   return crypto.pbkdf2Sync(token, API_KEY_FINGERPRINT_SALT, 120000, 12, "sha256").toString("hex");
 }
@@ -192,6 +201,19 @@ function getRequesterScope(clientIp, presentedApiKey) {
     return `api-key:${tokenFingerprint(presentedApiKey)}`;
   }
   return `ip:${clientIp || "unknown"}`;
+}
+
+function getScanOwnerId({ presentedApiKey, requesterScope, presentedScanOwner }) {
+  if (apiKey && presentedApiKey) {
+    return requesterScope;
+  }
+
+  const ownerToken = presentedScanOwner.trim();
+  if (!ownerToken || ownerToken.length < 16 || ownerToken.length > 256) {
+    return null;
+  }
+
+  return `scan-owner:${tokenFingerprint(ownerToken)}`;
 }
 
 function parseTargetHostForQuota(rawTarget) {
@@ -355,9 +377,10 @@ async function checkTargetQuota({ requesterScope, target, clientIp, requestPath,
   return { ok: false };
 }
 
-async function authorizeAnalysisRequest({ request, response, requestPath, enforceRateLimit = true }) {
+async function authorizeAnalysisRequest({ request, response, requestPath, enforceRateLimit = true, requireScanOwner = false }) {
   const clientIp = getClientIp(request) || "unknown";
   const presentedApiKey = getPresentedApiKey(request);
+  const presentedScanOwner = getPresentedScanOwner(request);
   const requesterScope = getRequesterScope(clientIp, presentedApiKey);
 
   if (apiKey && presentedApiKey !== apiKey) {
@@ -373,8 +396,28 @@ async function authorizeAnalysisRequest({ request, response, requestPath, enforc
     return null;
   }
 
+  const ownerId = getScanOwnerId({
+    presentedApiKey,
+    requesterScope,
+    presentedScanOwner,
+  });
+
+  if (requireScanOwner && !ownerId) {
+    telemetry.recordAuthRejected();
+    telemetry.recordFailure("auth_rejected");
+    recordAbuseSignal("scan_owner_missing", {
+      clientIp,
+      requesterScope,
+      path: requestPath,
+    });
+    sendJson(response, 401, {
+      error: "A scan owner token is required to access scan resources from this deployment.",
+    });
+    return null;
+  }
+
   if (!enforceRateLimit) {
-    return { clientIp, requesterScope };
+    return { clientIp, requesterScope, ownerId };
   }
 
   const rateLimitState = await rateLimiter.check(requesterScope);
@@ -390,7 +433,7 @@ async function authorizeAnalysisRequest({ request, response, requestPath, enforc
     return null;
   }
 
-  return { clientIp, requesterScope };
+  return { clientIp, requesterScope, ownerId };
 }
 
 const rateLimiter = createRateLimiter({
@@ -561,6 +604,7 @@ const server = http.createServer(async (request, response) => {
       response,
       requestPath: requestUrl.pathname,
       enforceRateLimit: false,
+      requireScanOwner: true,
     });
     if (!authState) {
       return;
@@ -568,7 +612,7 @@ const server = http.createServer(async (request, response) => {
 
     const scans = scanRepository.listScans({
       limit: Number(requestUrl.searchParams.get("limit") || 20),
-      requesterScope: authState.requesterScope,
+      ownerId: authState.ownerId,
     });
     sendJson(response, 200, {
       scans,
@@ -581,6 +625,7 @@ const server = http.createServer(async (request, response) => {
       request,
       response,
       requestPath: requestUrl.pathname,
+      requireScanOwner: true,
     });
     if (!authState) {
       return;
@@ -607,6 +652,7 @@ const server = http.createServer(async (request, response) => {
         url: validatedTarget.toString(),
         mode,
         requesterScope: authState.requesterScope,
+        ownerId: authState.ownerId,
         clientIp: authState.clientIp,
       });
 
@@ -665,13 +711,14 @@ const server = http.createServer(async (request, response) => {
       response,
       requestPath: requestUrl.pathname,
       enforceRateLimit: false,
+      requireScanOwner: true,
     });
     if (!authState) {
       return;
     }
 
     const scan = scanRepository.getScan(scanId, {
-      requesterScope: authState.requesterScope,
+      ownerId: authState.ownerId,
     });
     if (!scan) {
       sendJson(response, 404, {
