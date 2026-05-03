@@ -83,6 +83,8 @@ const upstashRestUrl = (process.env.UPSTASH_REDIS_REST_URL || "").trim();
 const upstashRestToken = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const abuseSignalBuckets = new Map();
 const exposeDetailedHealth = !isProduction;
+const exposeTelemetry = process.env.EXPOSE_TELEMETRY === "true" || !isProduction;
+const allowLegacyAnalyze = process.env.ALLOW_LEGACY_ANALYZE === "true" || !isProduction;
 const telemetry = createTelemetryTracker();
 const scanRepository = createInMemoryScanRepository();
 
@@ -353,7 +355,7 @@ async function checkTargetQuota({ requesterScope, target, clientIp, requestPath,
   return { ok: false };
 }
 
-async function authorizeAnalysisRequest({ request, response, requestPath }) {
+async function authorizeAnalysisRequest({ request, response, requestPath, enforceRateLimit = true }) {
   const clientIp = getClientIp(request) || "unknown";
   const presentedApiKey = getPresentedApiKey(request);
   const requesterScope = getRequesterScope(clientIp, presentedApiKey);
@@ -369,6 +371,10 @@ async function authorizeAnalysisRequest({ request, response, requestPath }) {
       error: "A valid API key is required to analyze targets from this deployment.",
     });
     return null;
+  }
+
+  if (!enforceRateLimit) {
+    return { clientIp, requesterScope };
   }
 
   const rateLimitState = await rateLimiter.check(requesterScope);
@@ -538,13 +544,31 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/telemetry") {
+    if (!exposeTelemetry) {
+      sendJson(response, 404, {
+        error: "Telemetry is not available.",
+      });
+      return;
+    }
+
     sendJson(response, 200, telemetry.snapshot());
     return;
   }
 
   if (requestUrl.pathname === "/api/scans" && request.method === "GET") {
+    const authState = await authorizeAnalysisRequest({
+      request,
+      response,
+      requestPath: requestUrl.pathname,
+      enforceRateLimit: false,
+    });
+    if (!authState) {
+      return;
+    }
+
     const scans = scanRepository.listScans({
       limit: Number(requestUrl.searchParams.get("limit") || 20),
+      requesterScope: authState.requesterScope,
     });
     sendJson(response, 200, {
       scans,
@@ -636,7 +660,19 @@ const server = http.createServer(async (request, response) => {
     }
 
     const { scanId, resource } = parsed;
-    const scan = scanRepository.getScan(scanId);
+    const authState = await authorizeAnalysisRequest({
+      request,
+      response,
+      requestPath: requestUrl.pathname,
+      enforceRateLimit: false,
+    });
+    if (!authState) {
+      return;
+    }
+
+    const scan = scanRepository.getScan(scanId, {
+      requesterScope: authState.requesterScope,
+    });
     if (!scan) {
       sendJson(response, 404, {
         error: "Scan not found.",
@@ -673,6 +709,13 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === "/api/analyze") {
+    if (!allowLegacyAnalyze) {
+      sendJson(response, 410, {
+        error: "Legacy GET analysis is disabled. Create scans with POST /api/scans.",
+      });
+      return;
+    }
+
     if (request.method !== "GET") {
       sendMethodNotAllowed(response, ["GET"]);
       return;

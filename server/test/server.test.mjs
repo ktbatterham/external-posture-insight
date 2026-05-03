@@ -246,6 +246,23 @@ test("telemetry endpoint returns aggregate page-load and failure counters", asyn
   }
 });
 
+test("telemetry endpoint is hidden by default in production", async () => {
+  const server = await startServer({
+    NODE_ENV: "production",
+    API_KEY: "test-secret",
+  });
+
+  try {
+    const telemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const payload = await telemetryResponse.json();
+
+    assert.equal(telemetryResponse.status, 404);
+    assert.match(payload.error, /not available/i);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("scan resources start empty and return 404 for unknown ids", async () => {
   const server = await startServer();
 
@@ -261,6 +278,62 @@ test("scan resources start empty and return 404 for unknown ids", async () => {
 
     assert.equal(missingResponse.status, 404);
     assert.match(missingPayload.error, /Scan not found/i);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("scan resources require the same requester scope that created the scan", async () => {
+  const server = await startServer({
+    API_KEY: "test-secret",
+  });
+
+  try {
+    const createResponse = await fetch(`${server.baseUrl}/api/scans`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": "test-secret",
+      },
+      body: JSON.stringify({
+        url: "https://example.com",
+      }),
+    });
+    const createdPayload = await createResponse.json();
+    assert.equal(createResponse.status, 202);
+
+    const scanId = createdPayload.scan.id;
+    const unauthenticatedList = await fetch(`${server.baseUrl}/api/scans`);
+    const unauthenticatedListPayload = await unauthenticatedList.json();
+    assert.equal(unauthenticatedList.status, 401);
+    assert.match(unauthenticatedListPayload.error, /API key/i);
+
+    const wrongScopeResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}`, {
+      headers: {
+        "X-API-Key": "wrong-secret",
+      },
+    });
+    const wrongScopePayload = await wrongScopeResponse.json();
+    assert.equal(wrongScopeResponse.status, 401);
+    assert.match(wrongScopePayload.error, /API key/i);
+
+    const scopedListResponse = await fetch(`${server.baseUrl}/api/scans`, {
+      headers: {
+        "X-API-Key": "test-secret",
+      },
+    });
+    const scopedListPayload = await scopedListResponse.json();
+    assert.equal(scopedListResponse.status, 200);
+    assert.deepEqual(scopedListPayload.scans.map((scan) => scan.id), [scanId]);
+
+    const scopedDetailResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}`, {
+      headers: {
+        "X-API-Key": "test-secret",
+      },
+    });
+    const scopedDetailPayload = await scopedDetailResponse.json();
+    assert.equal(scopedDetailResponse.status, 200);
+    assert.equal(scopedDetailPayload.scan.id, scanId);
   } finally {
     await server.stop();
   }
