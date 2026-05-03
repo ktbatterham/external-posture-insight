@@ -128,16 +128,21 @@ export function createInMemoryScanRepository({ maxEntries = 200 } = {}) {
       touchOrder(id);
       return enrichScan(scan);
     },
-    getScan(id, { requesterScope = null } = {}) {
+    getScan(id, { requesterScope = null, ownerId = null } = {}) {
       const scan = scans.get(id);
+      if (ownerId && scan?.ownerId !== ownerId) {
+        return null;
+      }
       if (requesterScope && scan?.requesterScope !== requesterScope) {
         return null;
       }
       return enrichScan(scan);
     },
-    listScans({ limit = 20, requesterScope = null } = {}) {
-      const scopedOrder = requesterScope
-        ? order.filter((id) => scans.get(id)?.requesterScope === requesterScope)
+    listScans({ limit = 20, requesterScope = null, ownerId = null } = {}) {
+      const scopedOrder = ownerId
+        ? order.filter((id) => scans.get(id)?.ownerId === ownerId)
+        : requesterScope
+          ? order.filter((id) => scans.get(id)?.requesterScope === requesterScope)
         : order;
 
       return scopedOrder

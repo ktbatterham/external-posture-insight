@@ -14,6 +14,7 @@ import {
   type MonitoredTarget,
   RECENT_SCANS_KEY,
   type RecentScan,
+  SCAN_OWNER_KEY,
   saveHistorySnapshot,
   STORAGE_SCHEMA_VERSION,
   type StoredHistorySnapshot,
@@ -102,12 +103,26 @@ export const useScanWorkspace = () => {
     return payload;
   };
 
+  const getScanOwnerToken = async () => {
+    const existing = await readBrowserStorage<string | null>(SCAN_OWNER_KEY, null, STORAGE_SCHEMA_VERSION);
+    if (existing) {
+      return existing;
+    }
+
+    const generated = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await writeBrowserStorage(SCAN_OWNER_KEY, generated, STORAGE_SCHEMA_VERSION);
+    return generated;
+  };
+
   const analyzeUrl = async (url: string, setAsCurrent = true) => {
+    const scanOwnerToken = await getScanOwnerToken();
+    const scanHeaders = {
+      "Content-Type": "application/json",
+      "X-Scan-Owner": scanOwnerToken,
+    };
     const createResponse = await fetch("/api/scans", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: scanHeaders,
       body: JSON.stringify({ url }),
     });
     const createdPayload = await readJsonResponse(createResponse);
@@ -118,7 +133,11 @@ export const useScanWorkspace = () => {
     }
 
     for (let attempt = 0; attempt < 120; attempt += 1) {
-      const scanResponse = await fetch(`/api/scans/${encodeURIComponent(scanId)}`);
+      const scanResponse = await fetch(`/api/scans/${encodeURIComponent(scanId)}`, {
+        headers: {
+          "X-Scan-Owner": scanOwnerToken,
+        },
+      });
       const scanPayload = await readJsonResponse(scanResponse);
       const scan = scanPayload.scan;
 

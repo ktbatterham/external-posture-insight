@@ -6,6 +6,17 @@ import test from "node:test";
 import { once } from "node:events";
 
 const SERVER_ENTRY = new URL("../index.mjs", import.meta.url);
+const SCAN_OWNER_ONE = "test-scan-owner-token-one";
+const SCAN_OWNER_TWO = "test-scan-owner-token-two";
+
+const scanOwnerHeaders = (owner = SCAN_OWNER_ONE) => ({
+  "X-Scan-Owner": owner,
+});
+
+const scanOwnerJsonHeaders = (owner = SCAN_OWNER_ONE) => ({
+  "Content-Type": "application/json",
+  ...scanOwnerHeaders(owner),
+});
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
@@ -267,13 +278,17 @@ test("scan resources start empty and return 404 for unknown ids", async () => {
   const server = await startServer();
 
   try {
-    const listResponse = await fetch(`${server.baseUrl}/api/scans`);
+    const listResponse = await fetch(`${server.baseUrl}/api/scans`, {
+      headers: scanOwnerHeaders(),
+    });
     const listPayload = await listResponse.json();
 
     assert.equal(listResponse.status, 200);
     assert.deepEqual(listPayload.scans, []);
 
-    const missingResponse = await fetch(`${server.baseUrl}/api/scans/not-a-real-scan`);
+    const missingResponse = await fetch(`${server.baseUrl}/api/scans/not-a-real-scan`, {
+      headers: scanOwnerHeaders(),
+    });
     const missingPayload = await missingResponse.json();
 
     assert.equal(missingResponse.status, 404);
@@ -339,15 +354,51 @@ test("scan resources require the same requester scope that created the scan", as
   }
 });
 
+test("unauthenticated scan resources are scoped by browser owner token, not shared IP", async () => {
+  const server = await startServer();
+
+  try {
+    const createResponse = await fetch(`${server.baseUrl}/api/scans`, {
+      method: "POST",
+      headers: scanOwnerJsonHeaders(SCAN_OWNER_ONE),
+      body: JSON.stringify({
+        url: "https://example.com",
+      }),
+    });
+    const createdPayload = await createResponse.json();
+    assert.equal(createResponse.status, 202);
+
+    const scanId = createdPayload.scan.id;
+    const wrongOwnerResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}`, {
+      headers: scanOwnerHeaders(SCAN_OWNER_TWO),
+    });
+    const wrongOwnerPayload = await wrongOwnerResponse.json();
+    assert.equal(wrongOwnerResponse.status, 404);
+    assert.match(wrongOwnerPayload.error, /Scan not found/i);
+
+    const wrongOwnerListResponse = await fetch(`${server.baseUrl}/api/scans`, {
+      headers: scanOwnerHeaders(SCAN_OWNER_TWO),
+    });
+    const wrongOwnerListPayload = await wrongOwnerListResponse.json();
+    assert.equal(wrongOwnerListResponse.status, 200);
+    assert.deepEqual(wrongOwnerListPayload.scans, []);
+
+    const missingOwnerResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}`);
+    const missingOwnerPayload = await missingOwnerResponse.json();
+    assert.equal(missingOwnerResponse.status, 401);
+    assert.match(missingOwnerPayload.error, /owner token/i);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("scan resources reject invalid json bodies", async () => {
   const server = await startServer();
 
   try {
     const response = await fetch(`${server.baseUrl}/api/scans`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: scanOwnerJsonHeaders(),
       body: "{broken",
     });
     const payload = await response.json();
@@ -365,9 +416,7 @@ test("scan resources return a sanitized error for invalid targets", async () => 
   try {
     const response = await fetch(`${server.baseUrl}/api/scans`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: scanOwnerJsonHeaders(),
       body: JSON.stringify({
         url: "https://user:pass@example.com",
       }),
@@ -387,9 +436,7 @@ test("scan detail endpoints return summary, findings, and evidence payloads", as
   try {
     const createResponse = await fetch(`${server.baseUrl}/api/scans`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: scanOwnerJsonHeaders(),
       body: JSON.stringify({
         url: "https://example.com",
       }),
@@ -401,7 +448,9 @@ test("scan detail endpoints return summary, findings, and evidence payloads", as
 
     let scanPayload = null;
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      const response = await fetch(`${server.baseUrl}/api/scans/${scanId}`);
+      const response = await fetch(`${server.baseUrl}/api/scans/${scanId}`, {
+        headers: scanOwnerHeaders(),
+      });
       scanPayload = await response.json();
       if (scanPayload.scan.status === "completed" || scanPayload.scan.status === "failed") {
         break;
@@ -411,9 +460,15 @@ test("scan detail endpoints return summary, findings, and evidence payloads", as
 
     assert.equal(scanPayload.scan.status, "completed");
 
-    const summaryResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/summary`);
-    const findingsResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/findings`);
-    const evidenceResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/evidence`);
+    const summaryResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/summary`, {
+      headers: scanOwnerHeaders(),
+    });
+    const findingsResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/findings`, {
+      headers: scanOwnerHeaders(),
+    });
+    const evidenceResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/evidence`, {
+      headers: scanOwnerHeaders(),
+    });
 
     const summaryPayload = await summaryResponse.json();
     const findingsPayload = await findingsResponse.json();
