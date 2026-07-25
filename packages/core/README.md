@@ -28,6 +28,8 @@ Use it when you need a fast outside-in read on a public web service:
   ·
   <a href="https://apps.apple.com/app/securl/id6774322464"><strong>Get the iOS app</strong></a>
   ·
+  <a href="https://securl.online/downloads?utm_source=securl_npm&utm_medium=docs&utm_campaign=android_downloads"><strong>Download Android apps</strong></a>
+  ·
   <a href="https://github.com/this-is-securl/securl"><strong>View the source</strong></a>
 </p>
 
@@ -52,7 +54,7 @@ npm install -g securl
 securl scan example.com
 ```
 
-Prefer the full hosted report and optional monitoring? [Open the free scanner](https://app.securl.online/?utm_source=securl_npm&utm_medium=docs&utm_campaign=package_scan_bridge). For the product overview, start at [securl.online](https://securl.online). Prefer mobile? Install [SecURL on the App Store](https://apps.apple.com/app/securl/id6774322464).
+Prefer the full hosted report and optional monitoring? [Open the free scanner](https://app.securl.online/?utm_source=securl_npm&utm_medium=docs&utm_campaign=package_scan_bridge). For the product overview, start at [securl.online](https://securl.online). Prefer mobile? Install [SecURL on the App Store](https://apps.apple.com/app/securl/id6774322464) or [download the Android apps](https://securl.online/downloads?utm_source=securl_npm&utm_medium=docs&utm_campaign=android_downloads).
 
 Explicitly continue one interactive summary scan into a durable hosted report:
 
@@ -507,6 +509,7 @@ This package is published and consumable from npm:
 - [`securl`](https://www.npmjs.com/package/securl)
 - Product site: [securl.online](https://securl.online)
 - Live scanner: [app.securl.online](https://app.securl.online)
+- Android apps: [SecURL mobile downloads](https://securl.online/downloads?utm_source=securl_npm&utm_medium=docs&utm_campaign=android_downloads)
 - iOS app: [SecURL on the App Store](https://apps.apple.com/app/securl/id6774322464)
 
 It is also used by the SecURL app from the local workspace during development.
