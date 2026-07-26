@@ -3,15 +3,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import { ReportPage } from "./pages/ReportPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { recordPageLoad } from "./lib/apiClient";
+import { parseAppRoute } from "./lib/appRoute";
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  const route = parseAppRoute(window.location.pathname);
+
   useEffect(() => {
     recordPageLoad();
   }, []);
@@ -21,15 +23,11 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <div className="noise">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/report/:scanId" element={<ReportPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
+        <div className="noise">
+          {route.kind === "home" && <Index />}
+          {route.kind === "report" && <ReportPage scanId={route.scanId} />}
+          {route.kind === "privacy" && <PrivacyPage />}
+        </div>
       </TooltipProvider>
     </QueryClientProvider>
   );

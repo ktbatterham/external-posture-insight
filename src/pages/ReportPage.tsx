@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { getSharedScan, getSharedScanCard, recordTelemetryEvent } from "@/lib/apiClient";
 import { buildScannerHandoffUrl } from "@/lib/deepLinks";
@@ -10,8 +9,7 @@ import type { ReportWorkspaceSectionKey } from "@/lib/reportWorkspace";
 import type { AnalysisResult } from "@/types/analysis";
 import type { ScanShareCard } from "@/types/api";
 
-export function ReportPage() {
-  const { scanId } = useParams<{ scanId: string }>();
+export function ReportPage({ scanId }: { scanId: string }) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [shareCard, setShareCard] = useState<ScanShareCard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,12 +63,12 @@ export function ReportPage() {
         <p className="max-w-sm text-sm text-zinc-500">
           This scan may have expired or the link is incorrect.
         </p>
-        <Link
-          to="/"
+        <a
+          href="/"
           className="rounded-xl bg-[#b56a2c] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#9d5a23]"
         >
           Run your own scan →
-        </Link>
+        </a>
       </div>
     );
   }
@@ -109,7 +107,7 @@ export function ReportPage() {
       {/* Minimal header */}
       <header className="sticky top-0 z-40 border-b border-white/6 bg-[#070b14]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 text-sm font-black tracking-[-0.03em] text-white hover:opacity-80">
+          <a href="/" className="flex items-center gap-2 text-sm font-black tracking-[-0.03em] text-white hover:opacity-80">
             <div
               className="flex h-6 w-6 items-center justify-center rounded-lg"
               style={{ background: "linear-gradient(135deg, #b56a2c, #d89a63)" }}
@@ -117,7 +115,7 @@ export function ReportPage() {
               <Sparkles className="h-3 w-3 text-white" />
             </div>
             Sec<span style={{ backgroundImage: "linear-gradient(135deg, #b56a2c, #d89a63)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>URL</span>
-          </Link>
+          </a>
           <span className="rounded-full border border-[#b56a2c]/25 bg-[#b56a2c]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-[#f0d5bc]">
             Shared report
           </span>
