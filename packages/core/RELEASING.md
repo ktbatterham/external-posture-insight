@@ -31,14 +31,22 @@ git diff --name-status securl-v$(node -p "require('./packages/core/package.json'
 ## Release steps
 
 1. Commit the version/changelog update.
-2. Tag the release using `securl-v<version>`, for example `securl-v1.4.1`.
+2. Tag the exact reviewed merge commit using `securl-v<version>`, for example
+   `securl-v1.4.1`.
 3. Push the tag.
 4. Let `.github/workflows/publish-core-package.yml` publish the package through short-lived npm OIDC credentials.
 
-The publish workflow verifies that the release commit is already contained in `origin/main` with `git merge-base --is-ancestor`. If a manual workflow dispatch is needed after a tag publish failure, run it from `main`; the package version comes from `packages/core/package.json`.
+The publish workflow derives the exact release tag from `packages/core/package.json`,
+requires that tag to peel to the checked-out publish commit, verifies the commit is on
+`origin/main`, and runs the complete package release gate before publishing. If a manual
+workflow dispatch is needed after a tag publish failure, dispatch it against the exact
+commit already named by that release tag. Never move or recreate a published tag to make
+recovery pass.
 
 ## Post-release
 
-1. Confirm the package is available on npm.
-2. Verify import/install instructions from the published artifact.
-3. Move changelog notes from `Unreleased` to the released version section.
+1. Confirm npm exposes the version as `latest` with provenance.
+2. Install `securl@<version>` in a clean temporary directory and smoke the import and CLI.
+3. Confirm the matching GitHub release exists and its tag peels to the published commit.
+4. Run `npm run package:signals` and verify repository, registry, tag, and release state
+   remain aligned.
