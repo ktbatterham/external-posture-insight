@@ -29,18 +29,39 @@ jobs:
       - name: Setup npm 12 security defaults and trusted publishing
         run: npm install --global npm@12.0.1
 
-      - name: Verify release tag is based on main
+      - name: Verify exact release tag and publish commit
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
         run: |
+          set -euo pipefail
+
           git fetch origin main:refs/remotes/origin/main
-          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+
+          PACKAGE_VERSION="$(node --input-type=commonjs --eval \
+            'process.stdout.write(require("./packages/core/package.json").version)')"
+          RELEASE_TAG="securl-v${PACKAGE_VERSION}"
+
+          git fetch origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+
+          PUBLISH_SHA="$(git rev-parse 'HEAD^{commit}')"
+          TAG_SHA="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+
+          test "$PUBLISH_SHA" = "$GITHUB_SHA"
+          test "$TAG_SHA" = "$PUBLISH_SHA"
+          git merge-base --is-ancestor "$PUBLISH_SHA" refs/remotes/origin/main
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            test "$EVENT_REF" = "refs/tags/${RELEASE_TAG}"
+          fi
+
+          echo "Verified ${RELEASE_TAG} -> ${PUBLISH_SHA}"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify package
-        run: |
-          npm run build:core
-          npm run test:core
+      - name: Run full package release gate
+        run: npm run release:package:check
 
       - name: Publish SecURL package
         run: npm publish ./packages/core --access public --provenance

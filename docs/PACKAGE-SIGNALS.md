@@ -65,10 +65,27 @@ The useful trend is consistency over time:
 
 ## Release Hygiene
 
+The trusted publish workflow accepts both release-tag pushes and manual recovery
+dispatches, but both paths publish only an exact, existing release tag:
+
+- the package version determines `securl-v<version>`;
+- that tag must peel to the checked-out publish commit;
+- the publish commit must be on `main`;
+- a tag-triggered run must have been triggered by that exact derived tag; and
+- the full `npm run release:package:check` gate must pass before `npm publish`.
+
+For manual recovery, dispatch the workflow against the exact commit already named by the
+release tag. Never move or recreate a published tag to make recovery pass. If the tag,
+package version, or commit differs, fix the release preparation through a new reviewed
+commit and version instead.
+
 After each package release:
 
 1. Confirm npm shows the new version as `latest`.
-2. Confirm GitHub Releases marks the matching `securl-v<version>` release as latest.
-3. Run `npm run package:signals`.
-4. Check Socket after indexing catches up.
-5. Revoke any short-lived npm token used for publishing.
+2. Confirm the installed package resolves to the expected version from a clean temporary
+   directory (`npm install securl@<version>` followed by an import/CLI smoke check).
+3. Confirm GitHub Releases marks the matching `securl-v<version>` release as latest and
+   that the tag peels to the published commit.
+4. Run `npm run package:signals`.
+5. Check Socket after indexing catches up.
+6. Revoke any short-lived npm token used for publishing.
