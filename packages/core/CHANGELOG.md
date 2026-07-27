@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-07-27
+
 ### Added
 - Added explicit single-target interactive `--publish` and `--notify` CLI continuation.
   The CLI creates an authoritative hosted scan without uploading the local result, waits
