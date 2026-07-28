@@ -1,4 +1,6 @@
 import dns from "node:dns/promises";
+import { evaluateDetectionPacks } from "./detectionPacks/evaluator.js";
+import { FIRST_PARTY_DETECTION_PACKS } from "./detectionPacks/edgeProviders.js";
 import {
   CT_CACHE_TTL_MS,
   DNS_LOOKUP_TIMEOUT_MS,
@@ -89,7 +91,6 @@ const WAF_PATTERNS = [
   { name: "Imperva", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(/imperva|incapsula/i.test(headerValue(headers, "server") || "") || headerValue(headers, "x-iinfo") || /incapsula incident id|imperva/i.test(body)) },
   { name: "Sucuri", test: (headers: Record<string, string | string[] | undefined>, body: string) => Boolean(headerValue(headers, "x-sucuri-id") || headerValue(headers, "x-sucuri-cache") || /sucuri/i.test(headerValue(headers, "server") || "") || /sucuri website firewall/i.test(body)) },
   { name: "Fastly", test: (headers: Record<string, string | string[] | undefined>) => Boolean((headerValue(headers, "x-served-by") || "").toLowerCase().includes("cache-") || (headerValue(headers, "x-cache") || "").toLowerCase().includes("fastly")) },
-  { name: "AWS WAF / CloudFront", test: (headers: Record<string, string | string[] | undefined>) => Boolean(headerValue(headers, "x-amz-cf-id") || /cloudfront/i.test(headerValue(headers, "server") || "")) },
 ];
 
 const TAKEOVER_SIGNATURES = [
@@ -197,11 +198,18 @@ const rankHosts = (hosts: string[]): CtDiscoveredHost[] =>
       );
     });
 
-const detectEdgeProvider = (headers: Record<string, string | string[] | undefined>, body: string) => {
+export const detectEdgeProvider = (headers: Record<string, string | string[] | undefined>, body: string) => {
   for (const entry of WAF_PATTERNS) {
     if (entry.test(headers, body)) {
       return entry.name;
     }
+  }
+  const cloudFrontPackMatch = evaluateDetectionPacks(
+    { headers, body },
+    FIRST_PARTY_DETECTION_PACKS,
+  ).find((match) => match.provider === "AWS CloudFront / WAF" && Boolean(match.outputs.ctEdgeProvider));
+  if (cloudFrontPackMatch) {
+    return cloudFrontPackMatch.outputs.ctEdgeProvider!.name;
   }
   const server = headerValue(headers, "server");
   if (server && /(proxy|gateway|edge|gtm|belfrage|varnish)/i.test(server)) {

@@ -114,6 +114,14 @@ export const EDGE_PROVIDER_PACK: DetectionPack = {
         [{ field: "headers.x-amz-cf-id", op: "exists" }],
       ],
       outputs: {
+        ctEdgeProvider: {
+          name: "AWS WAF / CloudFront",
+        },
+        infrastructureWaf: {
+          provider: "AWS WAF / CloudFront",
+          confidence: "medium",
+          evidence: "Observed AWS CloudFront edge headers.",
+        },
         waf: {
           name: "AWS CloudFront / WAF",
           confidence: "medium",
@@ -131,13 +139,31 @@ export const EDGE_PROVIDER_PACK: DetectionPack = {
       },
     },
     {
-      id: "edge.aws-cloudfront-server",
+      id: "edge.aws-cloudfront-pop",
       provider: "AWS CloudFront / WAF",
       priority: 69,
+      when: [
+        [{ field: "headers.x-amz-cf-pop", op: "exists" }],
+      ],
+      outputs: {
+        infrastructureWaf: {
+          provider: "AWS WAF / CloudFront",
+          confidence: "medium",
+          evidence: "Observed AWS CloudFront edge headers.",
+        },
+      },
+    },
+    {
+      id: "edge.aws-cloudfront-server",
+      provider: "AWS CloudFront / WAF",
+      priority: 68,
       when: [
         [{ field: "headers.server", op: "containsSubstring", value: "cloudfront" }],
       ],
       outputs: {
+        ctEdgeProvider: {
+          name: "AWS WAF / CloudFront",
+        },
         waf: {
           name: "AWS CloudFront / WAF",
           confidence: "medium",

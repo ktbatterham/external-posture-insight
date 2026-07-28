@@ -147,3 +147,33 @@ test("analyzeInfrastructure detects passive WAF header signatures", async () => 
   assert.equal(imperva.waf.provider, "Imperva");
   assert.equal(absent.waf.detected, false);
 });
+
+test("analyzeInfrastructure preserves CloudFront WAF output through the detection pack", async () => {
+  const resolver = {
+    resolveCname: async () => [],
+    resolve4: async () => [],
+    resolve6: async () => [],
+    reverse: async () => [],
+  };
+  const fromRequestId = await analyzeInfrastructure(
+    new URL("https://www.example.com/"),
+    { "x-amz-cf-id": "example-cloudfront-id" },
+    [],
+    resolver,
+  );
+  const fromPop = await analyzeInfrastructure(
+    new URL("https://www.example.com/"),
+    { "x-amz-cf-pop": "LHR62-P1" },
+    [],
+    resolver,
+  );
+
+  const expected = {
+    detected: true,
+    provider: "AWS WAF / CloudFront",
+    confidence: "medium",
+    evidence: "Observed AWS CloudFront edge headers.",
+  };
+  assert.deepEqual(fromRequestId.waf, expected);
+  assert.deepEqual(fromPop.waf, expected);
+});

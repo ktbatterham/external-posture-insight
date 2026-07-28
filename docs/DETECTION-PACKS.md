@@ -1,8 +1,9 @@
 # Detection Packs Architecture Proposal
 
 Status: first implementation slice shipped in
-[#382](https://github.com/this-is-securl/securl/pull/382), with follow-up migration in
-progress for additional low-risk edge-provider rules.
+[#382](https://github.com/this-is-securl/securl/pull/382). The AWS CloudFront follow-up
+now covers WAF, technology, infrastructure-WAF, and CT-sampling response-header
+inference while preserving existing public output.
 
 SecURL's detection knowledge is intentionally static and compiled into the
 engine. That keeps the package small, deterministic, and auditable, but the provider
@@ -13,9 +14,10 @@ without weakening the passive scanner boundary.
 
 PR #382 started that path with an internal bundled-first-party evaluator and a low-risk
 Cloudflare/Akamai/Fastly edge-provider migration across WAF and technology detection.
-The next follow-up extends the same bundled pack to AWS CloudFront/WAF response-header
-signals while preserving existing output shapes. The broader schema below remains the
-target shape for follow-on slices.
+The AWS CloudFront/WAF follow-up extends that same bundled pack across the remaining
+duplicated response-header seams while preserving existing output shapes and recording
+internal pack/rule provenance. The broader schema below remains the target shape for
+follow-on slices.
 
 ## Goals
 
@@ -247,7 +249,8 @@ Before implementation is considered complete:
 2. Migrate one low-risk duplicated seam first, preferably Cloudflare/Fastly/Akamai edge
    provider inference across WAF, infrastructure, and technology output.
    - Shipped: Cloudflare, Akamai, Fastly.
-   - Follow-up: AWS CloudFront/WAF response-header inference.
+   - Shipped follow-up: AWS CloudFront/WAF response-header inference across WAF,
+     technology, infrastructure WAF, and CT sampling.
 3. Keep current exports and output DTOs unchanged.
 4. Prove golden output equivalence.
 5. Add package docs that frame packs as bundled declarative detection knowledge, not

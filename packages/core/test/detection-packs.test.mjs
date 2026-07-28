@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { performance } from "node:perf_hooks";
 import test from "node:test";
 import { evaluateDetectionPacks } from "../dist/detectionPacks/evaluator.js";
 import { FIRST_PARTY_DETECTION_PACKS } from "../dist/detectionPacks/edgeProviders.js";
@@ -27,6 +28,58 @@ test("first-party edge detection pack produces deterministic provider matches", 
     matches.map((match) => match.provider),
     ["Cloudflare", "Akamai", "Fastly", "AWS CloudFront / WAF"],
   );
+});
+
+test("CloudFront pack matches retain internal provenance across infrastructure signals", () => {
+  const matches = evaluateDetectionPacks(
+    {
+      headers: {
+        "x-amz-cf-id": "cloudfront-request-id",
+        "x-amz-cf-pop": "LHR62-P1",
+      },
+      body: "",
+    },
+    FIRST_PARTY_DETECTION_PACKS,
+  ).filter((match) => match.provider === "AWS CloudFront / WAF");
+
+  assert.deepEqual(
+    matches.map(({ packId, packVersion, ruleId }) => ({ packId, packVersion, ruleId })),
+    [
+      {
+        packId: "securl.first-party.edge-providers",
+        packVersion: "1.0.0",
+        ruleId: "edge.aws-cloudfront",
+      },
+      {
+        packId: "securl.first-party.edge-providers",
+        packVersion: "1.0.0",
+        ruleId: "edge.aws-cloudfront-pop",
+      },
+    ],
+  );
+  assert.deepEqual(matches[0].outputs.infrastructureWaf, {
+    provider: "AWS WAF / CloudFront",
+    confidence: "medium",
+    evidence: "Observed AWS CloudFront edge headers.",
+  });
+});
+
+test("bundled detection-pack evaluation stays bounded for repeated CloudFront matches", () => {
+  const snapshot = {
+    headers: {
+      "x-amz-cf-id": "cloudfront-request-id",
+      "x-amz-cf-pop": "LHR62-P1",
+      server: "CloudFront",
+    },
+    body: "",
+  };
+  const startedAt = performance.now();
+  for (let index = 0; index < 10_000; index += 1) {
+    evaluateDetectionPacks(snapshot, FIRST_PARTY_DETECTION_PACKS);
+  }
+  const elapsedMs = performance.now() - startedAt;
+
+  assert.ok(elapsedMs < 1_000, `expected 10,000 pack evaluations below 1s, took ${elapsedMs}ms`);
 });
 
 test("edge detection pack keeps WAF output equivalent for migrated providers", () => {

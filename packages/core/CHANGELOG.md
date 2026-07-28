@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.27.1] - 2026-07-28
+
+### Changed
+- Migrated AWS CloudFront response-header inference for infrastructure WAF and
+  certificate-transparency sampling into the bundled first-party detection pack.
+- Preserved existing public provider names, confidence, evidence, and precedence while
+  retaining internal pack/rule provenance and passive-only evaluation.
+
 ## [1.27.0] - 2026-07-27
 
 ### Added
