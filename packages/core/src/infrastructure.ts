@@ -1,4 +1,6 @@
 import dns from "node:dns/promises";
+import { evaluateDetectionPacks } from "./detectionPacks/evaluator.js";
+import { FIRST_PARTY_DETECTION_PACKS } from "./detectionPacks/edgeProviders.js";
 import { DNS_LOOKUP_TIMEOUT_MS } from "./scannerConfig.js";
 import type { InfrastructureInfo, InfrastructureSignal, TechnologyResult } from "./types.js";
 import { headerValue, mapWithConcurrency, safeResolveWithTimeout, unique } from "./utils.js";
@@ -91,10 +93,20 @@ const detectWaf = (headers: Record<string, string | string[] | undefined>): NonN
   const server = headerValue(headers, "server") || "";
   const xCdn = headerValue(headers, "x-cdn") || "";
   const setCookie = headerValue(headers, "set-cookie") || "";
+  const cloudFrontPackMatch = evaluateDetectionPacks(
+    { headers, body: "" },
+    FIRST_PARTY_DETECTION_PACKS,
+  ).find((match) => Boolean(match.outputs.infrastructureWaf));
+  const cloudFrontWaf = cloudFrontPackMatch?.outputs.infrastructureWaf;
   const detectors: Array<{ provider: string; confidence: NonNullable<InfrastructureInfo["waf"]>["confidence"]; evidence: string; matched: boolean }> = [
     { provider: "Cloudflare", confidence: "high", evidence: "Observed Cloudflare edge headers.", matched: Boolean(headerValue(headers, "cf-ray") || headerValue(headers, "cf-cache-status") || /cloudflare/i.test(server)) },
     { provider: "Akamai", confidence: "high", evidence: "Observed Akamai cache/request headers.", matched: Boolean(headerValue(headers, "x-check-cacheable") || headerValue(headers, "x-akamai-request-id") || headerValue(headers, "akamai-cache-status")) },
-    { provider: "AWS WAF / CloudFront", confidence: "medium", evidence: "Observed AWS CloudFront edge headers.", matched: Boolean(headerValue(headers, "x-amz-cf-id") || headerValue(headers, "x-amz-cf-pop")) },
+    {
+      provider: cloudFrontWaf?.provider ?? "AWS WAF / CloudFront",
+      confidence: cloudFrontWaf?.confidence ?? "medium",
+      evidence: cloudFrontWaf?.evidence ?? "Observed AWS CloudFront edge headers.",
+      matched: Boolean(cloudFrontWaf),
+    },
     { provider: "Imperva", confidence: "high", evidence: "Observed Imperva / Incapsula headers.", matched: Boolean(headerValue(headers, "x-iinfo") || /imperva/i.test(xCdn)) },
     { provider: "Fastly", confidence: "medium", evidence: "Observed Fastly request/cache headers.", matched: Boolean(headerValue(headers, "x-fastly-request-id") || headerValue(headers, "fastly-restarts")) },
     { provider: "Vercel Edge", confidence: "high", evidence: "Observed Vercel edge headers.", matched: Boolean(headerValue(headers, "x-vercel-cache") || headerValue(headers, "x-vercel-id")) },

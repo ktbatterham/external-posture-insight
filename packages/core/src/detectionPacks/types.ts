@@ -24,6 +24,14 @@ export type DetectionPredicate =
     };
 
 export interface DetectionRuleOutput {
+  ctEdgeProvider?: {
+    name: string;
+  };
+  infrastructureWaf?: {
+    provider: string;
+    confidence: DetectionConfidence;
+    evidence: string;
+  };
   waf?: {
     name: string;
     confidence: DetectionConfidence;

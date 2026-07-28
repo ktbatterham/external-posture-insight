@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-28 — core 1.27.1 CloudFront detection-pack follow-through
+
+### Changed
+
+- Migrated the remaining duplicated AWS CloudFront response-header inference used by
+  infrastructure WAF and CT sampling into the bundled first-party detection pack.
+- Preserved public provider names, confidence, evidence, and precedence while retaining
+  deterministic internal pack, version, and rule provenance.
+
+### Classification
+
+- `PACKAGE_AFFECTING` — patch release `securl@1.27.1`.
+
 ## 2026-07-20 — focused hosted acquisition funnel
 
 ### Changed
