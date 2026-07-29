@@ -42,6 +42,15 @@ test("CLI schema command writes the posture manifest JSON Schema", async () => {
   assert.equal(output.properties.manifestId.pattern, "^pm_[a-f0-9]{24}$");
 });
 
+test("CLI schema command prints the portable evidence JSON Schema", async () => {
+  const { stdout } = await execFile(process.execPath, [cliPath, "schema", "evidence"]);
+  const output = JSON.parse(stdout);
+
+  assert.equal(output.$id, "https://securl.online/schemas/portable-evidence-v1.json");
+  assert.equal(output.properties.manifest.$id, "https://securl.online/schemas/posture-manifest-v1.json");
+  assert.equal(output.properties.integrity.properties.algorithm.const, "sha256");
+});
+
 test("CLI schema command prints mobile resource JSON Schemas", async () => {
   const expected = {
     "mobile-summary": "https://securl.online/schemas/scan-mobile-summary-v1.json",
@@ -439,7 +448,7 @@ test("CLI compare command rejects scan-only outputs", async () => {
   await assert.rejects(
     execFile(process.execPath, [cliPath, "compare", currentPath, baselinePath, "--format", "manifest"]),
     (error) => {
-      assert.match(error.stderr, /Manifest and exposure output are only supported by the scan command\./);
+      assert.match(error.stderr, /Manifest, evidence, and exposure output are only supported by the scan command\./);
       return true;
     },
   );
@@ -447,7 +456,7 @@ test("CLI compare command rejects scan-only outputs", async () => {
   await assert.rejects(
     execFile(process.execPath, [cliPath, "compare", currentPath, baselinePath, "--format", "exposure"]),
     (error) => {
-      assert.match(error.stderr, /Manifest and exposure output are only supported by the scan command\./);
+      assert.match(error.stderr, /Manifest, evidence, and exposure output are only supported by the scan command\./);
       return true;
     },
   );

@@ -60,7 +60,7 @@ For deeper technical views, export, or analyst workflows, use:
 - `GET /api/scans/:id/manifest`: one resolved artifact combining target metadata, scan timing/mode, score drivers, observation ledger, skipped checks, evidence quality, signal clarity, and policy evaluation.
 - `GET /api/scans/:id/drift`: scan-to-scan drift and risk events.
 - `GET /api/scans/:id/comparison`: current and previous scan summaries with direct diff context.
-- `GET /api/scans/:id/export?format=json|markdown|sarif|ci-json`: downloadable report and automation formats.
+- `GET /api/scans/:id/export?format=json|markdown|sarif|ci-json|evidence`: downloadable report, automation, and portable evidence formats.
 
 ## Heavy Or Legacy Reads
 

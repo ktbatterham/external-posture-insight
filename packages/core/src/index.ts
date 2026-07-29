@@ -81,6 +81,12 @@ export {
 export { buildPostureDigest } from "./postureDigest.js";
 export { buildPostureManifest, POSTURE_MANIFEST_SCHEMA } from "./postureManifest.js";
 export {
+  buildPortableEvidence,
+  PORTABLE_EVIDENCE_SCHEMA,
+  postureManifestSha256,
+  verifyPortableEvidence,
+} from "./portableEvidence.js";
+export {
   MOBILE_RESOURCE_SCHEMAS,
   MONITORING_CERT_SUMMARY_SCHEMA,
   MONITORING_MOBILE_SUMMARY_SCHEMA,

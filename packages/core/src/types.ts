@@ -1388,6 +1388,50 @@ export interface PostureManifest {
   };
 }
 
+export interface PortableEvidenceComparison {
+  baseline: {
+    manifestId: string;
+    manifestSha256: string;
+    scannedAt: string;
+    score: number;
+    grade: string;
+    policyPassed: boolean;
+  };
+  current: {
+    manifestId: string;
+    scannedAt: string;
+    score: number;
+    grade: string;
+    policyPassed: boolean;
+  };
+  scoreDelta: number;
+  policyChanged: boolean;
+  observationDrift: ObservationDriftReport;
+}
+
+export interface PortableEvidenceBundle {
+  version: "1.0";
+  evidenceId: string;
+  generatedAt: string;
+  provenance: {
+    producer: "securl";
+    producerVersion: string | null;
+    source: "cli" | "hosted";
+    scanId: string | null;
+  };
+  compatibility: {
+    manifestVersion: PostureManifest["version"];
+    manifestSchema: string;
+    minimumReaderVersion: string;
+  };
+  integrity: {
+    algorithm: "sha256";
+    manifestSha256: string;
+  };
+  manifest: PostureManifest;
+  comparison: PortableEvidenceComparison | null;
+}
+
 export interface AnalysisResult {
   inputUrl: string;
   normalizedUrl: string;

@@ -534,7 +534,7 @@ test("capabilities endpoint exposes additive client feature metadata", async () 
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/events"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/comparison"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/drift"));
-    assert.ok(payload.scans.resources.includes("GET /api/scans/:id/export?format=json|markdown|sarif|ci-json"));
+    assert.ok(payload.scans.resources.includes("GET /api/scans/:id/export?format=json|markdown|sarif|ci-json|evidence"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/share-card"));
     assert.equal(payload.monitoring.enabled, true);
     assert.equal(payload.monitoring.scheduler.enabled, true);
@@ -2378,6 +2378,9 @@ test("scan detail endpoints return summary, findings, evidence, and history payl
     const ciJsonExportResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/export?format=ci-json`, {
       headers: scanOwnerHeaders(),
     });
+    const evidenceExportResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/export?format=evidence`, {
+      headers: scanOwnerHeaders(),
+    });
     const invalidExportResponse = await fetch(`${server.baseUrl}/api/scans/${scanId}/export?format=pdf`, {
       headers: scanOwnerHeaders(),
     });
@@ -2400,6 +2403,7 @@ test("scan detail endpoints return summary, findings, evidence, and history payl
     const markdownExport = await markdownExportResponse.text();
     const sarifExport = await sarifExportResponse.json();
     const ciJsonExport = await ciJsonExportResponse.json();
+    const evidenceExport = await evidenceExportResponse.json();
     const invalidExportPayload = await invalidExportResponse.json();
     const shareCardPayload = await shareCardResponse.json();
 
@@ -2540,6 +2544,11 @@ test("scan detail endpoints return summary, findings, evidence, and history payl
     assert.equal(sarifExport.version, "2.1.0");
     assert.ok(Array.isArray(sarifExport.runs[0].results));
     assert.equal(ciJsonExportResponse.status, 200);
+    assert.equal(evidenceExportResponse.status, 200);
+    assert.equal(evidenceExport.portableEvidence.provenance.source, "hosted");
+    assert.equal(evidenceExport.portableEvidence.provenance.scanId, scanId);
+    assert.equal(evidenceExport.portableEvidence.manifest.manifestId, manifestPayload.postureManifest.manifestId);
+    assert.match(evidenceExport.portableEvidence.integrity.manifestSha256, /^[a-f0-9]{64}$/);
     assert.equal(ciJsonExport.apiVersion, "2026-05-14");
     assert.equal(ciJsonExport.scan.id, scanId);
     assert.equal(typeof ciJsonExport.posture.passed, "boolean");

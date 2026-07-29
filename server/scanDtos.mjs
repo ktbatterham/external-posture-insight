@@ -5,6 +5,7 @@ import { buildExposureBrief } from "../packages/core/dist/exposureBrief.js";
 import { buildPostureInsights } from "../packages/core/dist/postureInsights.js";
 import { buildPostureDigest } from "../packages/core/dist/postureDigest.js";
 import { buildPostureManifest } from "../packages/core/dist/postureManifest.js";
+import { buildPortableEvidence } from "../packages/core/dist/portableEvidence.js";
 import { buildPostureDriftReportFromDiff } from "../packages/core/dist/postureDrift.js";
 import {
   buildCertificateMonitoringEvents,
@@ -18,7 +19,7 @@ import { DEFAULT_OBSERVATION_POLICY, evaluateObservationPolicy } from "../packag
 const require = createRequire(import.meta.url);
 const corePackage = require("../packages/core/package.json");
 export const API_VERSION = "2026-05-14";
-export const SCAN_EXPORT_FORMATS = ["json", "markdown", "sarif", "ci-json"];
+export const SCAN_EXPORT_FORMATS = ["json", "markdown", "sarif", "ci-json", "evidence"];
 const CORE_ENGINE_VERSION = corePackage.version;
 const DEFAULT_WEB_APP_ORIGIN = "https://app.securl.online";
 
@@ -351,7 +352,7 @@ export function buildScanShareCardPayload(scan) {
   };
 }
 
-export function buildScanExportResponse(scan, format = "json") {
+export function buildScanExportResponse(scan, format = "json", postureManifest = null) {
   if (!SCAN_EXPORT_FORMATS.includes(format)) {
     return null;
   }
@@ -363,6 +364,25 @@ export function buildScanExportResponse(scan, format = "json") {
   }
 
   const baseName = safeExportName(scan.result.host || scan.url || scan.id);
+  if (format === "evidence") {
+    const manifest = postureManifest ?? buildPostureManifest(scan.result, {
+      engineVersion: CORE_ENGINE_VERSION,
+      scanMode: scan.mode,
+      policySource: "default",
+    });
+    return {
+      body: `${JSON.stringify({
+        apiVersion: API_VERSION,
+        portableEvidence: buildPortableEvidence(manifest, {
+          source: "hosted",
+          producerVersion: CORE_ENGINE_VERSION,
+          scanId: scan.id,
+        }),
+      }, null, 2)}\n`,
+      contentType: "application/json; charset=utf-8",
+      filename: `${baseName}-securl-evidence.json`,
+    };
+  }
   if (format === "markdown") {
     return {
       body: `${buildMarkdownExport(scan)}\n`,

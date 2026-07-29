@@ -358,6 +358,12 @@ Use `buildPostureManifest(result)` from `securl/posture-manifest` to produce a m
 
 Version `1.22.0+` exports `POSTURE_MANIFEST_SCHEMA` and the CLI command `securl schema manifest`, giving CI systems and consumers a stable JSON Schema for validating stored posture manifests.
 
+Version `1.28.0+` exports `buildPortableEvidence`, `verifyPortableEvidence`, and
+`PORTABLE_EVIDENCE_SCHEMA`. The bundle preserves the Posture Manifest as its source of
+truth, adds producer/scan provenance, a canonical SHA-256 digest, reader compatibility,
+and—when a baseline is supplied—an observation-ledger comparison without embedding a
+second copy of the baseline manifest.
+
 ```js
 import { analyzeTarget } from "securl";
 import {
@@ -603,6 +609,8 @@ npx securl scan example.com --format markdown
 npx securl scan example.com --format sarif
 npx securl scan example.com --format ci-json
 npx securl scan example.com --format manifest
+npx securl scan example.com --format evidence --output release-evidence.json
+npx securl scan example.com --baseline previous-report.json --format evidence --output compared-evidence.json
 npx securl schema manifest
 npx securl schema mobile-summary
 npx securl schema monitoring-mobile-summary
@@ -623,7 +631,7 @@ npx securl cert example.com --format markdown --output certificate.md
 
 `securl cert` performs a bounded TLS handshake only. It is useful for Cert Watch-style automation, release checks, and lightweight inventory tasks where a full posture scan would be unnecessary.
 
-The CLI writes machine-readable report output to stdout, and lightweight multi-target progress to stderr only when running interactively. This keeps JSON/SARIF/manifest output pipe-friendly. Use `--format manifest` when CI, self-hosted monitoring, or evidence archives need the same Posture Manifest v1 recipe card exposed by the hosted API. Use `securl schema manifest` or one of the mobile-resource schema targets when downstream tools need a JSON Schema contract without running a scan.
+The CLI writes machine-readable report output to stdout, and lightweight multi-target progress to stderr only when running interactively. This keeps JSON/SARIF/manifest/evidence output pipe-friendly. Use `--format manifest` when CI or self-hosted monitoring needs the raw Posture Manifest v1 recipe card. Use `--format evidence` for release archives or vendor review where provenance, integrity, compatibility, and an optional baseline comparison belong together. Use `securl schema manifest`, `securl schema evidence`, or one of the mobile-resource schema targets when downstream tools need a JSON Schema contract without running a scan.
 
 Scan modes:
 

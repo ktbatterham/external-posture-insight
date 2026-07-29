@@ -6,6 +6,22 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-07-29
+
+### Added
+- Added a Portable Evidence v1 envelope that preserves Posture Manifest v1 as the
+  source of truth while recording producer/scan provenance, reader compatibility, and a
+  canonical SHA-256 manifest digest.
+- Added optional manifest-to-manifest observation comparison when CLI evidence is
+  generated with `--baseline`.
+- Added `--format evidence`, `securl schema evidence`, the
+  `securl/portable-evidence` package export, and owner-scoped hosted evidence downloads.
+
+### Security
+- Kept portable evidence downloads behind the existing scan-owner boundary. The public
+  share-card remains the privacy-safe summary surface; portable bundles are not exposed
+  through the unauthenticated share endpoint.
+
 ## [1.27.1] - 2026-07-28
 
 ### Changed

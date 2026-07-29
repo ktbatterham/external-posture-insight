@@ -64,7 +64,7 @@ After completion, choose the right read:
 - Technical recipe card: `GET /api/scans/:id/manifest`
 - Findings only: `GET /api/scans/:id/findings`
 - Evidence only: `GET /api/scans/:id/evidence`
-- SARIF or CI JSON: `GET /api/scans/:id/export?format=sarif`
+- SARIF, CI JSON, or portable evidence: `GET /api/scans/:id/export?format=sarif`
 
 ## Choosing A Resource
 
@@ -76,6 +76,7 @@ After completion, choose the right read:
 | Evaluate policy fit | `/policy-evaluation` or `/manifest` |
 | Store an audit artifact | `/manifest` |
 | Feed GitHub or security tooling | `/export?format=sarif` or `/export?format=ci-json` |
+| Archive release/vendor evidence | `/export?format=evidence` |
 | Review visible vendors, infrastructure, identity, AI, and supply-chain exposure | `/vendors` (External Exposure Inventory v1) |
 | Review certificate only | `/api/certificates/live?url=...` |
 
@@ -98,6 +99,7 @@ CLI users can produce the same artifact without the hosted API:
 
 ```sh
 npx securl scan https://example.com --format manifest --output posture-manifest.json
+npx securl scan https://example.com --format evidence --output release-evidence.json
 ```
 
 For the concise external exposure inventory (visible vendors, infrastructure,

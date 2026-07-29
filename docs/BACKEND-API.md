@@ -47,7 +47,7 @@ Mobile clients should set these headers alongside `X-Scan-Owner` on every reques
 - `GET /api/scans/:id/history`
 - `GET /api/scans/:id/comparison`
 - `GET /api/scans/:id/drift`
-- `GET /api/scans/:id/export?format=json|markdown|sarif|ci-json`
+- `GET /api/scans/:id/export?format=json|markdown|sarif|ci-json|evidence`
 - `GET /api/scans/:id/share` (public — no auth required)
 
 `POST /api/scans` accepts an optional `mode`:
