@@ -1880,6 +1880,7 @@ const FUNNEL_EVENT_NAMES = new Set([
   "live_certificate_read",
   "live_certificate_failed",
   "cert_watchlist_summary_read",
+  "playground_action",
 ]);
 
 function sanitizeFunnelEvent(value) {

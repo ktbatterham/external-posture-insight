@@ -38,6 +38,15 @@ For the next few days, priority order is:
 
 This does not reduce the importance of the mobile suite. It preserves the principle that the engine is the source of truth, with web and mobile acting as increasingly polished views over the same passive posture intelligence.
 
+### Versioning note
+
+Roadmap numbers are strategic milestone labels, not promises that the npm package will
+publish with the same number. npm versions follow SemVer for the actual public package
+change. For example, the roadmap's `1.27` portable-evidence milestone shipped in
+`securl@1.28.0` because the additive package API followed already-published `1.27.x`
+releases. Rituals and close-downs must keep roadmap milestone, package version, hosted
+commit, and mobile app versions separate.
+
 ## Strategic Bets
 
 The roadmap should be ambitious in five places, while preserving the passive, bounded,
@@ -246,6 +255,19 @@ into "credible external posture system":
 | `1.29` | Team/API operating layer | Authenticated API keys, alert destinations, retention, audit-friendly exports, and team-oriented usage limits become coherent rather than ad hoc. |
 | `1.30` | External posture graph | SecURL can explain the current state, historical drift, policy fit, provider/vendor exposure, and evidence quality for watched targets as one product system. |
 
+Delivered state as of 29 July:
+
+- Roadmap `1.24`: shipped, including CloudFront follow-through.
+- Roadmap `1.25`: monitoring-control-room foundations shipped and in production
+  observation; retention remains the success test.
+- Roadmap `1.26`: provider/exposure knowledge primitives are live across the engine,
+  inventory, manifests, and detection-pack provenance, with catalogue breadth still
+  iterative.
+- Roadmap `1.27`: shipped through `securl@1.28.0`, PR #428, trusted npm publication, and
+  owner-scoped hosted Portable Evidence v1 export.
+- Roadmap `1.28` contributor packs: intentionally not started. Contributor machinery is
+  demand-gated and must not outrank acquisition or product use.
+
 ## Roadmap Review - 2026-07-15
 
 The roadmap does not need a wholesale refactor after `1.24`; the thematic structure is
@@ -268,32 +290,45 @@ working. It does need a sharper operating split for the next slice:
 Net decision: keep the `1.25` milestone, but define it around **monitoring retention and
 control-room confidence** rather than a bundle of mobile features.
 
-## Next Decision Gate - July 2026
+## Next Decision Gate - 29 July 2026
 
-The selected next slice is **post-1.24 detection-pack follow-through plus monitoring
-retention instrumentation**, with implementation order chosen by risk:
+The selected next slice is **public developer utility → live scan → portable evidence →
+recurring monitoring**.
 
 Current gate:
 
-- Choose the next detection-pack migration by evidence and risk: prefer another duplicated
-  low-risk provider family before attempting vendor-inventory or identity rules.
-- Preserve output equivalence, add pack-match provenance internally, and keep packs
-  declarative, schema-validated, deterministic, bounded, and unable to perform network I/O.
-- Keep package-affecting architecture work separate from mobile delivery; there is no new
-  mobile contract until a future API response shape intentionally exposes pack metadata or
-  richer detection provenance behind a capability flag.
-- In parallel, design the `1.25` monitoring-control-room API shape around attention
-  rollups, stable timeline DTOs, policy-fit summaries, and push-health state, because those
-  directly answer whether new installers become retained monitoring users. The proposed
-  source-of-truth contract lives in
-  [`MONITORING-CONTROL-ROOM-CONTRACT.md`](./MONITORING-CONTROL-ROOM-CONTRACT.md) and must
-  remain non-live until implemented behind capability flags.
-- Continue monitoring production/mobile telemetry; if real alert confusion or push
-  reliability becomes the stronger signal, move monitoring explanations and push-health
-  feedback above pack migration.
+- Ship a public CSP/header builder as a real standalone tool, not another landing-page
+  card. It must generate useful output locally, explain unsafe choices, provide deployment
+  snippets, and hand users into a live SecURL scan.
+- Measure privacy-safe tool loads, preset use, copied output, and scanner handoff without
+  recording policy contents.
+- Follow the CSP builder with CI/release-evidence examples that make Portable Evidence v1
+  immediately usable in GitHub Actions and vendor-review workflows.
+- Keep the CLI continuation experiment separately attributable while npm indexing catches
+  up; do not stack another CLI prompt over it.
+- Keep monitoring retention visible as the recurring-product test. If genuine alert
+  engagement or confusion becomes the stronger signal, monitoring explanation work moves
+  above the next acquisition tool.
+- Do not start contributor-pack or team/commercial machinery merely because their roadmap
+  labels are next. Require contributor demand, repeated evidence use, or multi-user demand.
 
-Until the slice proves itself in production/package review, favour reliability,
-compatibility, evidence, and operational visibility over new surface area.
+Measurement guardrail:
+
+- The 29 July cohort review confirmed that scan events and authenticated app events were
+  being written under structurally separate identity families. Client-header rows were
+  100% scanned by construction, while bundle-id rows could not receive scan events and
+  therefore remained 0% scanned.
+- The reported tracked-owner total counts owner/app ledger rows, not distinct people, and
+  may count one person in both families. The historical hashes cannot be safely joined.
+- Until prospective cohort reporting uses a stable owner identity and canonical app
+  identity, do not cite tracked-owner totals or activation rates as traction, compare or
+  average the two families, or use them to justify an onboarding pivot.
+- Acquisition remains the evidenced constraint. Sentinel alert engagement is currently
+  the only adoption-adjacent aggregate considered safe enough for directional use, and it
+  must still be labelled as a small-N signal.
+
+Be bold means creating standalone value that can earn discovery and use. It does not mean
+abandoning passive boundaries, privacy, compatibility, or evidence-backed sequencing.
 
 ## Adoption Push - 2026-07-17
 
@@ -319,8 +354,9 @@ choices now without becoming excuses to overbuild:
   model.
 - **Detection-pack workbench**: fixtures, golden-output comparisons, worst-case benchmark
   reports, and a review checklist for proposed provider rules.
-- **External evidence bundle**: signed or provenance-linked export containing manifest,
-  policy verdict, key evidence, report summary, engine version, and scan metadata.
+- **Portable evidence adoption**: Portable Evidence v1 is shipped; the remaining
+  opportunity is CI templates, release attachments, vendor-review examples, and later
+  signing or stronger provenance linkage when users require it.
 - **Vendor/security questionnaire assist**: convert posture manifests and vendor exposure
   into concise evidence-backed answers for customer or supplier review.
 - **Public benchmark corpus**: safe synthetic and public-fixture tests that track false

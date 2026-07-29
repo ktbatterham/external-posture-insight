@@ -880,6 +880,26 @@ test("telemetry event beacon records funnel events", async () => {
     assert.equal(updatedPayload.funnel.events.handoff_started, 1);
     assert.equal(updatedPayload.funnel.bySource["utm:landing"].handoff_started, 1);
 
+    const playgroundResponse = await fetch(`${server.baseUrl}/api/telemetry/event`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://securl.online",
+      },
+      body: JSON.stringify({
+        event: "playground_action",
+        currentUrl: "https://securl.online/tools/csp-builder",
+        mode: "csp_builder:copied",
+        format: "nginx",
+      }),
+    });
+    assert.equal(playgroundResponse.status, 202);
+    const playgroundTelemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const playgroundPayload = await playgroundTelemetryResponse.json();
+    assert.equal(playgroundPayload.funnel.events.playground_action, 1);
+    assert.equal(playgroundPayload.funnel.byMode["csp_builder:copied"].playground_action, 1);
+    assert.equal(playgroundPayload.funnel.recent[0].target, null);
+
     const invalidResponse = await fetch(`${server.baseUrl}/api/telemetry/event`, {
       method: "POST",
       headers: {
