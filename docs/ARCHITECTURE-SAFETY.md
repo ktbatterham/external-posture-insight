@@ -79,7 +79,7 @@ Clients should prefer smaller purpose-built API resources rather than coupling t
 - `/summary` for lifecycle and score state.
 - `/digest`, `/insights`, and `/mobile-summary` for product UI.
 - `/observations`, `/observation-drift`, `/policy-evaluation`, and `/manifest` for technical integrations.
-- `/export?format=json|markdown|sarif|ci-json` for reporting and automation.
+- `/export?format=json|markdown|sarif|ci-json|evidence` for reporting, automation, and owner-scoped portable evidence.
 
 See [`API-INTEGRATION-GUIDE.md`](API-INTEGRATION-GUIDE.md) and [`CONSUMER-API-MAP.md`](CONSUMER-API-MAP.md).
 

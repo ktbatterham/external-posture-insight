@@ -49,6 +49,7 @@ Follow product notes and practical posture write-ups at [@ThisIsSecURL on X](htt
 npx securl scan example.com
 npx securl scan example.com --format markdown --output securl-report.md
 npx securl scan example.com --format manifest --output posture-manifest.json
+npx securl scan example.com --format evidence --output release-evidence.json
 ```
 
 For a five-minute path from first scan to CI/monitoring evidence, read [`docs/ADOPTION-QUICKSTART.md`](docs/ADOPTION-QUICKSTART.md).
@@ -61,6 +62,7 @@ For a five-minute path from first scan to CI/monitoring evidence, read [`docs/AD
 - External Exposure Inventory v1 across visible third-party, infrastructure, identity, and AI dependencies, with stable IDs, data-flow purpose, confidence, evidence, SRI status, and review priority.
 - `securl scan --format exposure` for compact inventory output in CI, audit, and scheduled workflows.
 - `securl scan --format manifest` for generating Posture Manifest v1, SecURL's SBOM-adjacent external posture recipe card.
+- `securl scan --format evidence` for a digest-verifiable evidence bundle containing that manifest, provenance, reader compatibility, and an optional baseline comparison.
 - `securl schema manifest` for printing the JSON Schema contract without running a scan.
 - `POSTURE_MANIFEST_SCHEMA` from both `securl` and `securl/posture-manifest` for CI, evidence archives, vendor-risk tooling, and future reporting clients.
 - `securl cert` for fast TLS certificate checks without running a full posture scan.

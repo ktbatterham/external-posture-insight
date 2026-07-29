@@ -7,9 +7,11 @@ import {
   analyzeUrl,
   buildExternalExposureInventory,
   buildHistoryDiffFromSnapshots,
+  buildPortableEvidence,
   buildPostureManifest,
   formatErrorMessage,
   MOBILE_RESOURCE_SCHEMAS,
+  PORTABLE_EVIDENCE_SCHEMA,
   POSTURE_MANIFEST_SCHEMA,
   scanLiveCertificate,
   snapshotFromAnalysis,
@@ -25,7 +27,7 @@ const qrcodeTerminal = require("qrcode-terminal") as {
   generate(value: string, options: { small: boolean }, callback: (output: string) => void): void;
 };
 
-type OutputFormat = "json" | "markdown" | "summary" | "sarif" | "ci-json" | "manifest" | "exposure";
+type OutputFormat = "json" | "markdown" | "summary" | "sarif" | "ci-json" | "manifest" | "evidence" | "exposure";
 type FailOnSeverity = Exclude<ScanIssue["severity"], "good">;
 type ScanMode = "standard" | "quiet" | "deep-passive";
 type CertPolicyProfile = "production" | "strict" | "renewal-watch";
@@ -44,7 +46,7 @@ type ParsedArgs =
   | { command: "help" }
   | {
       command: "schema";
-      schema: "manifest" | keyof typeof MOBILE_RESOURCE_SCHEMAS;
+      schema: "manifest" | "evidence" | keyof typeof MOBILE_RESOURCE_SCHEMAS;
       outputPath: string | null;
     }
   | {
@@ -73,7 +75,7 @@ type ParsedArgs =
   | {
       command: "cert";
       target: string;
-      format: Exclude<OutputFormat, "sarif" | "manifest" | "exposure">;
+      format: Exclude<OutputFormat, "sarif" | "manifest" | "evidence" | "exposure">;
       outputPath: string | null;
       policy: CertPolicyOptions;
     };
@@ -81,10 +83,10 @@ type ParsedArgs =
 const usage = `SecURL CLI
 
 Usage:
-  securl scan <target...> [--publish|--notify] [--format json|markdown|summary|sarif|ci-json|manifest|exposure] [--baseline <report.json>] [--output <file>] [--quiet|--deep-passive] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  securl scan <target...> [--publish|--notify] [--format json|markdown|summary|sarif|ci-json|manifest|evidence|exposure] [--baseline <report.json>] [--output <file>] [--quiet|--deep-passive] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   securl compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   securl cert <target> [--format json|markdown|summary|ci-json] [--output <file>] [--policy production|strict|renewal-watch] [--fail-if-invalid] [--fail-if-expiring-within <days>] [--fail-if-legacy-tls] [--expect-issuer <text>]
-  securl schema manifest|mobile-summary|monitoring-mobile-summary|monitoring-cert-summary [--output <file>]
+  securl schema manifest|evidence|mobile-summary|monitoring-mobile-summary|monitoring-cert-summary [--output <file>]
 
 Examples:
   npx securl scan example.com
@@ -93,6 +95,8 @@ Examples:
   npx securl scan example.com --format sarif --output findings.sarif
   npx securl scan example.com --format ci-json --output ci.json
   npx securl scan example.com --format manifest --output posture-manifest.json
+  npx securl scan example.com --format evidence --output release-evidence.json
+  npx securl schema evidence --output portable-evidence.schema.json
   npx securl scan example.com --format exposure --output external-exposure.json
   npx securl schema manifest --output posture-manifest.schema.json
   npx securl schema monitoring-mobile-summary --output monitoring-mobile-summary.schema.json
@@ -212,8 +216,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
     if (arg === "--format") {
       const value = args[index + 1];
-      if (!value || !["json", "markdown", "summary", "sarif", "ci-json", "manifest", "exposure"].includes(value)) {
-        throw new Error("Invalid --format value. Use json, markdown, summary, sarif, ci-json, manifest, or exposure.");
+      if (!value || !["json", "markdown", "summary", "sarif", "ci-json", "manifest", "evidence", "exposure"].includes(value)) {
+        throw new Error("Invalid --format value. Use json, markdown, summary, sarif, ci-json, manifest, evidence, or exposure.");
       }
       format = value as OutputFormat;
       index += 1;
@@ -351,7 +355,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
   if (command === "schema") {
     const [schema, unexpected] = positionals;
-    const schemaNames = ["manifest", ...Object.keys(MOBILE_RESOURCE_SCHEMAS)];
+    const schemaNames = ["manifest", "evidence", ...Object.keys(MOBILE_RESOURCE_SCHEMAS)];
     if (!schema || !schemaNames.includes(schema) || unexpected) {
       throw new Error(`Schema command supports exactly one target: securl schema ${schemaNames.join(" | ")}`);
     }
@@ -369,7 +373,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
     return {
       command: "schema",
-      schema: schema as "manifest" | keyof typeof MOBILE_RESOURCE_SCHEMAS,
+      schema: schema as "manifest" | "evidence" | keyof typeof MOBILE_RESOURCE_SCHEMAS,
       outputPath,
     };
   }
@@ -427,7 +431,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     if (unexpected) {
       throw new Error("Certificate checks support one target at a time.");
     }
-    if (format === "sarif" || format === "manifest" || format === "exposure") {
+    if (format === "sarif" || format === "manifest" || format === "evidence" || format === "exposure") {
       throw new Error("Certificate checks support summary, json, markdown, or ci-json output.");
     }
     if (baselinePath || failOnSeverity || failOnRegression || failIfScoreBelow !== null) {
@@ -449,8 +453,8 @@ const parseArgs = (argv: string[]): ParsedArgs => {
   if (certPolicyActive(certPolicy)) {
     throw new Error("Certificate policy options are only supported by the cert command.");
   }
-  if (format === "manifest" || format === "exposure") {
-    throw new Error("Manifest and exposure output are only supported by the scan command.");
+  if (format === "manifest" || format === "evidence" || format === "exposure") {
+    throw new Error("Manifest, evidence, and exposure output are only supported by the scan command.");
   }
 
   const [currentPath, compareBaselinePath] = positionals;
@@ -1053,12 +1057,22 @@ const renderSingleOutput = (
   format: OutputFormat,
   diff: HistoryDiff | null = null,
   scanMode: ScanMode = "standard",
+  baseline: AnalysisResult | null = null,
 ) => {
   if (format === "json") {
     return `${JSON.stringify(diff ? { analysis, diff } : analysis, null, 2)}\n`;
   }
   if (format === "manifest") {
     return `${JSON.stringify({ postureManifest: buildCliManifest(analysis, scanMode) }, null, 2)}\n`;
+  }
+  if (format === "evidence") {
+    return `${JSON.stringify({
+      portableEvidence: buildPortableEvidence(buildCliManifest(analysis, scanMode), {
+        source: "cli",
+        producerVersion: CORE_ENGINE_VERSION,
+        baseline: baseline ? buildCliManifest(baseline, scanMode) : null,
+      }),
+    }, null, 2)}\n`;
   }
   if (format === "exposure") {
     return `${JSON.stringify({
@@ -1081,6 +1095,14 @@ const renderBatchOutput = (analyses: AnalysisResult[], format: OutputFormat, sca
   }
   if (format === "manifest") {
     return `${JSON.stringify({ manifests: analyses.map((analysis) => buildCliManifest(analysis, scanMode)) }, null, 2)}\n`;
+  }
+  if (format === "evidence") {
+    return `${JSON.stringify({
+      portableEvidence: analyses.map((analysis) => buildPortableEvidence(buildCliManifest(analysis, scanMode), {
+        source: "cli",
+        producerVersion: CORE_ENGINE_VERSION,
+      })),
+    }, null, 2)}\n`;
   }
   if (format === "exposure") {
     return `${JSON.stringify({ externalExposures: analyses.map(buildExternalExposureInventory) }, null, 2)}\n`;
@@ -1168,7 +1190,9 @@ const main = async () => {
     if (parsed.command === "schema") {
       const schema = parsed.schema === "manifest"
         ? POSTURE_MANIFEST_SCHEMA
-        : MOBILE_RESOURCE_SCHEMAS[parsed.schema];
+        : parsed.schema === "evidence"
+          ? PORTABLE_EVIDENCE_SCHEMA
+          : MOBILE_RESOURCE_SCHEMAS[parsed.schema];
       output = `${JSON.stringify(schema, null, 2)}\n`;
       if (parsed.outputPath) {
         await writeFile(parsed.outputPath, output, "utf8");
@@ -1217,7 +1241,7 @@ const main = async () => {
             2,
           )}\n`;
         } else {
-          output = renderSingleOutput(analysis, parsed.format, diff, parsed.scanMode);
+          output = renderSingleOutput(analysis, parsed.format, diff, parsed.scanMode, baselineAnalysis);
         }
       } else {
         policyMessages = formatPolicyFailureMessages(analyses, {

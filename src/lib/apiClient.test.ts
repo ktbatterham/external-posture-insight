@@ -110,7 +110,7 @@ describe("api client URL helpers", () => {
         resources: ["POST /api/monitoring-targets"],
       },
       exports: {
-        formats: ["json", "markdown", "sarif", "ci-json"],
+        formats: ["json", "markdown", "sarif", "ci-json", "evidence"],
         shareLinks: true,
       },
       safety: {

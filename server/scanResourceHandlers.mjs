@@ -799,10 +799,29 @@ export async function handleScanResourceRequest({
 
     if (resource === "export") {
       const requestedFormat = requestUrl.searchParams.get("format") || "json";
-      const exportResponse = buildScanExportResponse(scan, requestedFormat);
+      let postureManifest = null;
+      if (requestedFormat === "evidence" && scan.status === "completed" && scan.result) {
+        const [records, targets] = await Promise.all([
+          scanRepository.listPersistedRecords({
+            limit: clampLimit(requestUrl.searchParams.get("limit"), 20, 100),
+            ownerId: authState.ownerId,
+            url: scan.url,
+          }),
+          scanRepository.listMonitoringTargets({ ownerId: authState.ownerId, limit: 250 }),
+        ]);
+        const target = targets.find((candidate) => (candidate.kind ?? "posture") === "posture"
+          && (candidate.url === scan.url || candidate.url === scan.result.finalUrl));
+        postureManifest = buildScanManifestPayload(
+          scan,
+          records,
+          target?.observationPolicy ?? null,
+          target?.observationPolicy ? "monitoring_target" : "default",
+        ).postureManifest;
+      }
+      const exportResponse = buildScanExportResponse(scan, requestedFormat, postureManifest);
       if (!exportResponse) {
         sendJson(response, 400, {
-          error: "Unsupported export format. Use json, markdown, sarif, or ci-json.",
+          error: "Unsupported export format. Use json, markdown, sarif, ci-json, or evidence.",
         });
         return true;
       }

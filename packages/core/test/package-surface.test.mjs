@@ -11,6 +11,7 @@ test("package surface exports expected public functions", async () => {
   const pkg = await import("../dist/index.js");
   const postureDigest = await import("../dist/postureDigest.js");
   const postureManifest = await import("../dist/postureManifest.js");
+  const portableEvidence = await import("../dist/portableEvidence.js");
   const mobileSchemas = await import("../dist/mobileSchemas.js");
   const postureDrift = await import("../dist/postureDrift.js");
   const remediationPlan = await import("../dist/postureRemediation.js");
@@ -38,6 +39,9 @@ test("package surface exports expected public functions", async () => {
   assert.equal(typeof postureDigest.buildPostureDigest, "function");
   assert.equal(typeof pkg.buildPostureManifest, "function");
   assert.equal(typeof postureManifest.buildPostureManifest, "function");
+  assert.equal(typeof pkg.buildPortableEvidence, "function");
+  assert.equal(typeof portableEvidence.verifyPortableEvidence, "function");
+  assert.equal(pkg.PORTABLE_EVIDENCE_SCHEMA.$id, "https://securl.online/schemas/portable-evidence-v1.json");
   assert.equal(pkg.POSTURE_MANIFEST_SCHEMA.$id, "https://securl.online/schemas/posture-manifest-v1.json");
   assert.equal(postureManifest.POSTURE_MANIFEST_SCHEMA.title, "SecURL Posture Manifest v1");
   assert.equal(pkg.MONITORING_MOBILE_SUMMARY_SCHEMA.$id, "https://securl.online/schemas/monitoring-mobile-summary-v1.json");
@@ -90,7 +94,7 @@ test("package surface includes a working CLI help entrypoint", async () => {
   assert.match(stdout, /scan <target\.\.\.>/);
   assert.match(stdout, /--baseline/);
   assert.match(stdout, /json\|markdown\|summary\|sarif\|ci-json/);
-  assert.match(stdout, /manifest\|exposure/);
+  assert.match(stdout, /manifest\|evidence\|exposure/);
   assert.match(stdout, /--fail-on info\|warning\|critical/);
   assert.match(stdout, /--fail-on-regression/);
   assert.match(stdout, /--fail-if-score-below <0-100>/);
@@ -125,6 +129,7 @@ test("package surface exposes both long and short CLI binary names", async () =>
   assert.equal(packageJson.bin["external-posture-insight"], "dist/cli.js");
   assert.equal(packageJson.exports["./monitoring-events"].default, "./dist/monitoringEvents.js");
   assert.equal(packageJson.exports["./posture-manifest"].default, "./dist/postureManifest.js");
+  assert.equal(packageJson.exports["./portable-evidence"].default, "./dist/portableEvidence.js");
   assert.equal(packageJson.exports["./mobile-schemas"].default, "./dist/mobileSchemas.js");
 });
 
