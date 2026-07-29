@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.1] - 2026-07-29
+
+### Documentation
+- Added the free browser-local CSP Builder to the npm and GitHub package discovery paths,
+  with a report-only rollout and public verification loop.
+
 ## [1.28.0] - 2026-07-29
 
 ### Added

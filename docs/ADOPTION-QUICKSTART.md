@@ -18,6 +18,12 @@ Open [app.securl.online](https://app.securl.online), paste a public URL, and rev
 
 This is the fastest way to understand the product because it shows the full report workspace without any local setup.
 
+If Content-Security-Policy is one of the fixes, use the
+[SecURL CSP Builder](https://securl.online/tools/csp-builder?utm_source=securl_docs&utm_medium=docs&utm_campaign=csp_builder_docs)
+to start from a secure policy, inspect unsafe allowances, and copy a deployment snippet.
+The policy is generated locally. Deploy it in report-only mode first, observe legitimate
+violations, then enforce it and rescan the public URL.
+
 ### 2. Run the same check locally
 
 Use the npm package when you want repeatability in a terminal, script, release process, or CI job:

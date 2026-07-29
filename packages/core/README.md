@@ -56,6 +56,12 @@ securl scan example.com
 
 Prefer the full hosted report and optional monitoring? [Open the free scanner](https://app.securl.online/?utm_source=securl_npm&utm_medium=docs&utm_campaign=package_scan_bridge). For the product overview, start at [securl.online](https://securl.online). Prefer mobile? Install [SecURL on the App Store](https://apps.apple.com/app/securl/id6774322464) or [download the Android apps](https://securl.online/downloads?utm_source=securl_npm&utm_medium=docs&utm_campaign=android_downloads).
 
+Implementing Content-Security-Policy? Use the
+[free CSP Builder](https://securl.online/tools/csp-builder?utm_source=securl_npm&utm_medium=docs&utm_campaign=csp_builder_docs)
+to start from a secure policy, review unsafe allowances, and copy a deployment snippet.
+Generation stays in your browser. Roll it out in report-only mode, then scan the public
+site to verify the header your edge actually serves.
+
 Explicitly continue one interactive summary scan into a durable hosted report:
 
 ```bash
