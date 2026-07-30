@@ -755,6 +755,38 @@ test("telemetry endpoint separates scan engagement from raw scan volume", async 
   }
 });
 
+test("app scans use the authenticated owner and canonical bundle id for adoption cohorts", async () => {
+  const server = await startServer();
+
+  try {
+    const scanResponse = await postScan(server.baseUrl, "https://example.com", {
+      owner: SCAN_OWNER_ONE,
+      headers: {
+        "x-securl-client": "securl-ios",
+        "x-securl-client-version": "1.2.0+22",
+        "x-securl-client-channel": "app-store",
+      },
+    });
+    const scanPayload = await scanResponse.json();
+    assert.equal(scanResponse.status, 202);
+    await waitForScanTerminal(server.baseUrl, scanPayload.scan.id);
+
+    const telemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const payload = await telemetryResponse.json();
+    const cohort = payload.adoptionCohorts;
+
+    assert.equal(cohort.identityVersion, 2);
+    assert.equal(cohort.trackedOwnerAppRows, 1);
+    assert.equal(cohort.legacyOwnerAppRows, 0);
+    assert.equal(cohort.totalsByApp["com.ktbatterham.securl"].newOwners, 1);
+    assert.equal(cohort.totalsByApp["com.ktbatterham.securl"].firstScanOwners, 1);
+    assert.equal(cohort.totalsByApp["securl-ios"], undefined);
+    assert.equal(JSON.stringify(cohort).includes(SCAN_OWNER_ONE), false);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("telemetry endpoint rejects unsupported methods", async () => {
   const server = await startServer();
 

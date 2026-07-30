@@ -8,6 +8,8 @@ import {
   normalizeClientVersion,
 } from "./clientMetadata.mjs";
 
+const COHORT_IDENTITY_VERSION = 2;
+
 export function createTelemetryTracker({ storagePath = "" } = {}) {
   const persistence = storagePath ? "file" : "memory";
   const boundedBucketKey = (buckets, key, maxKeys) => {
@@ -479,12 +481,13 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     if (!safeAppId || isInternalCohortClient(safeAppId) || isInternalCohortClient(safeClient)) {
       return;
     }
-    const ledgerKey = `${safeAppId}:${ownerKey}`;
+    const ledgerKey = `v${COHORT_IDENTITY_VERSION}:${safeAppId}:${ownerKey}`;
     if (!state.cohortOwners[ledgerKey]) {
       if (Object.keys(state.cohortOwners).length >= 5000) {
         return;
       }
       state.cohortOwners[ledgerKey] = {
+        identityVersion: COHORT_IDENTITY_VERSION,
         appId: safeAppId,
         ownerKey,
         firstSeenAt: now.toISOString(),
@@ -502,6 +505,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     }
 
     const owner = state.cohortOwners[ledgerKey];
+    owner.identityVersion ||= COHORT_IDENTITY_VERSION;
     owner.appId ||= safeAppId;
     owner.ownerKey ||= ownerKey;
     owner.firstSeenAt ||= now.toISOString();
@@ -531,9 +535,11 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     if (!ownerKey || ownerKey === "unknown") return [];
     const safeOwnerKey = hashPrivacyValue(ownerKey, { prefix: "cohort_owner", length: 16 });
     const safeAppId = sanitizeTelemetryText(appId, 80);
-    return Object.values(state.cohortOwners).filter((owner) => (
+    const matches = Object.values(state.cohortOwners).filter((owner) => (
       owner.ownerKey === safeOwnerKey && (!safeAppId || owner.appId === safeAppId)
     ));
+    const current = matches.filter((owner) => owner.identityVersion === COHORT_IDENTITY_VERSION);
+    return current.length ? current : matches;
   };
 
   return {
@@ -748,6 +754,8 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
       channel = "unknown",
       requesterKey = null,
       clientKey = null,
+      cohortOwnerKey = null,
+      cohortAppId = null,
       target = null,
       client = null,
       clientVersion = null,
@@ -769,7 +777,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
       });
       const safeRequesterKey = hashPrivacyValue(requesterKey, { prefix: "req", length: 16 });
       const safeClientKey = hashPrivacyValue(clientKey, { prefix: "client", length: 16 });
-      const safeCohortOwnerKey = hashPrivacyValue(clientKey, { prefix: "cohort_owner", length: 16 });
+      const safeCohortOwnerKey = hashPrivacyValue(cohortOwnerKey, { prefix: "cohort_owner", length: 16 });
       state.scansRequested += 1;
       if (mode === "quiet") {
         state.quietModeScans += 1;
@@ -818,7 +826,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
       if (attribution.category === "verified") {
         recordCohortActivity({
           ownerKey: safeCohortOwnerKey,
-          appId: safeProduct,
+          appId: cohortAppId,
           client: safeProduct,
           clientVersion: safeProductVersion,
           event: "scan_requested",
@@ -1466,6 +1474,7 @@ function sanitizeCohortOwner(owner) {
     return null;
   }
   return {
+    identityVersion: Number(owner.identityVersion) || 1,
     appId,
     ownerKey,
     firstSeenAt,
@@ -1543,24 +1552,29 @@ function emptyCohortRow(appId, week) {
 function buildAdoptionCohortSnapshot(owners = {}) {
   const rows = {};
   const activeByAppWeek = {};
-  const ownerList = Object.values(owners || {})
+  const allOwnerRows = Object.values(owners || {})
     .map(sanitizeCohortOwner)
     .filter(Boolean);
+  const ownerList = allOwnerRows
+    .filter((owner) => owner.identityVersion === COHORT_IDENTITY_VERSION);
+  const legacyOwnerAppRows = allOwnerRows.length - ownerList.length;
   const targetRetentionByApp = {};
   const alertEngagementByApp = {};
 
-  for (const owner of ownerList) {
-    const rowKey = `${owner.appId}:${owner.firstSeenWeek}`;
-    rows[rowKey] ||= emptyCohortRow(owner.appId, owner.firstSeenWeek);
-    rows[rowKey].newOwners += 1;
-    if (owner.firstScanAt) rows[rowKey].firstScanOwners += 1;
-    if (owner.firstMonitoringTargetAt) rows[rowKey].firstMonitoringTargetOwners += 1;
-    if (owner.firstReturnAt) rows[rowKey].returnedWithin7DaysOwners += 1;
+  for (const owner of allOwnerRows) {
+    if (owner.identityVersion === COHORT_IDENTITY_VERSION) {
+      const rowKey = `${owner.appId}:${owner.firstSeenWeek}`;
+      rows[rowKey] ||= emptyCohortRow(owner.appId, owner.firstSeenWeek);
+      rows[rowKey].newOwners += 1;
+      if (owner.firstScanAt) rows[rowKey].firstScanOwners += 1;
+      if (owner.firstMonitoringTargetAt) rows[rowKey].firstMonitoringTargetOwners += 1;
+      if (owner.firstReturnAt) rows[rowKey].returnedWithin7DaysOwners += 1;
 
-    for (const week of owner.activeWeeks || []) {
-      const activeKey = `${owner.appId}:${week}`;
-      activeByAppWeek[activeKey] ||= new Set();
-      activeByAppWeek[activeKey].add(owner.ownerKey);
+      for (const week of owner.activeWeeks || []) {
+        const activeKey = `${owner.appId}:${week}`;
+        activeByAppWeek[activeKey] ||= new Set();
+        activeByAppWeek[activeKey].add(owner.ownerKey);
+      }
     }
 
     if (owner.monitoringTargets?.length) {
@@ -1667,11 +1681,20 @@ function buildAdoptionCohortSnapshot(owners = {}) {
   }
 
   return {
-    privacy: "Aggregate only; owner keys are hashed internally and are not exposed.",
-    limitations: ownerList.length
-      ? []
-      : ["No cohort owners have been recorded since cohort tracking was enabled."],
-    trackedOwners: ownerList.length,
+    identityVersion: COHORT_IDENTITY_VERSION,
+    privacy: "Aggregate owner/app rows only; owner keys are hashed internally and are not exposed.",
+    limitations: [
+      "Owner/app rows are not distinct-person counts and must not be presented as unique users.",
+      "Anonymous and CLI scans are excluded from app activation because they cannot be safely joined to an authenticated app owner.",
+      ...(legacyOwnerAppRows
+        ? [`${legacyOwnerAppRows} legacy owner/app rows use incompatible identity semantics and are excluded from activation and repeat-rate cohorts.`]
+        : []),
+      ...(!ownerList.length
+        ? ["No canonical owner/app cohort rows have been recorded since identity v2 was enabled."]
+        : []),
+    ],
+    trackedOwnerAppRows: ownerList.length,
+    legacyOwnerAppRows,
     weeklyByApp,
     repeatWeekByApp,
     targetRetentionByApp: Object.values(targetRetentionByApp)
