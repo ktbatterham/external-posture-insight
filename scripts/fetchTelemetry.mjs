@@ -171,7 +171,8 @@ const main = async () => {
   const cohorts = telemetry.adoptionCohorts || {};
   console.log("");
   console.log("Adoption cohorts");
-  console.log(`  Tracked owners: ${cohorts.trackedOwners ?? 0}`);
+  console.log(`  Canonical owner/app rows (identity v${cohorts.identityVersion ?? "unknown"}): ${cohorts.trackedOwnerAppRows ?? 0}`);
+  console.log(`  Excluded legacy owner/app rows: ${cohorts.legacyOwnerAppRows ?? 0}`);
   console.log(`  Privacy: ${cohorts.privacy || "Aggregate only."}`);
   const limitations = cohorts.limitations || [];
   if (limitations.length) {

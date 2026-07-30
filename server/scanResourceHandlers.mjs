@@ -422,6 +422,8 @@ export async function handleScanCollectionRequest({
           target: validatedTarget,
           requesterKey: authState.requesterScope,
           clientKey: telemetryContext.clientKey || authState.clientIp,
+          cohortOwnerKey: telemetryContext.cohortOwnerKey,
+          cohortAppId: telemetryContext.cohortAppId,
           source: telemetryContext.source,
           channel: telemetryContext.channel,
           client: telemetryContext.client,

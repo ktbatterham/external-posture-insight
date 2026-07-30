@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -341,6 +341,8 @@ test("telemetry tracker reports aggregate adoption cohorts without exposing owne
     clientAttribution: "verified",
     clientProvenance: "owner-bound",
     clientKey: "owner-one",
+    cohortOwnerKey: "owner-one",
+    cohortAppId: "com.ktbatterham.securl",
     requesterKey: "owner-one",
     target: "https://example.com",
     now: new Date("2026-07-06T08:05:00Z"),
@@ -425,7 +427,9 @@ test("telemetry tracker reports aggregate adoption cohorts without exposing owne
   const repeatRow = snapshot.adoptionCohorts.repeatWeekByApp
     .find((row) => row.appId === "com.ktbatterham.securl" && row.week === "2026-07-06");
 
-  assert.equal(snapshot.adoptionCohorts.trackedOwners, 2);
+  assert.equal(snapshot.adoptionCohorts.identityVersion, 2);
+  assert.equal(snapshot.adoptionCohorts.trackedOwnerAppRows, 2);
+  assert.equal(snapshot.adoptionCohorts.legacyOwnerAppRows, 0);
   assert.equal(securlRow.newOwners, 1);
   assert.equal(securlRow.firstScanOwners, 1);
   assert.equal(securlRow.firstMonitoringTargetOwners, 1);
@@ -443,6 +447,59 @@ test("telemetry tracker reports aggregate adoption cohorts without exposing owne
   assert.equal(JSON.stringify(snapshot.adoptionCohorts).includes("owner-one"), false);
   assert.equal(JSON.stringify(snapshot.adoptionCohorts).includes("owner-two"), false);
   assert.equal(JSON.stringify(snapshot.adoptionCohorts).includes("smoke-owner"), false);
+});
+
+test("adoption cohorts exclude legacy and unjoinable scan identities from canonical rates", () => {
+  const dir = mkdtempSync(join(tmpdir(), "securl-legacy-cohort-"));
+  const storagePath = join(dir, "telemetry.json");
+  writeFileSync(storagePath, JSON.stringify({
+    cohortOwners: {
+      "com.ktbatterham.securl:legacy-owner-hash": {
+        appId: "com.ktbatterham.securl",
+        ownerKey: "legacy-owner-hash",
+        firstSeenAt: "2026-07-20T08:00:00.000Z",
+        firstSeenWeek: "2026-07-20",
+        client: "securl-ios",
+        firstScanAt: null,
+        firstMonitoringTargetAt: "2026-07-20T08:05:00.000Z",
+        activeWeeks: ["2026-07-20"],
+      },
+    },
+  }));
+  const telemetry = createTelemetryTracker({ storagePath });
+
+  try {
+    telemetry.recordScanRequested({
+      mode: "standard",
+      source: "direct",
+      channel: "anonymous",
+      client: "securl-cli",
+      clientVersion: "1.28.1",
+      clientAttribution: "verified",
+      clientProvenance: "api-key",
+      clientKey: "visitor-derived-key",
+      requesterKey: "requester-one",
+      target: "https://example.com",
+      now: new Date("2026-07-30T08:00:00Z"),
+    });
+
+    const snapshot = telemetry.snapshot();
+    assert.equal(snapshot.adoptionCohorts.trackedOwnerAppRows, 0);
+    assert.equal(snapshot.adoptionCohorts.legacyOwnerAppRows, 1);
+    assert.equal(snapshot.adoptionCohorts.weeklyByApp.length, 0);
+    assert.equal(snapshot.adoptionCohorts.totalsByApp["com.ktbatterham.securl"], undefined);
+    assert.equal(snapshot.adoptionCohorts.totalsByApp["securl-cli"], undefined);
+    assert.match(
+      snapshot.adoptionCohorts.limitations.join(" "),
+      /legacy owner\/app rows use incompatible identity semantics/,
+    );
+    assert.match(
+      snapshot.adoptionCohorts.limitations.join(" "),
+      /Anonymous and CLI scans are excluded/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("telemetry tracker reports sentinel retention and delivered-alert engagement privately", () => {
