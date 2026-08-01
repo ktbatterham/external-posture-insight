@@ -57,7 +57,7 @@ For a five-minute path from first scan to CI/monitoring evidence, read [`docs/AD
 
 ## Current Engine Surface
 
-`securl@1.28.1` is the current repository package version. It includes:
+`securl@1.28.2` is the current repository package version. It includes:
 
 - Detection-pack architecture foundation with a constrained first-party rules seam, schema validation, and output-equivalence checks.
 - External Exposure Inventory v1 across visible third-party, infrastructure, identity, and AI dependencies, with stable IDs, data-flow purpose, confidence, evidence, SRI status, and review priority.
@@ -68,6 +68,9 @@ For a five-minute path from first scan to CI/monitoring evidence, read [`docs/AD
 - `POSTURE_MANIFEST_SCHEMA` from both `securl` and `securl/posture-manifest` for CI, evidence archives, vendor-risk tooling, and future reporting clients.
 - `securl cert` for fast TLS certificate checks without running a full posture scan.
 - Named certificate policy profiles for automation: `production`, `strict`, and `renewal-watch`.
+- A consent-safe interactive continuation from a successful local summary scan into a
+  free shareable hosted report. The prompt states that the target URL is sent to SecURL,
+  defaults to No, and never appears in CI, pipes, files, structured output, or policy runs.
 
 Read the package integration notes in [`packages/core/README.md`](packages/core/README.md) and the hosted API guide in [`docs/API-INTEGRATION-GUIDE.md`](docs/API-INTEGRATION-GUIDE.md).
 

@@ -6,6 +6,20 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.2] - 2026-08-01
+
+### Changed
+- Replaced the passive post-scan hosted link with an explicit, consent-safe prompt that
+  can create a free shareable hosted report after a successful interactive single-target
+  summary scan.
+- The prompt states that accepting sends the target URL to SecURL, defaults to No, and is
+  suppressed for CI, pipes, redirected output, structured formats, file output, baseline
+  comparisons, and policy runs.
+
+### Security
+- Continued to send only the target URL for an authoritative hosted rescan. Local analysis
+  results and owner credentials are never uploaded or printed.
+
 ## [1.28.1] - 2026-07-29
 
 ### Documentation

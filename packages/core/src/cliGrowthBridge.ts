@@ -9,9 +9,10 @@ export type CliGrowthBridgeContext = {
   hasPolicy: boolean;
   stdoutIsTty: boolean;
   stderrIsTty: boolean;
+  stdinIsTty: boolean;
 };
 
-export const buildCliGrowthBridge = (context: CliGrowthBridgeContext): string | null => {
+export const buildCliGrowthPrompt = (context: CliGrowthBridgeContext): string | null => {
   if (
     context.targetCount !== 1
     || context.format !== "summary"
@@ -20,15 +21,16 @@ export const buildCliGrowthBridge = (context: CliGrowthBridgeContext): string | 
     || context.hasPolicy
     || !context.stdoutIsTty
     || !context.stderrIsTty
+    || !context.stdinIsTty
   ) {
     return null;
   }
 
-  const url = new URL(HOSTED_SCANNER_URL);
-  url.searchParams.set("url", context.targetUrl);
-  url.searchParams.set("utm_source", "securl_cli");
-  url.searchParams.set("utm_medium", "cli");
-  url.searchParams.set("utm_campaign", "package_scan_bridge");
-
-  return `Open the full report and optional monitoring:\n${url.toString()}\n`;
+  const destination = new URL(HOSTED_SCANNER_URL).hostname;
+  return [
+    "Create a free shareable web report with fixes and monitoring?",
+    `This sends the target URL to ${destination}. [y/N] `,
+  ].join("\n");
 };
+
+export const acceptsHostedReport = (answer: string): boolean => /^(?:y|yes)$/i.test(answer.trim());
