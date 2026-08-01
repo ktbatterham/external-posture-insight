@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
+import { createInterface } from "node:readline/promises";
 import {
   analyzeUrl,
   buildExternalExposureInventory,
@@ -17,7 +18,7 @@ import {
   snapshotFromAnalysis,
 } from "./index.js";
 import type { AnalysisResult, HistoryDiff, LiveCertificateResult, ScanIssue } from "./types.js";
-import { buildCliGrowthBridge } from "./cliGrowthBridge.js";
+import { acceptsHostedReport, buildCliGrowthPrompt } from "./cliGrowthBridge.js";
 import { formatPublishedScan, publishHostedScan } from "./cliPublishBridge.js";
 
 const require = createRequire(import.meta.url);
@@ -1282,8 +1283,9 @@ const main = async () => {
       } else {
         process.stdout.write(output);
       }
-      if (!parsed.publish) {
-        const growthBridge = buildCliGrowthBridge({
+      let publishRequested = parsed.publish;
+      if (!publishRequested) {
+        const growthPrompt = buildCliGrowthPrompt({
           targetUrl: analyses[0]?.finalUrl ?? parsed.targets[0],
           targetCount: analyses.length,
           format: parsed.format,
@@ -1294,12 +1296,18 @@ const main = async () => {
             || parsed.failIfScoreBelow !== null,
           stdoutIsTty: Boolean(process.stdout.isTTY),
           stderrIsTty: Boolean(process.stderr.isTTY),
+          stdinIsTty: Boolean(process.stdin.isTTY),
         });
-        if (growthBridge) {
-          process.stderr.write(`\n${growthBridge}`);
+        if (growthPrompt) {
+          const prompt = createInterface({ input: process.stdin, output: process.stderr });
+          try {
+            publishRequested = acceptsHostedReport(await prompt.question(`\n${growthPrompt}`));
+          } finally {
+            prompt.close();
+          }
         }
       }
-      if (parsed.publish) {
+      if (publishRequested) {
         process.stderr.write("\nCreating authoritative hosted report…\n");
         const published = await publishHostedScan({
           targetUrl: analyses[0].finalUrl,

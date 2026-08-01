@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCliGrowthBridge } from "../dist/cliGrowthBridge.js";
+import { acceptsHostedReport, buildCliGrowthPrompt } from "../dist/cliGrowthBridge.js";
 
 const interactiveScan = {
   targetUrl: "https://example.com/path?q=one two",
@@ -11,17 +11,16 @@ const interactiveScan = {
   hasPolicy: false,
   stdoutIsTty: true,
   stderrIsTty: true,
+  stdinIsTty: true,
 };
 
-test("CLI growth bridge attributes and pre-fills an interactive scan", () => {
-  const bridge = buildCliGrowthBridge(interactiveScan);
-  assert.ok(bridge);
-  const url = new URL(bridge.trim().split("\n").at(-1));
-  assert.equal(url.origin, "https://app.securl.online");
-  assert.equal(url.searchParams.get("url"), interactiveScan.targetUrl);
-  assert.equal(url.searchParams.get("utm_source"), "securl_cli");
-  assert.equal(url.searchParams.get("utm_medium"), "cli");
-  assert.equal(url.searchParams.get("utm_campaign"), "package_scan_bridge");
+test("CLI growth bridge offers one explicit consent-safe hosted continuation", () => {
+  const prompt = buildCliGrowthPrompt(interactiveScan);
+  assert.ok(prompt);
+  assert.match(prompt, /free shareable web report/i);
+  assert.match(prompt, /sends the target URL/i);
+  assert.match(prompt, /app\.securl\.online/);
+  assert.match(prompt, /\[y\/N\]/);
 });
 
 test("CLI growth bridge stays out of machine-oriented and policy runs", () => {
@@ -35,8 +34,17 @@ test("CLI growth bridge stays out of machine-oriented and policy runs", () => {
     { hasPolicy: true },
     { stdoutIsTty: false },
     { stderrIsTty: false },
+    { stdinIsTty: false },
   ];
   for (const override of suppressedContexts) {
-    assert.equal(buildCliGrowthBridge({ ...interactiveScan, ...override }), null);
+    assert.equal(buildCliGrowthPrompt({ ...interactiveScan, ...override }), null);
   }
+});
+
+test("CLI hosted continuation accepts only an explicit affirmative response", () => {
+  assert.equal(acceptsHostedReport("y"), true);
+  assert.equal(acceptsHostedReport(" YES "), true);
+  assert.equal(acceptsHostedReport(""), false);
+  assert.equal(acceptsHostedReport("n"), false);
+  assert.equal(acceptsHostedReport("later"), false);
 });

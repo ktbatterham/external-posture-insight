@@ -77,9 +77,12 @@ holding a funnel that is not producing users.
   to try the richer hosted report when the next step is contextual, target-prefilled, and
   attributable.
 - **Change:** attributed scanner links in the package and repository READMEs. A successful
-  single-target summary scan also shows a concise target-prefilled link, but only when both
-  output streams are terminals. Batch, redirected, piped, file, structured-format,
-  baseline, and policy/CI runs stay unchanged.
+  single-target summary scan initially showed a concise target-prefilled link. On 1 August,
+  after the only attributed CLI continuation remained the team's own verification, the
+  treatment was strengthened to one explicit opt-in prompt that can create a free
+  shareable hosted report. The prompt states that accepting sends the target URL to SecURL
+  and defaults to No. Batch, redirected, piped, file, structured-format, baseline, and
+  policy/CI runs stay unchanged.
 - **Primary read:** `securl_cli` and `securl_npm` attributed page loads -> scan starts ->
   completions. `securl_github` is reported separately. Secondary read: monitoring saves;
   guardrails: CLI output compatibility, automation noise, scan failures, and auth rejects.

@@ -68,6 +68,12 @@ Explicitly continue one interactive summary scan into a durable hosted report:
 npx securl scan example.com --publish
 ```
 
+A successful single-target summary scan now offers this continuation directly when stdin,
+stdout, and stderr are all interactive terminals. The prompt clearly states that accepting
+sends the target URL to `app.securl.online` and defaults to No. It never appears in CI,
+pipes, redirected output, structured formats, file output, baseline comparisons, or policy
+runs.
+
 Add `--notify` instead to print a compact QR code for the
 `securl.online/m/<scanId>` mobile bridge:
 
