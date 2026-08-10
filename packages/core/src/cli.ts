@@ -18,7 +18,11 @@ import {
   snapshotFromAnalysis,
 } from "./index.js";
 import type { AnalysisResult, HistoryDiff, LiveCertificateResult, ScanIssue } from "./types.js";
-import { acceptsHostedReport, buildCliGrowthPrompt } from "./cliGrowthBridge.js";
+import {
+  acceptsMonitoringHandoff,
+  buildCliGrowthPrompt,
+  buildCliMonitoringHandoffUrl,
+} from "./cliGrowthBridge.js";
 import { formatPublishedScan, publishHostedScan } from "./cliPublishBridge.js";
 
 const require = createRequire(import.meta.url);
@@ -1283,8 +1287,8 @@ const main = async () => {
       } else {
         process.stdout.write(output);
       }
-      let publishRequested = parsed.publish;
-      if (!publishRequested) {
+      let monitoringHandoffRequested = false;
+      if (!parsed.publish) {
         const growthPrompt = buildCliGrowthPrompt({
           targetUrl: analyses[0]?.finalUrl ?? parsed.targets[0],
           targetCount: analyses.length,
@@ -1301,13 +1305,22 @@ const main = async () => {
         if (growthPrompt) {
           const prompt = createInterface({ input: process.stdin, output: process.stderr });
           try {
-            publishRequested = acceptsHostedReport(await prompt.question(`\n${growthPrompt}`));
+            monitoringHandoffRequested = acceptsMonitoringHandoff(await prompt.question(`\n${growthPrompt}`));
           } finally {
             prompt.close();
           }
         }
       }
-      if (publishRequested) {
+      if (monitoringHandoffRequested) {
+        const handoffUrl = buildCliMonitoringHandoffUrl(analyses[0].finalUrl);
+        process.stderr.write([
+          "\nStart monitoring in SecURL:",
+          handoffUrl,
+          "The web app will run an authoritative hosted scan before you choose a watch cadence.",
+          "",
+        ].join("\n"));
+      }
+      if (parsed.publish) {
         process.stderr.write("\nCreating authoritative hosted report…\n");
         const published = await publishHostedScan({
           targetUrl: analyses[0].finalUrl,

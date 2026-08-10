@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { acceptsHostedReport, buildCliGrowthPrompt } from "../dist/cliGrowthBridge.js";
+import {
+  acceptsMonitoringHandoff,
+  buildCliGrowthPrompt,
+  buildCliMonitoringHandoffUrl,
+} from "../dist/cliGrowthBridge.js";
 
 const interactiveScan = {
   targetUrl: "https://example.com/path?q=one two",
@@ -14,10 +18,10 @@ const interactiveScan = {
   stdinIsTty: true,
 };
 
-test("CLI growth bridge offers one explicit consent-safe hosted continuation", () => {
+test("CLI growth bridge offers one explicit consent-safe monitoring continuation", () => {
   const prompt = buildCliGrowthPrompt(interactiveScan);
   assert.ok(prompt);
-  assert.match(prompt, /free shareable web report/i);
+  assert.match(prompt, /watch this site for security drift/i);
   assert.match(prompt, /sends the target URL/i);
   assert.match(prompt, /app\.securl\.online/);
   assert.match(prompt, /\[y\/N\]/);
@@ -41,10 +45,20 @@ test("CLI growth bridge stays out of machine-oriented and policy runs", () => {
   }
 });
 
-test("CLI hosted continuation accepts only an explicit affirmative response", () => {
-  assert.equal(acceptsHostedReport("y"), true);
-  assert.equal(acceptsHostedReport(" YES "), true);
-  assert.equal(acceptsHostedReport(""), false);
-  assert.equal(acceptsHostedReport("n"), false);
-  assert.equal(acceptsHostedReport("later"), false);
+test("CLI monitoring continuation builds an attributed target-prefilled handoff", () => {
+  const handoff = new URL(buildCliMonitoringHandoffUrl(interactiveScan.targetUrl));
+  assert.equal(handoff.origin, "https://app.securl.online");
+  assert.equal(handoff.pathname, "/");
+  assert.equal(handoff.searchParams.get("url"), interactiveScan.targetUrl);
+  assert.equal(handoff.searchParams.get("utm_source"), "securl_cli");
+  assert.equal(handoff.searchParams.get("utm_medium"), "cli");
+  assert.equal(handoff.searchParams.get("utm_campaign"), "cli_monitoring_watch");
+});
+
+test("CLI monitoring continuation accepts only an explicit affirmative response", () => {
+  assert.equal(acceptsMonitoringHandoff("y"), true);
+  assert.equal(acceptsMonitoringHandoff(" YES "), true);
+  assert.equal(acceptsMonitoringHandoff(""), false);
+  assert.equal(acceptsMonitoringHandoff("n"), false);
+  assert.equal(acceptsMonitoringHandoff("later"), false);
 });
