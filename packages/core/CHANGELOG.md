@@ -6,6 +6,19 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.3] - 2026-08-10
+
+### Changed
+- Replaced the interactive post-scan report prompt with a focused first-watch continuation.
+  An explicit Yes now prints an attributed, target-prefilled web-app link that runs a
+  browser-owned hosted scan before the user chooses daily or weekly monitoring.
+- Preserved the existing `--publish` and `--notify` flows, and kept the prompt suppressed
+  for batch, redirected, piped, file, structured-format, baseline, and policy or CI runs.
+
+### Security
+- Continued to default the prompt to No and disclose that accepting sends the target URL
+  to SecURL. Local analysis results and owner credentials are not uploaded or printed.
+
 ## [1.28.2] - 2026-08-01
 
 ### Changed

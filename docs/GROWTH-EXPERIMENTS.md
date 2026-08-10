@@ -90,3 +90,36 @@ holding a funnel that is not producing users.
   another reversible iteration but must not be presented as proof of causality.
 - **Rollback:** remove the interactive prompt and attributed README links in a package patch.
   Hosted API, engine findings, mobile clients, and monitoring contracts are unchanged.
+
+## Experiment 004: CLI scan to first watch
+
+- **Owner/surfaces:** published `securl` CLI into the existing hosted scan and monitoring
+  workspace at `app.securl.online`.
+- **Prepared:** 2026-08-10. The experiment starts only after the package patch is published
+  and installed-package smoke verification passes.
+- **Decision from Experiment 003:** package demand remains materially stronger than owned-web
+  demand, but the hosted-report continuation produced no verified external conversion. A
+  second report repeats the value the CLI has just delivered and does not create a durable
+  reason to return.
+- **Audience and problem:** an interactive CLI user who has just checked a public target and
+  now needs to know if its grade, certificate, headers, or posture changes after deployment.
+  The first-hand value is the scan they just completed. The natural next action is saving
+  the target as a daily or weekly watch.
+- **Hypothesis:** replacing the report-creation prompt with one monitoring-led continuation
+  will convert more useful CLI sessions into a first active watch.
+- **Change:** after a successful interactive single-target summary scan, ask whether the user
+  wants to watch the site for security drift. An explicit Yes prints an attributed,
+  target-prefilled hosted URL. Opening it runs an authoritative browser-owned scan, after
+  which the user chooses a watch cadence. The prompt states that the target URL is sent to
+  SecURL and defaults to No. `--publish`, `--notify`, batch, piped, file, structured-format,
+  baseline, and policy or CI behavior remain unchanged.
+- **Primary read:** `securl_cli` + `cli_monitoring_watch` handoff starts to completed hosted
+  scans to `monitoring_saved`. Secondary read: a later due monitoring run. Eligible
+  interactive prompt exposure is not sent as background telemetry, so package demand is
+  only a directional exposure proxy and must not be presented as an exact denominator.
+- **Guardrails:** CLI output compatibility, automation noise, hosted scan failures, auth
+  rejects, and monitoring save failures.
+- **Review:** first directional review seven days after package publication. Low volume is a
+  reason to iterate the motion, not to invent precision or average unrelated owner cohorts.
+- **Rollback:** restore the report-creation prompt in a package patch. Hosted API, monitoring
+  contracts, public web, and mobile clients are unchanged.
