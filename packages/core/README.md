@@ -54,7 +54,7 @@ npm install -g securl
 securl scan example.com
 ```
 
-Prefer the full hosted report and optional monitoring? [Open the free scanner](https://app.securl.online/?utm_source=securl_npm&utm_medium=docs&utm_campaign=package_scan_bridge). For the product overview, start at [securl.online](https://securl.online). Prefer mobile? Install [SecURL on the App Store](https://apps.apple.com/app/securl/id6774322464) or [download the Android apps](https://securl.online/downloads?utm_source=securl_npm&utm_medium=docs&utm_campaign=android_downloads).
+Prefer a browser-owned scan and recurring monitoring? [Open the free scanner](https://app.securl.online/?utm_source=securl_npm&utm_medium=docs&utm_campaign=cli_monitoring_launch). For the product overview, start at [securl.online](https://securl.online). Prefer mobile? Install [SecURL on the App Store](https://apps.apple.com/app/securl/id6774322464) or [download the Android apps](https://securl.online/downloads?utm_source=securl_npm&utm_medium=docs&utm_campaign=android_downloads).
 
 Implementing Content-Security-Policy? Use the
 [free CSP Builder](https://securl.online/tools/csp-builder?utm_source=securl_npm&utm_medium=docs&utm_campaign=csp_builder_docs)
@@ -62,17 +62,27 @@ to start from a secure policy, review unsafe allowances, and copy a deployment s
 Generation stays in your browser. Roll it out in report-only mode, then scan the public
 site to verify the header your edge actually serves.
 
-Explicitly continue one interactive summary scan into a durable hosted report:
+Run an interactive summary scan:
+
+```bash
+npx securl scan example.com
+```
+
+After the local result, SecURL asks whether you want to watch the site for security drift.
+An explicit Yes prints an attributed, target-prefilled web link. Opening it runs a fresh
+browser-owned hosted scan, then lets you save the target as a daily or weekly watch. The
+prompt clearly states that the target URL is sent to `app.securl.online` and defaults to
+No. It never appears in CI, pipes, redirected output, structured formats, file output,
+baseline comparisons, or policy runs.
+
+To create a durable hosted report directly instead, use the explicit option:
 
 ```bash
 npx securl scan example.com --publish
 ```
 
-A successful single-target summary scan now offers this continuation directly when stdin,
-stdout, and stderr are all interactive terminals. The prompt clearly states that accepting
-sends the target URL to `app.securl.online` and defaults to No. It never appears in CI,
-pipes, redirected output, structured formats, file output, baseline comparisons, or policy
-runs.
+`--publish` remains an explicit report-creation path and does not change the interactive
+monitoring prompt.
 
 Add `--notify` instead to print a compact QR code for the
 `securl.online/m/<scanId>` mobile bridge:

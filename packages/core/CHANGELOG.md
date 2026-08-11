@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.4] - 2026-08-11
+
+### Documentation
+- Updated the npm and GitHub quick starts to describe the shipped interactive first-watch
+  continuation and its `cli_monitoring_watch` attribution rather than the superseded
+  report-creation prompt.
+- Kept the explicit `--publish` and `--notify` paths documented separately.
+
 ## [1.28.3] - 2026-08-10
 
 ### Changed
