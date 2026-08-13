@@ -45,6 +45,11 @@ npx securl scan "$PUBLIC_URL" --format markdown --output securl-report.md
 npx securl scan "$PUBLIC_URL" --format manifest --output posture-manifest.json
 ```
 
+For GitHub Actions, the reusable
+[`SecURL Release Evidence`](./GITHUB-ACTIONS.md) workflow performs one local scan, writes a
+human-readable job summary, and uploads digest-verifiable evidence without requiring an
+account or secret.
+
 Once the team trusts the output, add policy checks, threshold checks, or SARIF upload as a second step. Do not turn SecURL into theatre: make the gate reflect a real risk decision your team is willing to maintain.
 
 If `securl` is already running in CI, make the next step human-visible: save the same
