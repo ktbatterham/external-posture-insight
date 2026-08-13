@@ -26,6 +26,7 @@ test("GitHub Actions summary makes release evidence and the next action visible"
   assert.match(summary, /SecURL release evidence/);
   assert.match(summary, /\| example\.com \| 82\/100 \| B \| 1 \| 2 \| 200 \|/);
   assert.match(summary, /Policy result: passed/);
+  assert.match(summary, /Assessment result: complete/);
 
   const match = summary.match(/\((https:\/\/app\.securl\.online\/\?[^)]+)\)/);
   assert.ok(match);
@@ -35,6 +36,26 @@ test("GitHub Actions summary makes release evidence and the next action visible"
   assert.equal(continuation.searchParams.get("utm_medium"), "ci");
   assert.equal(continuation.searchParams.get("utm_campaign"), "release_evidence");
   assert.match(summary, /explicit user action/);
+});
+
+test("GitHub Actions summary never presents a limited assessment as a policy pass", () => {
+  const summary = buildGithubActionsSummary({
+    analyses: [{
+      ...analysis,
+      score: 0,
+      grade: "U",
+      statusCode: 0,
+      assessmentLimitation: {
+        limited: true,
+        title: "The target could not be assessed cleanly.",
+      },
+    }],
+    scanMode: "quiet",
+  });
+
+  assert.match(summary, /Assessment result: incomplete/);
+  assert.match(summary, /Policy result: not evaluated/);
+  assert.doesNotMatch(summary, /Policy result: passed/);
 });
 
 test("GitHub Actions summary shows configured policy failures", () => {

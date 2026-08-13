@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.6] - 2026-08-13
+
+### Fixed
+- Prevented GitHub Actions summaries from presenting an incomplete public-target read as
+  a passing release policy. Limited assessments now report that policy was not evaluated,
+  and the reusable workflow fails after preserving the diagnostic evidence artifact.
+
 ## [1.28.5] - 2026-08-13
 
 ### Added

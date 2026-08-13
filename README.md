@@ -59,7 +59,7 @@ evidence artifact, use [`docs/GITHUB-ACTIONS.md`](docs/GITHUB-ACTIONS.md).
 
 ## Current Engine Surface
 
-`securl@1.28.5` is the current repository package version. It includes:
+`securl@1.28.6` is the current repository package version. It includes:
 
 - Detection-pack architecture foundation with a constrained first-party rules seam, schema validation, and output-equivalence checks.
 - External Exposure Inventory v1 across visible third-party, infrastructure, identity, and AI dependencies, with stable IDs, data-flow purpose, confidence, evidence, SRI status, and review priority.

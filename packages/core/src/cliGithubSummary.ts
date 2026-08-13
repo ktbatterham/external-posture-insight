@@ -33,6 +33,7 @@ export function buildGithubActionsSummary({
   scanMode,
   policyMessages = [],
 }: GithubActionsSummaryOptions): string {
+  const incomplete = analyses.filter((analysis) => analysis.assessmentLimitation?.limited);
   const rows = analyses.map((analysis) => {
     const counts = issueCounts(analysis);
     return `| ${escapeTableCell(analysis.host)} | ${analysis.score}/100 | ${escapeTableCell(analysis.grade)} | ${counts.critical} | ${counts.warning} | ${analysis.statusCode} |`;
@@ -49,9 +50,19 @@ export function buildGithubActionsSummary({
     "| --- | ---: | :---: | ---: | ---: | ---: |",
     ...rows,
     "",
-    policyMessages.length ? "### Policy result: failed" : "### Policy result: passed",
+    incomplete.length ? "### Assessment result: incomplete" : "### Assessment result: complete",
     "",
-    ...(policyMessages.length ? policyMessages.map((message) => `- ${message}`) : ["No configured release policy failed."]),
+    ...(incomplete.length
+      ? incomplete.map((analysis) => `- ${analysis.host}: ${analysis.assessmentLimitation?.title ?? "The target could not be assessed completely."}`)
+      : ["The target returned enough public evidence for the posture result to be evaluated."]),
+    "",
+    incomplete.length
+      ? "### Policy result: not evaluated"
+      : policyMessages.length ? "### Policy result: failed" : "### Policy result: passed",
+    "",
+    ...(incomplete.length
+      ? ["A release policy cannot pass when the public target could not be assessed completely."]
+      : policyMessages.length ? policyMessages.map((message) => `- ${message}`) : ["No configured release policy failed."]),
     "",
     "### Continue from the evidence",
     "",
