@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.5] - 2026-08-13
+
+### Added
+- Added `securl scan --github-summary <file>` to append a GitHub Actions release summary
+  from the same local scan used to generate JSON, Markdown, SARIF, manifest, or portable
+  evidence output.
+- Added a pinned, reusable GitHub Actions workflow that produces a non-blocking posture
+  summary and uploads digest-verifiable release evidence, with an optional score gate.
+- Added an attributable, target-prefilled hosted continuation for measuring the path from
+  useful CI evidence to an interactive scan or first watch. No repository or actor identity
+  is included.
+
 ## [1.28.4] - 2026-08-11
 
 ### Documentation

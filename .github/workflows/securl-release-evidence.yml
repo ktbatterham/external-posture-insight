@@ -1,0 +1,89 @@
+name: SecURL Release Evidence
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: Public URL or hostname to assess
+        required: true
+        type: string
+      scan-mode:
+        description: SecURL scan mode (quiet, standard, or deep-passive)
+        required: false
+        default: quiet
+        type: string
+      fail-if-score-below:
+        description: Optional score threshold from 0 to 100
+        required: false
+        default: ""
+        type: string
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Public URL or hostname to assess
+        required: true
+        default: securl.online
+        type: string
+      scan-mode:
+        description: SecURL scan mode
+        required: true
+        default: quiet
+        type: choice
+        options: [quiet, standard, deep-passive]
+      fail-if-score-below:
+        description: Optional score threshold from 0 to 100
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-evidence:
+    name: External posture evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Generate SecURL release evidence
+        env:
+          SECURL_TARGET: ${{ inputs.target }}
+          SECURL_SCAN_MODE: ${{ inputs.scan-mode }}
+          SECURL_SCORE_THRESHOLD: ${{ inputs.fail-if-score-below }}
+          npm_config_ignore_scripts: "true"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "$SECURL_SCAN_MODE" in
+            quiet) MODE_FLAG="--quiet" ;;
+            standard) MODE_FLAG="" ;;
+            deep-passive) MODE_FLAG="--deep-passive" ;;
+            *) echo "Unsupported scan mode: $SECURL_SCAN_MODE" >&2; exit 2 ;;
+          esac
+
+          SCORE_ARGS=()
+          if [ -n "$SECURL_SCORE_THRESHOLD" ]; then
+            SCORE_ARGS=(--fail-if-score-below "$SECURL_SCORE_THRESHOLD")
+          fi
+
+          npm exec --yes --package=securl@1.28.5 -- securl scan "$SECURL_TARGET" \
+            $MODE_FLAG \
+            --format evidence \
+            --output securl-release-evidence.json \
+            --github-summary "$GITHUB_STEP_SUMMARY" \
+            "${SCORE_ARGS[@]}"
+
+      - name: Upload SecURL evidence
+        if: ${{ always() && hashFiles('securl-release-evidence.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: securl-release-evidence
+          path: securl-release-evidence.json
+          if-no-files-found: error
+          retention-days: 30

@@ -54,10 +54,12 @@ npx securl scan example.com --format evidence --output release-evidence.json
 ```
 
 For a five-minute path from first scan to CI/monitoring evidence, read [`docs/ADOPTION-QUICKSTART.md`](docs/ADOPTION-QUICKSTART.md).
+For a copy-ready, non-blocking release workflow with an Actions job summary and portable
+evidence artifact, use [`docs/GITHUB-ACTIONS.md`](docs/GITHUB-ACTIONS.md).
 
 ## Current Engine Surface
 
-`securl@1.28.4` is the current repository package version. It includes:
+`securl@1.28.5` is the current repository package version. It includes:
 
 - Detection-pack architecture foundation with a constrained first-party rules seam, schema validation, and output-equivalence checks.
 - External Exposure Inventory v1 across visible third-party, infrastructure, identity, and AI dependencies, with stable IDs, data-flow purpose, confidence, evidence, SRI status, and review priority.
@@ -67,6 +69,8 @@ For a five-minute path from first scan to CI/monitoring evidence, read [`docs/AD
 - `securl schema manifest` for printing the JSON Schema contract without running a scan.
 - `POSTURE_MANIFEST_SCHEMA` from both `securl` and `securl/posture-manifest` for CI, evidence archives, vendor-risk tooling, and future reporting clients.
 - `securl cert` for fast TLS certificate checks without running a full posture scan.
+- `--github-summary` for appending scores, policy status, and an attributed hosted
+  continuation to a GitHub Actions job summary from the same local scan.
 - Named certificate policy profiles for automation: `production`, `strict`, and `renewal-watch`.
 - A consent-safe interactive continuation from a successful local summary scan into
   recurring monitoring. An explicit Yes prints an attributed, target-prefilled web link,
