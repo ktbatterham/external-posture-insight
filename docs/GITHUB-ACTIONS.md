@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   securl:
-    uses: this-is-securl/securl/.github/workflows/securl-release-evidence.yml@release-evidence-v1.0.1
+    uses: this-is-securl/securl/.github/workflows/securl-release-evidence.yml@release-evidence-v1.0.2
     with:
       target: https://example.com
       scan-mode: quiet

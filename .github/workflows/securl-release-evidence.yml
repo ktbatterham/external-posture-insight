@@ -45,10 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 22
-          package-manager-cache: false
 
       - name: Generate SecURL release evidence
         env:
@@ -91,7 +90,7 @@ jobs:
 
       - name: Upload SecURL evidence
         if: ${{ always() && hashFiles('securl-release-evidence.json') != '' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: securl-release-evidence
           path: securl-release-evidence.json
