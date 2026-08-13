@@ -72,12 +72,22 @@ jobs:
             SCORE_ARGS=(--fail-if-score-below "$SECURL_SCORE_THRESHOLD")
           fi
 
-          npm exec --yes --package=securl@1.28.5 -- securl scan "$SECURL_TARGET" \
+          npm exec --yes --package=securl@1.28.6 -- securl scan "$SECURL_TARGET" \
             $MODE_FLAG \
             --format evidence \
             --output securl-release-evidence.json \
             --github-summary "$GITHUB_STEP_SUMMARY" \
             "${SCORE_ARGS[@]}"
+
+          node --input-type=commonjs <<'NODE'
+          const fs = require("node:fs");
+          const payload = JSON.parse(fs.readFileSync("securl-release-evidence.json", "utf8"));
+          const manifest = payload.portableEvidence?.manifest;
+          if (!manifest || manifest.scan?.assessmentLimitation?.limited || manifest.scan?.statusCode === 0) {
+            console.error("SecURL could not complete the public posture assessment. Review the uploaded evidence and retry.");
+            process.exit(1);
+          }
+          NODE
 
       - name: Upload SecURL evidence
         if: ${{ always() && hashFiles('securl-release-evidence.json') != '' }}
