@@ -696,7 +696,13 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (requestUrl.pathname === "/api/scans") {
+  if (requestUrl.pathname === "/api/link-checks" && request.method !== "POST") {
+    sendApiMethodNotAllowed(response, ["POST", "OPTIONS"]);
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/scans" || requestUrl.pathname === "/api/link-checks") {
+    const isLinkCheck = requestUrl.pathname === "/api/link-checks";
     await handleScanCollectionRequest({
       request,
       response,
@@ -709,7 +715,7 @@ const server = http.createServer(async (request, response) => {
       }),
       readJsonBody,
       buildScanTelemetryContext,
-      getRequestedScanMode,
+      getRequestedScanMode: isLinkCheck ? () => "standard" : getRequestedScanMode,
       checkTargetQuota: (options) => checkTargetQuota({
         ...options,
         sendRateLimitedResponse: sendApiRateLimited,

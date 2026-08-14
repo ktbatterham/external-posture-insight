@@ -114,6 +114,7 @@ export function buildCapabilitiesPayload({
         operators: ["eq", "neq", "in", "gte", "lte"],
       },
       resources: [
+        "POST /api/link-checks",
         "POST /api/scans",
         "GET /api/scans",
         "GET /api/scans?url=:url",
