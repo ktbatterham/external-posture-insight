@@ -47,6 +47,13 @@ const postScan = (baseUrl, url, options = {}) =>
       : {}),
   });
 
+const postLinkCheck = (baseUrl, url, options = {}) =>
+  fetch(`${baseUrl}/api/link-checks`, {
+    method: "POST",
+    headers: scanOwnerJsonHeaders(options.owner),
+    body: JSON.stringify({ url, mode: "deep-passive" }),
+  });
+
 const postMonitoringTarget = (baseUrl, url, options = {}) =>
   fetch(`${baseUrl}/api/monitoring-targets`, {
     method: "POST",
@@ -522,6 +529,7 @@ test("capabilities endpoint exposes additive client feature metadata", async () 
     assert.ok(payload.auth.resources.includes("GET /api/auth/api-keys"));
     assert.ok(payload.auth.resources.includes("DELETE /api/auth/api-keys/:id"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/digest"));
+    assert.ok(payload.scans.resources.includes("POST /api/link-checks"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/insights"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/mobile-summary"));
     assert.ok(payload.scans.resources.includes("GET /api/scans/:id/brief"));
@@ -1017,6 +1025,28 @@ test("api preflight allows the Hostinger frontend origins", async () => {
       assert.match(response.headers.get("access-control-allow-headers") || "", /X-SecURL-Client-Channel/i);
       assert.match(response.headers.get("access-control-allow-headers") || "", /Authorization/i);
     }
+  } finally {
+    await server.stop();
+  }
+});
+
+test("link checks reuse the standard passive scan contract", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await postLinkCheck(server.baseUrl, "https://example.com");
+    const payload = await response.json();
+
+    assert.equal(response.status, 202);
+    assert.equal(payload.scan.mode, "standard");
+    assert.equal(typeof payload.scan.id, "string");
+    assert.ok(payload.scan.id.length > 0);
+    assert.equal(payload.resources.digest, `/api/scans/${payload.scan.id}/digest`);
+
+    const getResponse = await fetch(`${server.baseUrl}/api/link-checks`, {
+      headers: scanOwnerHeaders(),
+    });
+    assert.equal(getResponse.status, 405);
   } finally {
     await server.stop();
   }
