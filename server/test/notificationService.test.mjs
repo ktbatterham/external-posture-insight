@@ -289,6 +289,45 @@ test("per-device app ids remove the need for one global APNs topic", async () =>
   assert.equal(topic, "com.ktbatterham.securl");
 });
 
+test("certificate monitoring for the unified app uses the SecURL APNs topic", async () => {
+  const repository = createInMemoryScanRepository();
+  await repository.upsertPushDevice({
+    token: "b".repeat(64),
+    appId: "com.ktbatterham.securl",
+    requesterScope: "scope-1",
+    ownerId: "owner-1",
+  });
+  let topic = null;
+  const service = createService({
+    repository,
+    transport: async (request) => {
+      topic = request.topic;
+      return { statusCode: 200, body: null };
+    },
+  });
+
+  const result = await service.notifyCertMonitoringEvent({
+    target: {
+      id: "target-unified-cert",
+      ownerId: "owner-1",
+      requesterScope: "scope-1",
+      appId: "com.ktbatterham.securl",
+      url: "https://example.com/",
+      label: "example.com",
+    },
+    event: {
+      type: "cert_expiring",
+      severity: "warning",
+      title: "Certificate expiring",
+      body: "12 days remain.",
+    },
+    certState: { host: "example.com", daysRemaining: 12, reachable: true },
+  });
+
+  assert.equal(result.sent, 1);
+  assert.equal(topic, "com.ktbatterham.securl");
+});
+
 test("Android devices route through FCM with the existing notification payload", async () => {
   const repository = buildRepository(buildAndroidDevice());
   let delivered = null;
