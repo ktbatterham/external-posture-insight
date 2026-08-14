@@ -741,6 +741,20 @@ test("traffic source classification groups common public launch channels", () =>
     classifyTrafficSource({ currentUrl: "https://app.securl.online/?utm_source=show_hn" }),
     "utm:show_hn",
   );
+  assert.equal(
+    classifyTrafficSource({ currentUrl: "https://securl.online/?ref=producthunt" }),
+    "producthunt",
+  );
+  assert.equal(
+    classifyTrafficSource({ currentUrl: "https://securl.online/?ref=untrusted_source" }),
+    "direct",
+  );
+  assert.equal(
+    classifyTrafficSource({
+      currentUrl: "https://securl.online/?utm_source=launch&utm_medium=social&ref=producthunt",
+    }),
+    "utm:launch",
+  );
 });
 
 test("scan failure classification groups the common invalid-target cases", () => {

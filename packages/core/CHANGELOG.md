@@ -6,6 +6,46 @@ The format is based on Keep a Changelog and this package follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.6] - 2026-08-13
+
+### Fixed
+- Prevented GitHub Actions summaries from presenting an incomplete public-target read as
+  a passing release policy. Limited assessments now report that policy was not evaluated,
+  and the reusable workflow fails after preserving the diagnostic evidence artifact.
+
+## [1.28.5] - 2026-08-13
+
+### Added
+- Added `securl scan --github-summary <file>` to append a GitHub Actions release summary
+  from the same local scan used to generate JSON, Markdown, SARIF, manifest, or portable
+  evidence output.
+- Added a pinned, reusable GitHub Actions workflow that produces a non-blocking posture
+  summary and uploads digest-verifiable release evidence, with an optional score gate.
+- Added an attributable, target-prefilled hosted continuation for measuring the path from
+  useful CI evidence to an interactive scan or first watch. No repository or actor identity
+  is included.
+
+## [1.28.4] - 2026-08-11
+
+### Documentation
+- Updated the npm and GitHub quick starts to describe the shipped interactive first-watch
+  continuation and its `cli_monitoring_watch` attribution rather than the superseded
+  report-creation prompt.
+- Kept the explicit `--publish` and `--notify` paths documented separately.
+
+## [1.28.3] - 2026-08-10
+
+### Changed
+- Replaced the interactive post-scan report prompt with a focused first-watch continuation.
+  An explicit Yes now prints an attributed, target-prefilled web-app link that runs a
+  browser-owned hosted scan before the user chooses daily or weekly monitoring.
+- Preserved the existing `--publish` and `--notify` flows, and kept the prompt suppressed
+  for batch, redirected, piped, file, structured-format, baseline, and policy or CI runs.
+
+### Security
+- Continued to default the prompt to No and disclose that accepting sends the target URL
+  to SecURL. Local analysis results and owner credentials are not uploaded or printed.
+
 ## [1.28.2] - 2026-08-01
 
 ### Changed

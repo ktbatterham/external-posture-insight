@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createRequire } from "node:module";
-import { writeFile } from "node:fs/promises";
+import { appendFile, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import { createInterface } from "node:readline/promises";
@@ -18,8 +18,13 @@ import {
   snapshotFromAnalysis,
 } from "./index.js";
 import type { AnalysisResult, HistoryDiff, LiveCertificateResult, ScanIssue } from "./types.js";
-import { acceptsHostedReport, buildCliGrowthPrompt } from "./cliGrowthBridge.js";
+import {
+  acceptsMonitoringHandoff,
+  buildCliGrowthPrompt,
+  buildCliMonitoringHandoffUrl,
+} from "./cliGrowthBridge.js";
 import { formatPublishedScan, publishHostedScan } from "./cliPublishBridge.js";
+import { buildGithubActionsSummary } from "./cliGithubSummary.js";
 
 const require = createRequire(import.meta.url);
 const corePackage = require("../package.json") as { version?: string };
@@ -55,6 +60,7 @@ type ParsedArgs =
       targets: string[];
       format: OutputFormat;
       outputPath: string | null;
+      githubSummaryPath: string | null;
       baselinePath: string | null;
       failOnSeverity: FailOnSeverity | null;
       failOnRegression: boolean;
@@ -84,7 +90,7 @@ type ParsedArgs =
 const usage = `SecURL CLI
 
 Usage:
-  securl scan <target...> [--publish|--notify] [--format json|markdown|summary|sarif|ci-json|manifest|evidence|exposure] [--baseline <report.json>] [--output <file>] [--quiet|--deep-passive] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
+  securl scan <target...> [--publish|--notify] [--format json|markdown|summary|sarif|ci-json|manifest|evidence|exposure] [--baseline <report.json>] [--output <file>] [--github-summary <file>] [--quiet|--deep-passive] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   securl compare <current-report.json> <baseline-report.json> [--format json|markdown|summary|sarif|ci-json] [--output <file>] [--fail-on info|warning|critical] [--fail-on-regression] [--fail-if-score-below <0-100>]
   securl cert <target> [--format json|markdown|summary|ci-json] [--output <file>] [--policy production|strict|renewal-watch] [--fail-if-invalid] [--fail-if-expiring-within <days>] [--fail-if-legacy-tls] [--expect-issuer <text>]
   securl schema manifest|evidence|mobile-summary|monitoring-mobile-summary|monitoring-cert-summary [--output <file>]
@@ -97,6 +103,7 @@ Examples:
   npx securl scan example.com --format ci-json --output ci.json
   npx securl scan example.com --format manifest --output posture-manifest.json
   npx securl scan example.com --format evidence --output release-evidence.json
+  npx securl scan example.com --quiet --format evidence --output release-evidence.json --github-summary "$GITHUB_STEP_SUMMARY"
   npx securl schema evidence --output portable-evidence.schema.json
   npx securl scan example.com --format exposure --output external-exposure.json
   npx securl schema manifest --output posture-manifest.schema.json
@@ -128,6 +135,7 @@ Hosted continuation:
                  Both options support one interactive summary target only. No local scan payload is uploaded.
 
 CI policy modes:
+  --github-summary <file>    Append a GitHub Actions job summary with posture scores, policy status, and an attributed hosted continuation.
   --fail-on warning          Fail when findings at or above the selected severity are present.
   --fail-on-regression       Fail when a baseline comparison finds score, issue, or status regressions.
   --fail-if-score-below 75   Fail when any scanned target falls below the selected score.
@@ -196,6 +204,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
 
   let format: OutputFormat = "summary";
   let outputPath: string | null = null;
+  let githubSummaryPath: string | null = null;
   let baselinePath: string | null = null;
   let failOnSeverity: FailOnSeverity | null = null;
   let failOnRegression = false;
@@ -231,6 +240,16 @@ const parseArgs = (argv: string[]): ParsedArgs => {
         throw new Error("Missing --output value.");
       }
       outputPath = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--github-summary") {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error("Missing --github-summary value.");
+      }
+      githubSummaryPath = value;
       index += 1;
       continue;
     }
@@ -354,6 +373,10 @@ const parseArgs = (argv: string[]): ParsedArgs => {
     throw new Error("--publish and --notify are only supported by the scan command.");
   }
 
+  if (command !== "scan" && githubSummaryPath) {
+    throw new Error("--github-summary is only supported by the scan command.");
+  }
+
   if (command === "schema") {
     const [schema, unexpected] = positionals;
     const schemaNames = ["manifest", "evidence", ...Object.keys(MOBILE_RESOURCE_SCHEMAS)];
@@ -414,6 +437,7 @@ const parseArgs = (argv: string[]): ParsedArgs => {
       targets: positionals,
       format,
       outputPath,
+      githubSummaryPath,
       baselinePath,
       failOnSeverity,
       failOnRegression,
@@ -1283,8 +1307,15 @@ const main = async () => {
       } else {
         process.stdout.write(output);
       }
-      let publishRequested = parsed.publish;
-      if (!publishRequested) {
+      if (parsed.githubSummaryPath) {
+        await appendFile(parsed.githubSummaryPath, buildGithubActionsSummary({
+          analyses,
+          scanMode: parsed.scanMode,
+          policyMessages,
+        }), "utf8");
+      }
+      let monitoringHandoffRequested = false;
+      if (!parsed.publish) {
         const growthPrompt = buildCliGrowthPrompt({
           targetUrl: analyses[0]?.finalUrl ?? parsed.targets[0],
           targetCount: analyses.length,
@@ -1301,13 +1332,22 @@ const main = async () => {
         if (growthPrompt) {
           const prompt = createInterface({ input: process.stdin, output: process.stderr });
           try {
-            publishRequested = acceptsHostedReport(await prompt.question(`\n${growthPrompt}`));
+            monitoringHandoffRequested = acceptsMonitoringHandoff(await prompt.question(`\n${growthPrompt}`));
           } finally {
             prompt.close();
           }
         }
       }
-      if (publishRequested) {
+      if (monitoringHandoffRequested) {
+        const handoffUrl = buildCliMonitoringHandoffUrl(analyses[0].finalUrl);
+        process.stderr.write([
+          "\nStart monitoring in SecURL:",
+          handoffUrl,
+          "The web app will run an authoritative hosted scan before you choose a watch cadence.",
+          "",
+        ].join("\n"));
+      }
+      if (parsed.publish) {
         process.stderr.write("\nCreating authoritative hosted report…\n");
         const published = await publishHostedScan({
           targetUrl: analyses[0].finalUrl,

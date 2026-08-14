@@ -1958,6 +1958,11 @@ export function classifyTrafficSource({ referrer = "", currentUrl = "" } = {}) {
     return explicitSource;
   }
 
+  const knownReferralSource = readKnownReferralSource(currentUrl);
+  if (knownReferralSource) {
+    return knownReferralSource;
+  }
+
   if (!referrer) {
     return "direct";
   }
@@ -2007,6 +2012,19 @@ function readUtmSource(currentUrl) {
     }
     const normalized = normalizeTrafficSource(source.replace(/[^a-z0-9_-]/gi, "_"));
     return normalized === "unknown" ? null : `utm:${normalized}`;
+  } catch {
+    return null;
+  }
+}
+
+function readKnownReferralSource(currentUrl) {
+  if (!currentUrl) {
+    return null;
+  }
+
+  try {
+    const referral = new URL(currentUrl).searchParams.get("ref")?.trim().toLowerCase();
+    return referral === "producthunt" ? "producthunt" : null;
   } catch {
     return null;
   }
