@@ -36,6 +36,9 @@ jobs:
       - name: Run core tests
         run: npm run test:core
 
+      - name: Run package-signal tests
+        run: npm run test:package-signals
+
       - name: Lint repo
         run: npm run lint
 

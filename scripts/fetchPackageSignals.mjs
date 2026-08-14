@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const PACKAGES = [
   {
@@ -14,6 +15,8 @@ const PACKAGES = [
 
 const NPM_REGISTRY = "https://registry.npmjs.org";
 const NPM_DOWNLOADS = "https://api.npmjs.org/downloads";
+const RELEASE_EVIDENCE_WORKFLOW = "this-is-securl/securl/.github/workflows/securl-release-evidence.yml@release-evidence-v1.0.2";
+const OWNED_REPOSITORIES = new Set(["this-is-securl/securl"]);
 
 const encodePackageName = (packageName) => encodeURIComponent(packageName);
 
@@ -99,19 +102,21 @@ const fetchDownloadRange = async (range, packageName) => {
 
 const sumDownloads = (rows) => rows.reduce((total, row) => total + Number(row.downloads || 0), 0);
 
-const runGitHubCodeSearch = (query) => {
+const runGitHubCodeSearch = (query, options = {}) => {
   try {
-    const raw = execFileSync("gh", [
+    const args = [
       "search",
       "code",
       query,
-      "--filename",
-      "package.json",
       "--json",
       "repository,path,url",
       "--limit",
-      "20",
-    ], {
+      String(options.limit || 20),
+    ];
+    if (options.filename) args.push("--filename", options.filename);
+    if (options.extension) args.push("--extension", options.extension);
+
+    const raw = execFileSync("gh", args, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -170,16 +175,71 @@ const filterDependencyMentions = async (rows, packageName) => {
   return filtered;
 };
 
+export const workflowUsesPinnedReference = (source) => {
+  const escaped = RELEASE_EVIDENCE_WORKFLOW.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^\\s*uses:\\s*${escaped}\\s*(?:#.*)?$`, "m").test(String(source || ""));
+};
+
+const repositoryName = (row) => String(
+  row.repository?.fullName || row.repository?.nameWithOwner || "",
+).toLowerCase();
+
+export const filterWorkflowReferences = async (rows, readSource = async (row) => {
+  const rawUrl = getRawGitHubUrl(row);
+  if (!rawUrl) return "";
+  const response = await fetch(rawUrl, {
+    headers: {
+      Accept: "text/plain",
+      "User-Agent": "securl-package-signals/1.0",
+    },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${rawUrl}`);
+  return response.text();
+}) => {
+  if (!rows) return null;
+  const repositories = new Map();
+
+  for (const row of rows) {
+    const repo = repositoryName(row);
+    if (!repo || OWNED_REPOSITORIES.has(repo)) continue;
+    if (!/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(String(row.path || ""))) continue;
+
+    try {
+      const source = await readSource(row);
+      if (workflowUsesPinnedReference(source) && !repositories.has(repo)) {
+        repositories.set(repo, row);
+      }
+    } catch {
+      // Best-effort public signal: skip files that disappear or cannot be read.
+    }
+  }
+
+  return [...repositories.values()];
+};
+
+const fetchWorkflowSignals = async () => {
+  const query = `"${RELEASE_EVIDENCE_WORKFLOW}"`;
+  const yaml = runGitHubCodeSearch(query, { extension: "yaml", limit: 100 });
+  const yml = runGitHubCodeSearch(query, { extension: "yml", limit: 100 });
+  if (!yaml || !yml) return null;
+  return filterWorkflowReferences([...yaml, ...yml]);
+};
+
 const fetchGitHubSignals = async () => {
-  const current = await filterDependencyMentions(runGitHubCodeSearch('"securl"'), "securl");
+  const current = await filterDependencyMentions(
+    runGitHubCodeSearch('"securl"', { filename: "package.json" }),
+    "securl",
+  );
   const legacy = await filterDependencyMentions(
-    runGitHubCodeSearch('"@ktbatterham/external-posture-core"'),
+    runGitHubCodeSearch('"@ktbatterham/external-posture-core"', { filename: "package.json" }),
     "@ktbatterham/external-posture-core",
   );
+  const releaseEvidenceWorkflows = await fetchWorkflowSignals();
 
   return {
     current,
     legacy,
+    releaseEvidenceWorkflows,
   };
 };
 
@@ -234,7 +294,7 @@ const printPackage = (signals) => {
 
 const printGitHubSignals = (githubSignals) => {
   console.log("Public GitHub code signals");
-  if (!githubSignals.current || !githubSignals.legacy) {
+  if (!githubSignals.current || !githubSignals.legacy || !githubSignals.releaseEvidenceWorkflows) {
     console.log("  Skipped: GitHub CLI code search was not available or not authenticated.");
     console.log("  Tip: run `gh auth login`, then rerun `npm run package:signals`.");
     return;
@@ -243,6 +303,7 @@ const printGitHubSignals = (githubSignals) => {
   const groups = [
     ["securl package.json dependency mentions", githubSignals.current],
     ["legacy package.json dependency mentions", githubSignals.legacy],
+    ["external repositories using release-evidence-v1.0.2", githubSignals.releaseEvidenceWorkflows],
   ];
 
   for (const [label, rows] of groups) {
@@ -321,7 +382,9 @@ const main = async () => {
   printGitHubSignals(github);
 };
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}
