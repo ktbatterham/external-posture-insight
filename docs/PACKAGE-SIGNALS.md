@@ -13,6 +13,8 @@ Use:
 - npm package metadata, provenance, signatures, dependency count, maintainer count, and install-script checks
 - Socket package health pages
 - public GitHub `package.json` dependency mentions where GitHub code search is available
+- public GitHub Actions workflows that use the exact immutable SecURL release-evidence
+  workflow reference, counted once per external repository
 - hosted backend telemetry for scans that go through the SecURL API
 
 Do not use:
@@ -37,7 +39,7 @@ For machine-readable output:
 node scripts/fetchPackageSignals.mjs --json
 ```
 
-The script reads public npm registry/download metadata for both package names. If the GitHub CLI is authenticated, it also runs a best-effort public code search for `package.json` dependency mentions. It intentionally searches dependency-key style entries such as `"securl":` so unrelated projects that merely happen to be named `securl` are not counted as adoption.
+The script reads public npm registry/download metadata for both package names. If the GitHub CLI is authenticated, it also runs best-effort public code searches for `package.json` dependency mentions and the exact `release-evidence-v1.0.2` reusable-workflow reference. It intentionally searches dependency-key style entries such as `"securl":` so unrelated projects that merely happen to be named `securl` are not counted as adoption. Workflow results must be in `.github/workflows/*.yml` or `.yaml`, are verified against the fetched file, exclude the SecURL repository, and are deduplicated by repository.
 
 Hosted product/API telemetry remains separate:
 
@@ -53,6 +55,11 @@ The telemetry commands first check `TELEMETRY_TOKEN` and `TELEMETRY_BASE_URL` fr
 ## Interpretation
 
 npm downloads are directional, not identity. They can include CI, cache misses, local installs, mirrors, and automated tooling. They do not identify people, companies, private repos, or whether the package is actually used after installation.
+
+Likewise, a public workflow reference shows discoverable adoption, not whether the workflow
+ran, completed, produced an artifact, or led to a hosted scan or first watch. Private
+repository adoption is invisible. Keep this count separate from attributed backend funnel
+events and never treat a repository as a person or active user.
 
 The useful trend is consistency over time:
 
