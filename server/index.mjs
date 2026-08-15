@@ -66,6 +66,7 @@ import { createAlertDeliveryService } from "./alertDeliveryService.mjs";
 import { handleAlertDestinationCollectionRequest, handleAlertDestinationItemRequest } from "./alertDestinationHandlers.mjs";
 import { handleAuthRequest, resolveAuthenticatedApiKey, resolveAuthenticatedSession } from "./authHandlers.mjs";
 import { handleScanCollectionRequest, handleScanResourceRequest, runQueuedScan } from "./scanResourceHandlers.mjs";
+import { handleLinkInspectionRequest } from "./linkInspectionHandlers.mjs";
 import { createScanScheduler } from "./scanScheduler.mjs";
 import { createStaticHandler } from "./staticServer.mjs";
 import { enforceStartupConfiguration, initializeScanRepository } from "./startupValidation.mjs";
@@ -696,13 +697,31 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (requestUrl.pathname === "/api/link-checks" && request.method !== "POST") {
-    sendApiMethodNotAllowed(response, ["POST", "OPTIONS"]);
+  if (requestUrl.pathname === "/api/link-checks") {
+    await handleLinkInspectionRequest({
+      request,
+      response,
+      requestUrl,
+      authorizeAnalysisRequest: (options) => withAuthResolvers({
+        ...options,
+        sendJsonResponse: sendApiJson,
+        sendRateLimitedResponse: sendApiRateLimited,
+      }),
+      readJsonBody,
+      checkTargetQuota: (options) => checkTargetQuota({
+        ...options,
+        sendRateLimitedResponse: sendApiRateLimited,
+      }),
+      sendJson: sendApiJson,
+      sendMethodNotAllowed: sendApiMethodNotAllowed,
+      classifyScanFailure,
+      normalizeScanErrorMessage,
+      telemetry,
+    });
     return;
   }
 
-  if (requestUrl.pathname === "/api/scans" || requestUrl.pathname === "/api/link-checks") {
-    const isLinkCheck = requestUrl.pathname === "/api/link-checks";
+  if (requestUrl.pathname === "/api/scans") {
     await handleScanCollectionRequest({
       request,
       response,
@@ -715,7 +734,7 @@ const server = http.createServer(async (request, response) => {
       }),
       readJsonBody,
       buildScanTelemetryContext,
-      getRequestedScanMode: isLinkCheck ? () => "standard" : getRequestedScanMode,
+      getRequestedScanMode,
       checkTargetQuota: (options) => checkTargetQuota({
         ...options,
         sendRateLimitedResponse: sendApiRateLimited,

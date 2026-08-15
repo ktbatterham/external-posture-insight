@@ -29,7 +29,7 @@ Mobile clients should set these headers alongside `X-Scan-Owner` on every reques
 ## Current scan resources
 
 - `POST /api/scans`
-- `POST /api/link-checks` (standard passive scan alias for the public Before You Click surface)
+- `POST /api/link-checks` (link-specific URL and redirect inspection for the public Before You Click surface)
 - `GET /api/scans`
 - `GET /api/scans?url=...`
 - `GET /api/scans/:id`
@@ -59,11 +59,15 @@ Mobile clients should set these headers alongside `X-Scan-Owner` on every reques
 
 Successful `POST /api/scans` responses include a `resources` object with relative paths for follow-up reads such as `events`, `digest`, `summary`, `evidence`, `comparison`, and `drift`. Clients can use these links instead of constructing endpoint paths themselves.
 
-`POST /api/link-checks` accepts the same `{ "url": "https://example.com" }` body and
-owner authentication as `POST /api/scans`, but always runs the standard passive mode.
-It returns the same scan summary and resource links, so the public link-checking surface
-does not create a second analysis or trust model. It does not visit the target in the
-user's browser and must not be presented as proof that a link is safe.
+`POST /api/link-checks` accepts `{ "url": "https://example.com/path?next=..." }` and the
+same owner authentication used by scan resources. It returns
+`securl.link-inspection.v1`: the normalized exact URL, lexical attention signals, every
+bounded redirect hop, the final destination, response status/type/disposition, a cautious
+verdict, and explicit limitations. Every requested hop is independently DNS-validated
+and connected through an IP-pinned lookup, preserving the SSRF and DNS-rebinding boundary.
+Credential-bearing URLs are described but never requested. The endpoint does not run page
+scripts, submit forms, download attachments, query a reputation provider, or claim that a
+link is safe. A full destination posture scan remains a separate, explicit user action.
 
 Runtime controls:
 
