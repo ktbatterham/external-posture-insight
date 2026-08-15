@@ -167,9 +167,10 @@ export async function requestJson(
 export async function fetchWithRedirects(initialUrl: URL, redirectLimit = REDIRECT_LIMIT, options: RequestOptions = {}) {
   const redirects: RedirectHop[] = [];
   let currentUrl = initialUrl;
-  let response = await requestOnce(currentUrl, "HEAD", options);
+  const requestMethod = options.method ?? "HEAD";
+  let response = await requestOnce(currentUrl, requestMethod, options);
 
-  if (response.statusCode === 405 || response.statusCode === 403) {
+  if (requestMethod === "HEAD" && (response.statusCode === 405 || response.statusCode === 403)) {
     response = await requestOnce(currentUrl, "GET", options);
   }
 
@@ -190,8 +191,8 @@ export async function fetchWithRedirects(initialUrl: URL, redirectLimit = REDIRE
     currentUrl = new URL(location!, currentUrl);
     // Each hop is validated and IP-pinned inside requestOnce -> assertPublicRequestTarget,
     // so a redirect cannot be re-pointed at a private address between check and connect.
-    response = await requestOnce(currentUrl, "HEAD", options);
-    if (response.statusCode === 405 || response.statusCode === 403) {
+    response = await requestOnce(currentUrl, requestMethod, options);
+    if (requestMethod === "HEAD" && (response.statusCode === 405 || response.statusCode === 403)) {
       response = await requestOnce(currentUrl, "GET", options);
     }
   }

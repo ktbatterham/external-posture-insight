@@ -49,7 +49,7 @@ export interface LinkInspectionResult {
 }
 
 const SHORTENER_HOSTS = new Set([
-  "bit.ly", "buff.ly", "cutt.ly", "goo.gl", "is.gd", "lnkd.in", "ow.ly",
+  "bit.ly", "bitly.is", "buff.ly", "cutt.ly", "goo.gl", "is.gd", "lnkd.in", "ow.ly",
   "rebrand.ly", "t.co", "tiny.cc", "tinyurl.com", "trib.al", "youtu.be",
 ]);
 
@@ -149,13 +149,15 @@ export async function inspectLink(rawTarget: string): Promise<LinkInspectionResu
     return { ...base, destinationUrl: null, verdict: buildVerdict(signals, true), redirects: [], response: null, signals };
   }
 
-  const result = await fetchWithRedirects(initialUrl);
+  // Resolve links as a browser navigation would. Some redirect services return a
+  // different response to HEAD, while GET still discards the body in requestOnce.
+  const result = await fetchWithRedirects(initialUrl, undefined, { method: "GET" });
   const redirects = result.redirects.map((hop, position, chain) => {
     const url = new URL(hop.url);
     const next = position < chain.length - 1 ? new URL(chain[position + 1].url) : null;
     const downgradedToHttp = Boolean(next && url.protocol === "https:" && next.protocol === "http:");
     if (next && next.origin !== url.origin) {
-      signals.push(signal(`origin_change_${position}`, "info", "The redirect changes site", `${url.hostname} sends the request to ${next.hostname}.`));
+      signals.push(signal(`origin_change_${position}`, "info", "The redirect changes origin", `${url.hostname} sends the request to ${next.hostname}.`));
     }
     if (downgradedToHttp) {
       signals.push(signal(`https_downgrade_${position}`, "high", "A redirect drops HTTPS", `${url.hostname} redirects to an unencrypted HTTP destination.`));

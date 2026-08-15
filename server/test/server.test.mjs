@@ -1071,6 +1071,25 @@ test("link checks stop before requesting URLs with embedded credentials", async 
   }
 });
 
+test("link checks use browser-like GET redirect semantics", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await postLinkCheck(
+      server.baseUrl,
+      "https://httpbingo.org/redirect-to?url=https%3A%2F%2Fexample.com&status_code=302",
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.inspection.redirects.length, 2);
+    assert.equal(payload.inspection.redirects[0].statusCode, 302);
+    assert.equal(payload.inspection.destinationUrl, "https://example.com/");
+  } finally {
+    await server.stop();
+  }
+});
+
 test("auth register, session, login, and logout flow works", async () => {
   const server = await startServer();
 
