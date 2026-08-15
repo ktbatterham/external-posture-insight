@@ -1030,23 +1030,42 @@ test("api preflight allows the Hostinger frontend origins", async () => {
   }
 });
 
-test("link checks reuse the standard passive scan contract", async () => {
+test("link checks return link-specific URL, redirect, and destination evidence", async () => {
   const server = await startServer();
 
   try {
     const response = await postLinkCheck(server.baseUrl, "https://example.com");
     const payload = await response.json();
 
-    assert.equal(response.status, 202);
-    assert.equal(payload.scan.mode, "standard");
-    assert.equal(typeof payload.scan.id, "string");
-    assert.ok(payload.scan.id.length > 0);
-    assert.equal(payload.resources.digest, `/api/scans/${payload.scan.id}/digest`);
+    assert.equal(response.status, 200);
+    assert.equal(payload.inspection.schema, "securl.link-inspection.v1");
+    assert.equal(payload.inspection.input.hostname, "example.com");
+    assert.equal(payload.inspection.destinationUrl, "https://example.com/");
+    assert.ok(Array.isArray(payload.inspection.redirects));
+    assert.equal(payload.inspection.redirects.at(-1).statusCode, 200);
+    assert.match(payload.inspection.response.contentType, /text\/html/i);
+    assert.match(payload.inspection.verdict.summary, /not a malware verdict/i);
 
     const getResponse = await fetch(`${server.baseUrl}/api/link-checks`, {
       headers: scanOwnerHeaders(),
     });
     assert.equal(getResponse.status, 405);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("link checks stop before requesting URLs with embedded credentials", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await postLinkCheck(server.baseUrl, "https://trusted.example@evil.example/path");
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.inspection.destinationUrl, null);
+    assert.equal(payload.inspection.verdict.level, "blocked");
+    assert.ok(payload.inspection.signals.some((item) => item.id === "embedded_credentials"));
   } finally {
     await server.stop();
   }
