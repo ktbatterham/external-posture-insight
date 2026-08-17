@@ -68,9 +68,6 @@ function inspectLexicalUrl(target: URL): LinkSignal[] {
   if (target.username || target.password) {
     signals.push(signal("embedded_credentials", "high", "The URL hides a destination behind an @ sign", "Text before the @ sign is user information, not the site being opened."));
   }
-  if (target.protocol === "http:") {
-    signals.push(signal("unencrypted_http", "attention", "The link starts without HTTPS", "Traffic to the first destination is not protected by TLS."));
-  }
   if (target.hostname.includes("xn--")) {
     signals.push(signal("internationalized_hostname", "attention", "The hostname uses encoded international characters", `The browser-readable hostname is ${unicodeHostname || target.hostname}. Check that spelling carefully.`));
   }
@@ -115,6 +112,36 @@ function buildVerdict(signals: LinkSignal[], blocked = false): LinkInspectionRes
   return { level: "no_obvious_concern", title: "No obvious link-level concern found", summary: "The destination resolved and the URL and redirect checks below found no obvious concern. This is not a malware verdict." };
 }
 
+export function isMaterialOriginChange(current: URL, next: URL): boolean {
+  if (current.origin === next.origin) return false;
+  return !(
+    current.hostname.toLowerCase() === next.hostname.toLowerCase()
+    && current.protocol === "http:"
+    && next.protocol === "https:"
+  );
+}
+
+export function classifyResolvedTransport(initial: URL, destination: URL): LinkSignal[] {
+  if (initial.protocol !== "http:") return [];
+  if (
+    destination.protocol === "https:"
+    && initial.hostname.toLowerCase() === destination.hostname.toLowerCase()
+  ) {
+    return [signal(
+      "https_upgrade",
+      "info",
+      "Secures with HTTPS",
+      `${initial.hostname} upgrades the connection to HTTPS before the final response.`,
+    )];
+  }
+  return [signal(
+    "unencrypted_http",
+    "attention",
+    "The link starts without HTTPS",
+    "Traffic to the first destination is not protected by TLS.",
+  )];
+}
+
 export async function inspectLink(rawTarget: string): Promise<LinkInspectionResult> {
   const submittedUrl = rawTarget.trim();
   const normalizedInput = /^https?:\/\//i.test(submittedUrl) ? submittedUrl : `https://${submittedUrl}`;
@@ -156,7 +183,8 @@ export async function inspectLink(rawTarget: string): Promise<LinkInspectionResu
     const url = new URL(hop.url);
     const next = position < chain.length - 1 ? new URL(chain[position + 1].url) : null;
     const downgradedToHttp = Boolean(next && url.protocol === "https:" && next.protocol === "http:");
-    if (next && next.origin !== url.origin) {
+    const originChanged = Boolean(next && isMaterialOriginChange(url, next));
+    if (next && originChanged) {
       signals.push(signal(`origin_change_${position}`, "info", "The redirect changes origin", `${url.hostname} sends the request to ${next.hostname}.`));
     }
     if (downgradedToHttp) {
@@ -168,7 +196,7 @@ export async function inspectLink(rawTarget: string): Promise<LinkInspectionResu
       hostname: url.hostname,
       statusCode: hop.statusCode,
       location: hop.location,
-      originChanged: Boolean(next && next.origin !== url.origin),
+      originChanged,
       downgradedToHttp,
     };
   });
@@ -187,6 +215,10 @@ export async function inspectLink(rawTarget: string): Promise<LinkInspectionResu
   if (redirects.length >= 6) {
     signals.push(signal("many_redirects", "attention", "The link takes a long redirect path", `${redirects.length - 1} redirects were followed before the final response.`));
   }
+  const firstResolvedUrl = result.redirects.length > 1
+    ? new URL(result.redirects[1].url)
+    : result.finalUrl;
+  signals.push(...classifyResolvedTransport(initialUrl, firstResolvedUrl));
 
   return {
     ...base,

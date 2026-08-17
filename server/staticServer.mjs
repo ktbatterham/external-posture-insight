@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { classifyPageView } from "./telemetry.mjs";
 
 function getMimeType(filePath) {
   const ext = path.extname(filePath);
@@ -89,6 +90,7 @@ export function createStaticHandler({
       telemetry.recordPageLoad({
         visitorKey: getVisitorKey(request),
         source: "direct",
+        ...classifyPageView(`https://app.securl.online${requestPath}`),
       });
     }
 
