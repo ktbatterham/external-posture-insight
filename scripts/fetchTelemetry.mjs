@@ -71,6 +71,23 @@ const main = async () => {
   console.log(`  Page loads: ${telemetry.pageLoads}`);
   console.log(`  Unique visitors: ${telemetry.visitors?.unique ?? 0}`);
   console.log(`  Today: ${telemetry.visitors?.today?.pageLoads ?? 0} page loads / ${telemetry.visitors?.today?.uniqueVisitors ?? 0} unique`);
+  const pageSurfaces = Object.entries(telemetry.visitors?.bySurface || {});
+  if (pageSurfaces.length) {
+    console.log(`  Surfaces (measured since ${telemetry.visitors?.surfaceMeasurementStartedAt || "deployment"}):`);
+    for (const [surface, summary] of pageSurfaces) {
+      console.log(`    - ${surface}: ${summary.pageLoads ?? 0} loads / ${summary.uniqueVisitors ?? 0} unique`);
+      for (const [path, pathSummary] of Object.entries(summary.paths || {})) {
+        console.log(`      - ${path}: ${pathSummary.pageLoads ?? 0} / ${pathSummary.uniqueVisitors ?? 0}`);
+      }
+    }
+  }
+  const todaySurfaces = Object.entries(telemetry.visitors?.todayBySurface || {});
+  if (todaySurfaces.length) {
+    console.log(`  Today by surface:`);
+    for (const [surface, summary] of todaySurfaces) {
+      console.log(`    - ${surface}: ${summary.pageLoads ?? 0} loads / ${summary.uniqueVisitors ?? 0} unique`);
+    }
+  }
   console.log("");
   console.log(`Traffic sources`);
   console.log(sources);

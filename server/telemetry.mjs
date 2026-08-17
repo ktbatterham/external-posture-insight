@@ -21,6 +21,11 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     startedAt: new Date().toISOString(),
     pageLoads: 0,
     visitorKeys: new Set(),
+    pageSurfaceStartedAt: new Date().toISOString(),
+    pageSurfaceBuckets: {},
+    pageSurfacePathBuckets: {},
+    visitorKeysBySurface: {},
+    visitorKeysBySurfacePath: {},
     visitorDays: {},
     sourceBuckets: {},
     scansRequested: 0,
@@ -82,6 +87,8 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
   const serializeState = () => ({
     ...state,
     visitorKeys: [...state.visitorKeys],
+    visitorKeysBySurface: serializeSetBuckets(state.visitorKeysBySurface),
+    visitorKeysBySurfacePath: serializeSetBuckets(state.visitorKeysBySurfacePath),
     scanRequesterKeys: [...state.scanRequesterKeys],
     scanClientKeys: [...state.scanClientKeys],
     scanTargetOrigins: [...state.scanTargetOrigins],
@@ -92,6 +99,10 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
           pageLoads: bucket.pageLoads,
           visitorKeys: [...bucket.visitorKeys],
           sourceBuckets: { ...(bucket.sourceBuckets || {}) },
+          surfaceBuckets: { ...(bucket.surfaceBuckets || {}) },
+          surfacePathBuckets: { ...(bucket.surfacePathBuckets || {}) },
+          visitorKeysBySurface: serializeSetBuckets(bucket.visitorKeysBySurface || {}),
+          visitorKeysBySurfacePath: serializeSetBuckets(bucket.visitorKeysBySurfacePath || {}),
         },
       ]),
     ),
@@ -147,6 +158,13 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     state.startedAt = typeof value.startedAt === "string" ? value.startedAt : state.startedAt;
     state.pageLoads = Number.isFinite(value.pageLoads) ? value.pageLoads : state.pageLoads;
     state.visitorKeys = new Set(Array.isArray(value.visitorKeys) ? value.visitorKeys : []);
+    state.pageSurfaceStartedAt = typeof value.pageSurfaceStartedAt === "string"
+      ? value.pageSurfaceStartedAt
+      : state.pageSurfaceStartedAt;
+    state.pageSurfaceBuckets = { ...(value.pageSurfaceBuckets || {}) };
+    state.pageSurfacePathBuckets = { ...(value.pageSurfacePathBuckets || {}) };
+    state.visitorKeysBySurface = hydrateSetBuckets(value.visitorKeysBySurface);
+    state.visitorKeysBySurfacePath = hydrateSetBuckets(value.visitorKeysBySurfacePath);
     state.visitorDays = Object.fromEntries(
       Object.entries(value.visitorDays || {}).map(([date, bucket]) => [
         date,
@@ -154,6 +172,10 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
           pageLoads: Number.isFinite(bucket?.pageLoads) ? bucket.pageLoads : 0,
           visitorKeys: new Set(Array.isArray(bucket?.visitorKeys) ? bucket.visitorKeys : []),
           sourceBuckets: { ...(bucket?.sourceBuckets || {}) },
+          surfaceBuckets: { ...(bucket?.surfaceBuckets || {}) },
+          surfacePathBuckets: { ...(bucket?.surfacePathBuckets || {}) },
+          visitorKeysBySurface: hydrateSetBuckets(bucket?.visitorKeysBySurface),
+          visitorKeysBySurfacePath: hydrateSetBuckets(bucket?.visitorKeysBySurfacePath),
         },
       ]),
     );
@@ -351,6 +373,10 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
       state.visitorDays[dateKey] = {
         pageLoads: 0,
         visitorKeys: new Set(),
+        surfaceBuckets: {},
+        surfacePathBuckets: {},
+        visitorKeysBySurface: {},
+        visitorKeysBySurfacePath: {},
       };
     }
     return state.visitorDays[dateKey];
@@ -543,10 +569,15 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
   };
 
   return {
-    recordPageLoad({ visitorKey = null, now = new Date(), source = "unknown" } = {}) {
+    recordPageLoad({ visitorKey = null, now = new Date(), source = "unknown", surface = "unknown", path = "other" } = {}) {
       const normalizedSource = normalizeTrafficSource(source);
+      const normalizedSurface = normalizePageSurface(surface);
+      const normalizedPath = normalizePagePath(path);
+      const surfacePathKey = `${normalizedSurface}:${normalizedPath}`;
       state.pageLoads += 1;
       incrementBucket(state.sourceBuckets, normalizedSource);
+      incrementBucket(state.pageSurfaceBuckets, normalizedSurface);
+      incrementBucket(state.pageSurfacePathBuckets, surfacePathKey);
       const dateKey = now.toISOString().slice(0, 10);
       const dayBucket = getDayBucket(dateKey);
       dayBucket.pageLoads += 1;
@@ -554,9 +585,15 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         dayBucket.sourceBuckets = {};
       }
       incrementBucket(dayBucket.sourceBuckets, normalizedSource);
+      incrementBucket(dayBucket.surfaceBuckets, normalizedSurface);
+      incrementBucket(dayBucket.surfacePathBuckets, surfacePathKey);
       if (visitorKey) {
         state.visitorKeys.add(visitorKey);
         dayBucket.visitorKeys.add(visitorKey);
+        addToSetBucket(state.visitorKeysBySurface, normalizedSurface, visitorKey, 10);
+        addToSetBucket(state.visitorKeysBySurfacePath, surfacePathKey, visitorKey, 100);
+        addToSetBucket(dayBucket.visitorKeysBySurface, normalizedSurface, visitorKey, 10);
+        addToSetBucket(dayBucket.visitorKeysBySurfacePath, surfacePathKey, visitorKey, 100);
       }
       persist();
     },
@@ -1042,6 +1079,19 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
             visitorKeys: state.visitorKeys,
           }),
           recentDays,
+          surfaceMeasurementStartedAt: state.pageSurfaceStartedAt,
+          bySurface: buildPageSurfaceSnapshot({
+            surfaceBuckets: state.pageSurfaceBuckets,
+            surfacePathBuckets: state.pageSurfacePathBuckets,
+            visitorKeysBySurface: state.visitorKeysBySurface,
+            visitorKeysBySurfacePath: state.visitorKeysBySurfacePath,
+          }),
+          todayBySurface: buildPageSurfaceSnapshot({
+            surfaceBuckets: getDayBucket(todayKey).surfaceBuckets,
+            surfacePathBuckets: getDayBucket(todayKey).surfacePathBuckets,
+            visitorKeysBySurface: getDayBucket(todayKey).visitorKeysBySurface,
+            visitorKeysBySurfacePath: getDayBucket(todayKey).visitorKeysBySurfacePath,
+          }),
         },
         trafficSources: {
           pageLoads: { ...state.sourceBuckets },
@@ -1812,6 +1862,33 @@ function countSetBuckets(buckets = {}) {
   );
 }
 
+function buildPageSurfaceSnapshot({
+  surfaceBuckets = {},
+  surfacePathBuckets = {},
+  visitorKeysBySurface = {},
+  visitorKeysBySurfacePath = {},
+} = {}) {
+  return Object.fromEntries(Object.entries(surfaceBuckets).map(([surface, pageLoads]) => {
+    const pathPrefix = `${surface}:`;
+    const paths = Object.fromEntries(Object.entries(surfacePathBuckets)
+      .filter(([key]) => key.startsWith(pathPrefix))
+      .map(([key, pathPageLoads]) => {
+        const path = key.slice(pathPrefix.length);
+        const visitors = visitorKeysBySurfacePath[key];
+        return [path, {
+          pageLoads: Number(pathPageLoads || 0),
+          uniqueVisitors: visitors instanceof Set ? visitors.size : 0,
+        }];
+      }));
+    const visitors = visitorKeysBySurface[surface];
+    return [surface, {
+      pageLoads: Number(pageLoads || 0),
+      uniqueVisitors: visitors instanceof Set ? visitors.size : 0,
+      paths,
+    }];
+  }));
+}
+
 function sanitizeTelemetryText(value, maxLength = 240) {
   if (typeof value !== "string") {
     return null;
@@ -1945,6 +2022,49 @@ function sanitizeFunnelEvent(value) {
 export function normalizeTrafficSource(source) {
   const value = String(source || "unknown").trim().toLowerCase();
   return /^[a-z0-9_:-]{1,40}$/.test(value) ? value : "unknown";
+}
+
+const PAGE_SURFACES = new Set(["acquisition_site", "scanner_app", "unknown"]);
+const PAGE_PATHS = new Set([
+  "home", "link_checker", "csp_builder", "csp_guide", "downloads",
+  "mobile_bridge", "report", "other",
+]);
+
+export function normalizePageSurface(surface) {
+  const value = String(surface || "unknown").trim().toLowerCase();
+  return PAGE_SURFACES.has(value) ? value : "unknown";
+}
+
+export function normalizePagePath(path) {
+  const value = String(path || "other").trim().toLowerCase();
+  return PAGE_PATHS.has(value) ? value : "other";
+}
+
+export function classifyPageView(currentUrl = "") {
+  try {
+    const url = new URL(currentUrl);
+    const hostname = url.hostname.toLowerCase();
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    if (hostname === "app.securl.online") {
+      return {
+        surface: "scanner_app",
+        path: pathname.startsWith("/report") || pathname.startsWith("/scan") ? "report" : "home",
+      };
+    }
+    if (hostname === "securl.online" || hostname === "www.securl.online") {
+      let path = "other";
+      if (pathname === "/") path = "home";
+      else if (pathname === "/check-link") path = "link_checker";
+      else if (pathname === "/tools/csp-builder") path = "csp_builder";
+      else if (pathname.includes("csp")) path = "csp_guide";
+      else if (pathname === "/downloads") path = "downloads";
+      else if (pathname === "/m" || pathname.startsWith("/m/")) path = "mobile_bridge";
+      return { surface: "acquisition_site", path };
+    }
+  } catch {
+    // Invalid or absent URLs are retained only in fixed unknown buckets.
+  }
+  return { surface: "unknown", path: "other" };
 }
 
 export function normalizeScanChannel(channel) {

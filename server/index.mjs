@@ -70,7 +70,7 @@ import { handleLinkInspectionRequest } from "./linkInspectionHandlers.mjs";
 import { createScanScheduler } from "./scanScheduler.mjs";
 import { createStaticHandler } from "./staticServer.mjs";
 import { enforceStartupConfiguration, initializeScanRepository } from "./startupValidation.mjs";
-import { classifyTrafficSource, classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
+import { classifyPageView, classifyTrafficSource, classifyScanFailure, createTelemetryTracker } from "./telemetry.mjs";
 import { hashClientIp, redactRequesterScope, targetOriginForPrivacy } from "./privacy.mjs";
 import {
   analyzeUrl,
@@ -598,12 +598,15 @@ const server = http.createServer(async (request, response) => {
     }
 
     const body = await readJsonBody(request, { maxBytes: 2 * 1024 }).catch(() => ({}));
+    const currentUrl = typeof body.currentUrl === "string" ? body.currentUrl : "";
+    const pageView = classifyPageView(currentUrl);
     telemetry.recordPageLoad({
       visitorKey: buildVisitorKey(request),
       source: classifyTrafficSource({
         referrer: typeof body.referrer === "string" ? body.referrer : String(request.headers.referer || ""),
-        currentUrl: typeof body.currentUrl === "string" ? body.currentUrl : "",
+        currentUrl,
       }),
+      ...pageView,
     });
     sendApiJson(response, 202, { ok: true });
     return;

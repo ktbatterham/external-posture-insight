@@ -3,7 +3,62 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { classifyScanFailure, classifyTrafficSource, createTelemetryTracker } from "../telemetry.mjs";
+import { classifyPageView, classifyScanFailure, classifyTrafficSource, createTelemetryTracker } from "../telemetry.mjs";
+
+test("page telemetry separates fixed privacy-safe web surfaces and paths", () => {
+  const telemetry = createTelemetryTracker();
+  telemetry.recordPageLoad({
+    visitorKey: "visitor-one",
+    now: new Date("2026-08-16T08:00:00Z"),
+    source: "direct",
+    ...classifyPageView("https://securl.online/check-link?target=secret"),
+  });
+  telemetry.recordPageLoad({
+    visitorKey: "visitor-one",
+    now: new Date("2026-08-16T08:05:00Z"),
+    source: "internal",
+    ...classifyPageView("https://app.securl.online/?url=https%3A%2F%2Fprivate.example"),
+  });
+  telemetry.recordPageLoad({
+    visitorKey: "visitor-two",
+    now: new Date("2026-08-16T08:10:00Z"),
+    source: "direct",
+    ...classifyPageView("https://securl.online/tools/csp-builder"),
+  });
+
+  const snapshot = telemetry.snapshot();
+  assert.deepEqual(snapshot.visitors.bySurface.acquisition_site, {
+    pageLoads: 2,
+    uniqueVisitors: 2,
+    paths: {
+      link_checker: { pageLoads: 1, uniqueVisitors: 1 },
+      csp_builder: { pageLoads: 1, uniqueVisitors: 1 },
+    },
+  });
+  assert.deepEqual(snapshot.visitors.bySurface.scanner_app, {
+    pageLoads: 1,
+    uniqueVisitors: 1,
+    paths: { home: { pageLoads: 1, uniqueVisitors: 1 } },
+  });
+  assert.deepEqual(snapshot.visitors.todayBySurface, {});
+  assert.equal(typeof snapshot.visitors.surfaceMeasurementStartedAt, "string");
+  assert.equal(JSON.stringify(snapshot).includes("private.example"), false);
+});
+
+test("page view classifier retains only allowlisted surface and path labels", () => {
+  assert.deepEqual(classifyPageView("https://securl.online/downloads/file.apk?token=secret"), {
+    surface: "acquisition_site",
+    path: "other",
+  });
+  assert.deepEqual(classifyPageView("https://app.securl.online/report/abc?token=secret"), {
+    surface: "scanner_app",
+    path: "report",
+  });
+  assert.deepEqual(classifyPageView("https://evil.example/check-link"), {
+    surface: "unknown",
+    path: "other",
+  });
+});
 
 test("telemetry tracker records aggregate counts", () => {
   const telemetry = createTelemetryTracker();
