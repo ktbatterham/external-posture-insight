@@ -26,17 +26,32 @@ The roadmap is based on the signals now visible across the product system:
 - The web landing page is now instrumented as a routing funnel, but mobile and npm currently show the clearest engagement signals.
 - The deprecated scoped package still receives residual downloads, which suggests historical discovery and automation paths are still alive.
 
-## Current Operating Focus - July 2026
+## Current Operating Focus - August 2026
 
-After a fast sequence of mobile releases and backend contract work, the next short window deliberately lets the mobile suite settle while the engine and public-facing surfaces get ahead again.
+The engine, hosted API and monitoring foundations are healthy, while acquisition remains
+the evidenced constraint. The mobile suite has consolidated into SecURL and broadened from
+developer-only posture scanning to checking an unfamiliar link or QR before opening it.
+SecURL 1.5's Share Extension is the active distribution experiment because it puts link
+inspection at the moment of doubt instead of asking people to remember a passive website.
 
-For the next few days, priority order is:
+Current priority order is:
 
-1. **Engine/package/API first**: improve the npm-consumable engine, hosted API contracts, policy/manifest examples, release evidence, and architecture/safety documentation.
-2. **Public websites second**: make `securl.online` and `app.securl.online` explain the product system clearly, link to downloads and docs, and route interested users toward the web app, npm package, and self-hosted/mobile surfaces.
-3. **Mobile later**: keep mobile contracts stable and additive, but avoid new mobile feature pressure until the current app wave has had time to settle in production.
+1. **Measure the Share Extension loop**: count privacy-safe link-inspection starts and
+   terminal outcomes by client version, channel and a bounded entry-point label. Do not
+   store inspected URLs or QR payloads in product telemetry.
+2. **Release-linked acquisition**: once Mobile records a validated release, align App
+   Store, Android/downloads and one attributed product story around inspecting shared links.
+3. **Observe before adding capability**: use exposure, completed inspections, monitoring
+   registrations and repeat activity to decide whether the proposition pulls.
+4. **Finish consolidation safely**: build the consent-based ownership migration contract
+   only after the unified app is live and stable, then observe real migrations before any
+   legacy app is removed from sale.
+5. **Keep engine integrity strong**: maintain package provenance, passive boundaries,
+   contract compatibility, deploy health and honest telemetry while acquisition runs.
 
-This does not reduce the importance of the mobile suite. It preserves the principle that the engine is the source of truth, with web and mobile acting as increasingly polished views over the same passive posture intelligence.
+New detection-pack breadth, contributor machinery, team/commercial layers and additional
+monitoring features remain demand-gated. They should not displace acquisition measurement
+or be used to answer weak distribution with more product surface area.
 
 ### Versioning note
 

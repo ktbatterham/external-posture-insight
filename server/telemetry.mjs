@@ -51,6 +51,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     funnelEvents: {},
     funnelEventsBySource: {},
     funnelEventsByMode: {},
+    funnelEventsByEntryPoint: {},
     funnelEventsByClient: {},
     funnelEventsByClientVersion: {},
     clientAttributionBuckets: {},
@@ -133,6 +134,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
           events: { ...(bucket.events || {}) },
           sources: { ...(bucket.sources || {}) },
           modes: { ...(bucket.modes || {}) },
+          entryPoints: { ...(bucket.entryPoints || {}) },
           clients: { ...(bucket.clients || {}) },
           clientVersions: { ...(bucket.clientVersions || {}) },
           registrationOutcomesByMode: serializeNestedBuckets(bucket.registrationOutcomesByMode || {}),
@@ -220,6 +222,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     state.funnelEvents = { ...(value.funnelEvents || {}) };
     state.funnelEventsBySource = { ...(value.funnelEventsBySource || {}) };
     state.funnelEventsByMode = { ...(value.funnelEventsByMode || {}) };
+    state.funnelEventsByEntryPoint = { ...(value.funnelEventsByEntryPoint || {}) };
     state.funnelEventsByClient = { ...(value.funnelEventsByClient || {}) };
     state.funnelEventsByClientVersion = { ...(value.funnelEventsByClientVersion || {}) };
     state.clientAttributionBuckets = hydrateAttributionBuckets(value.clientAttributionBuckets);
@@ -238,6 +241,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
           events: { ...(bucket?.events || {}) },
           sources: { ...(bucket?.sources || {}) },
           modes: { ...(bucket?.modes || {}) },
+          entryPoints: { ...(bucket?.entryPoints || {}) },
           clients: { ...(bucket?.clients || {}) },
           clientVersions: { ...(bucket?.clientVersions || {}) },
           registrationOutcomesByMode: hydrateNestedBuckets(bucket?.registrationOutcomesByMode),
@@ -387,6 +391,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         events: {},
         sources: {},
         modes: {},
+        entryPoints: {},
         clients: {},
         clientVersions: {},
         registrationOutcomesByMode: {},
@@ -401,6 +406,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
     state.funnelDays[dateKey].events ||= {};
     state.funnelDays[dateKey].sources ||= {};
     state.funnelDays[dateKey].modes ||= {};
+    state.funnelDays[dateKey].entryPoints ||= {};
     state.funnelDays[dateKey].clients ||= {};
     state.funnelDays[dateKey].clientVersions ||= {};
     state.funnelDays[dateKey].registrationOutcomesByMode ||= {};
@@ -610,6 +616,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
       clientAttribution = "unverified",
       clientProvenance = "self-reported",
       clientKey = null,
+      entryPoint = null,
       targetKind = null,
       outcome = null,
       now = new Date(),
@@ -625,6 +632,7 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         client,
         clientVersion,
         clientChannel,
+        entryPoint,
         targetKind,
         outcome,
         clientAttribution,
@@ -639,6 +647,12 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         state.funnelEventsBySource[sanitized.source] = {};
       }
       incrementBucket(state.funnelEventsBySource[sanitized.source], sanitized.event);
+      if (sanitized.entryPoint) {
+        if (!state.funnelEventsByEntryPoint[sanitized.entryPoint]) {
+          state.funnelEventsByEntryPoint[sanitized.entryPoint] = {};
+        }
+        incrementBucket(state.funnelEventsByEntryPoint[sanitized.entryPoint], sanitized.event);
+      }
       if (sanitized.mode) {
         if (!state.funnelEventsByMode[sanitized.mode]) {
           state.funnelEventsByMode[sanitized.mode] = {};
@@ -720,6 +734,12 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         dayBucket.sources[sanitized.source] = {};
       }
       incrementBucket(dayBucket.sources[sanitized.source], sanitized.event);
+      if (sanitized.entryPoint) {
+        if (!dayBucket.entryPoints[sanitized.entryPoint]) {
+          dayBucket.entryPoints[sanitized.entryPoint] = {};
+        }
+        incrementBucket(dayBucket.entryPoints[sanitized.entryPoint], sanitized.event);
+      }
       if (sanitized.mode) {
         if (!dayBucket.modes[sanitized.mode]) {
           dayBucket.modes[sanitized.mode] = {};
@@ -1047,6 +1067,9 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         liveCertificateFailures: state.funnelEvents.live_certificate_failed || 0,
         certWatchlistSummaryReads: state.funnelEvents.cert_watchlist_summary_read || 0,
         shareCardReads: state.funnelEvents.share_card_read || 0,
+        linkInspectionCompletions: state.funnelEvents.link_inspection_completed || 0,
+        linkInspectionBlocks: state.funnelEvents.link_inspection_blocked || 0,
+        linkInspectionFailures: state.funnelEvents.link_inspection_failed || 0,
       };
       const todayClientConsumptionEvents = {
         monitoringTargetRegistrations: todayFunnelEvents.monitoring_target_registered || 0,
@@ -1061,6 +1084,9 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
         liveCertificateFailures: todayFunnelEvents.live_certificate_failed || 0,
         certWatchlistSummaryReads: todayFunnelEvents.cert_watchlist_summary_read || 0,
         shareCardReads: todayFunnelEvents.share_card_read || 0,
+        linkInspectionCompletions: todayFunnelEvents.link_inspection_completed || 0,
+        linkInspectionBlocks: todayFunnelEvents.link_inspection_blocked || 0,
+        linkInspectionFailures: todayFunnelEvents.link_inspection_failed || 0,
       };
       const clientConsumptionTotal = Object.values(clientConsumptionEvents)
         .reduce((total, count) => total + count, 0);
@@ -1111,6 +1137,12 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
               { ...events },
             ]),
           ),
+          byEntryPoint: Object.fromEntries(
+            Object.entries(state.funnelEventsByEntryPoint).map(([entryPoint, events]) => [
+              entryPoint,
+              { ...events },
+            ]),
+          ),
           byClient: Object.fromEntries(
             Object.entries(state.funnelEventsByClient).map(([client, events]) => [
               client,
@@ -1140,6 +1172,12 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
           todayByMode: Object.fromEntries(
             Object.entries(todayFunnelBucket.modes || {}).map(([mode, events]) => [
               mode,
+              { ...events },
+            ]),
+          ),
+          todayByEntryPoint: Object.fromEntries(
+            Object.entries(todayFunnelBucket.entryPoints || {}).map(([entryPoint, events]) => [
+              entryPoint,
               { ...events },
             ]),
           ),
@@ -1177,6 +1215,12 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
               modes: Object.fromEntries(
                 Object.entries(bucket.modes || {}).map(([mode, events]) => [
                   mode,
+                  { ...events },
+                ]),
+              ),
+              entryPoints: Object.fromEntries(
+                Object.entries(bucket.entryPoints || {}).map(([entryPoint, events]) => [
+                  entryPoint,
                   { ...events },
                 ]),
               ),
@@ -1266,6 +1310,9 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
                   || events.live_certificate_failed
                   || events.cert_watchlist_summary_read
                   || events.share_card_read
+                  || events.link_inspection_completed
+                  || events.link_inspection_blocked
+                  || events.link_inspection_failed
                 ))
                 .map(([mode, events]) => [
                   mode,
@@ -1282,6 +1329,9 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
                     liveCertificateFailures: events.live_certificate_failed || 0,
                     certWatchlistSummaryReads: events.cert_watchlist_summary_read || 0,
                     shareCardReads: events.share_card_read || 0,
+                    linkInspectionCompletions: events.link_inspection_completed || 0,
+                    linkInspectionBlocks: events.link_inspection_blocked || 0,
+                    linkInspectionFailures: events.link_inspection_failed || 0,
                   },
                 ]),
             ),
@@ -1297,6 +1347,9 @@ export function createTelemetryTracker({ storagePath = "" } = {}) {
                 || clientConsumptionEvents.liveCertificateFailures > 0
                 || clientConsumptionEvents.certWatchlistSummaryReads > 0,
               shareCards: clientConsumptionEvents.shareCardReads > 0,
+              linkInspection: clientConsumptionEvents.linkInspectionCompletions > 0
+                || clientConsumptionEvents.linkInspectionBlocks > 0
+                || clientConsumptionEvents.linkInspectionFailures > 0,
             },
           },
         },
@@ -1958,6 +2011,12 @@ function sanitizeOutcome(value) {
   return value === "created" || value === "updated" ? value : null;
 }
 
+function sanitizeLinkInspectionEntryPoint(value) {
+  return ["share_extension", "qr", "paste", "manual", "unknown"].includes(value)
+    ? value
+    : "unknown";
+}
+
 const FUNNEL_EVENT_NAMES = new Set([
   "scan_started",
   "handoff_started",
@@ -1980,6 +2039,10 @@ const FUNNEL_EVENT_NAMES = new Set([
   "live_certificate_read",
   "live_certificate_failed",
   "cert_watchlist_summary_read",
+  "link_inspection_started",
+  "link_inspection_completed",
+  "link_inspection_blocked",
+  "link_inspection_failed",
   "playground_action",
 ]);
 
@@ -2009,6 +2072,9 @@ function sanitizeFunnelEvent(value) {
     scanId: sanitizeTelemetryText(value.scanId, 80),
     format: sanitizeTelemetryText(value.format, 40),
     mode: sanitizeTelemetryText(value.mode, 40),
+    entryPoint: event.startsWith("link_inspection_")
+      ? sanitizeLinkInspectionEntryPoint(value.entryPoint)
+      : null,
     client,
     clientVersion: client ? normalizeClientVersion(value.clientVersion) : null,
     clientChannel: attribution.category === "automation" ? "automation" : normalizedChannel,

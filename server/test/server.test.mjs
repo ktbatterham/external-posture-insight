@@ -50,8 +50,16 @@ const postScan = (baseUrl, url, options = {}) =>
 const postLinkCheck = (baseUrl, url, options = {}) =>
   fetch(`${baseUrl}/api/link-checks`, {
     method: "POST",
-    headers: scanOwnerJsonHeaders(options.owner),
-    body: JSON.stringify({ url, mode: "deep-passive" }),
+    headers: {
+      ...scanOwnerJsonHeaders(options.owner),
+      ...(options.headers || {}),
+    },
+    body: JSON.stringify({
+      url,
+      mode: "deep-passive",
+      ...(options.entryPoint ? { entryPoint: options.entryPoint } : {}),
+      ...(options.appId ? { appId: options.appId } : {}),
+    }),
   });
 
 const postMonitoringTarget = (baseUrl, url, options = {}) =>
@@ -1055,6 +1063,39 @@ test("link checks return link-specific URL, redirect, and destination evidence",
   }
 });
 
+test("link checks record privacy-safe client and entry-point funnel telemetry", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await postLinkCheck(server.baseUrl, "https://example.com", {
+      entryPoint: "share_extension",
+      headers: {
+        "X-SecURL-Client": "securl-ios",
+        "X-SecURL-Client-Version": "1.5.0+29",
+        "X-SecURL-Client-Channel": "testflight",
+      },
+    });
+    assert.equal(response.status, 200);
+
+    const telemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const telemetryPayload = await telemetryResponse.json();
+    assert.equal(telemetryPayload.funnel.events.link_inspection_started, 1);
+    assert.equal(telemetryPayload.funnel.events.link_inspection_completed, 1);
+    assert.equal(
+      telemetryPayload.funnel.byEntryPoint.share_extension.link_inspection_completed,
+      1,
+    );
+    assert.equal(
+      telemetryPayload.funnel.byClientVersion["securl-ios@1.5.0+29"].link_inspection_completed,
+      1,
+    );
+    assert.equal(telemetryPayload.funnel.recent[0].target, null);
+    assert.equal(telemetryPayload.funnel.recent[0].entryPoint, "share_extension");
+  } finally {
+    await server.stop();
+  }
+});
+
 test("link checks stop before requesting URLs with embedded credentials", async () => {
   const server = await startServer();
 
@@ -1066,6 +1107,11 @@ test("link checks stop before requesting URLs with embedded credentials", async 
     assert.equal(payload.inspection.destinationUrl, null);
     assert.equal(payload.inspection.verdict.level, "blocked");
     assert.ok(payload.inspection.signals.some((item) => item.id === "embedded_credentials"));
+
+    const telemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const telemetryPayload = await telemetryResponse.json();
+    assert.equal(telemetryPayload.funnel.events.link_inspection_blocked, 1);
+    assert.equal(telemetryPayload.funnel.byEntryPoint.unknown.link_inspection_blocked, 1);
   } finally {
     await server.stop();
   }
