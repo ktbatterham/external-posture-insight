@@ -12,6 +12,7 @@ export async function handleLinkInspectionRequest({
   classifyScanFailure,
   normalizeScanErrorMessage,
   telemetry,
+  readClientMetadata,
 }) {
   if (request.method !== "POST") {
     sendMethodNotAllowed(response, ["POST", "OPTIONS"]);
@@ -25,9 +26,18 @@ export async function handleLinkInspectionRequest({
   });
   if (!authState) return true;
 
+  const ownerOrScope = authState.ownerId || authState.requesterScope || null;
+  let clientMetadata = {};
+  let entryPoint = "unknown";
+
   try {
     const body = await readJsonBody(request);
     const target = typeof body.url === "string" ? body.url : "";
+    entryPoint = typeof body.entryPoint === "string" ? body.entryPoint : "unknown";
+    clientMetadata = readClientMetadata?.(request, {
+      fallbackClient: body.appId,
+      authState,
+    }) || {};
     const targetQuota = await checkTargetQuota({
       requesterScope: authState.requesterScope,
       target,
@@ -37,9 +47,39 @@ export async function handleLinkInspectionRequest({
     });
     if (!targetQuota.ok) return true;
 
+    const telemetryContext = {
+      source: "backend_api",
+      mode: clientMetadata.appId,
+      entryPoint,
+      client: clientMetadata.client,
+      clientVersion: clientMetadata.version,
+      clientChannel: clientMetadata.channel,
+      clientAttribution: clientMetadata.category,
+      clientProvenance: clientMetadata.provenance,
+      clientKey: ownerOrScope,
+    };
+    telemetry.recordFunnelEvent({ event: "link_inspection_started", ...telemetryContext });
     const inspection = await inspectLink(target);
+    telemetry.recordFunnelEvent({
+      event: inspection.verdict?.level === "blocked"
+        ? "link_inspection_blocked"
+        : "link_inspection_completed",
+      ...telemetryContext,
+    });
     sendJson(response, 200, { apiVersion: "2026-08-14", inspection });
   } catch (error) {
+    telemetry.recordFunnelEvent({
+      event: "link_inspection_failed",
+      source: "backend_api",
+      mode: clientMetadata.appId,
+      entryPoint,
+      client: clientMetadata.client,
+      clientVersion: clientMetadata.version,
+      clientChannel: clientMetadata.channel,
+      clientAttribution: clientMetadata.category,
+      clientProvenance: clientMetadata.provenance,
+      clientKey: ownerOrScope,
+    });
     telemetry.recordFailure(classifyScanFailure(error));
     sendJson(response, 400, { error: normalizeScanErrorMessage(error) });
   }

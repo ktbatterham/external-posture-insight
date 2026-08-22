@@ -720,6 +720,7 @@ const server = http.createServer(async (request, response) => {
       classifyScanFailure,
       normalizeScanErrorMessage,
       telemetry,
+      readClientMetadata,
     });
     return;
   }

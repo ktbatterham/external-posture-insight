@@ -150,6 +150,13 @@ const main = async () => {
       console.log(`    - ${source}: ${count}`);
     }
   }
+  const linkEntryPoints = sortedEventBuckets(telemetry.funnel?.byEntryPoint);
+  if (linkEntryPoints.length) {
+    console.log("  Link inspections by entry point:");
+    for (const [entryPoint, events] of linkEntryPoints) {
+      console.log(`    - ${entryPoint}: ${describeEventCounts(events)}`);
+    }
+  }
   const growthLoop = telemetry.growthLoop || {};
   console.log("");
   console.log("Growth loop");
@@ -255,6 +262,9 @@ const main = async () => {
   console.log(`  Live certificate failures: ${clientConsumption.liveCertificateFailures ?? 0}`);
   console.log(`  Cert watchlist summary reads: ${clientConsumption.certWatchlistSummaryReads ?? 0}`);
   console.log(`  Share-card reads: ${clientConsumption.shareCardReads ?? 0}`);
+  console.log(`  Link inspections completed: ${clientConsumption.linkInspectionCompletions ?? 0}`);
+  console.log(`  Link inspections blocked: ${clientConsumption.linkInspectionBlocks ?? 0}`);
+  console.log(`  Link inspections failed: ${clientConsumption.linkInspectionFailures ?? 0}`);
   const todayConsumption = clientConsumption.today || {};
   const todayConsumptionRows = Object.entries(todayConsumption)
     .filter(([, count]) => Number(count || 0) > 0)

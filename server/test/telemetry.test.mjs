@@ -285,6 +285,7 @@ test("telemetry tracker records aggregate counts", () => {
     notificationHealth: true,
     certWatch: true,
     shareCards: true,
+    linkInspection: false,
   });
 });
 
@@ -702,6 +703,7 @@ test("telemetry tracker can persist counters to disk", () => {
       notificationHealth: false,
       certWatch: false,
       shareCards: false,
+      linkInspection: false,
     });
     assert.equal(snapshot.failures.classes.requester_rate_limited, 1);
     assert.equal(snapshot.failures.recent.length, 1);

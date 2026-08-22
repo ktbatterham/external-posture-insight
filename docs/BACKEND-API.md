@@ -60,7 +60,9 @@ Mobile clients should set these headers alongside `X-Scan-Owner` on every reques
 Successful `POST /api/scans` responses include a `resources` object with relative paths for follow-up reads such as `events`, `digest`, `summary`, `evidence`, `comparison`, and `drift`. Clients can use these links instead of constructing endpoint paths themselves.
 
 `POST /api/link-checks` accepts `{ "url": "https://example.com/path?next=..." }` and the
-same owner authentication used by scan resources. It returns
+same owner authentication used by scan resources. Clients may also send the optional,
+bounded `entryPoint` value `share_extension`, `qr`, `paste`, or `manual`; omitted or invalid
+values are aggregated as `unknown`. Existing clients remain compatible. It returns
 `securl.link-inspection.v1`: the normalized exact URL, lexical attention signals, every
 bounded redirect hop, the final destination, response status/type/disposition, a cautious
 verdict, and explicit limitations. Every requested hop is independently DNS-validated
@@ -68,6 +70,9 @@ and connected through an IP-pinned lookup, preserving the SSRF and DNS-rebinding
 Credential-bearing URLs are described but never requested. The endpoint does not run page
 scripts, submit forms, download attachments, query a reputation provider, or claim that a
 link is safe. A full destination posture scan remains a separate, explicit user action.
+The backend records aggregate started and terminal outcome counts by authenticated client,
+version, channel and entry point. Link-inspection telemetry never stores the submitted URL,
+QR payload, redirect destination, device identifier, owner credential, IP or raw user agent.
 
 Runtime controls:
 
