@@ -18,6 +18,7 @@ const DEFAULT_ALLOWED_HEADERS = [
   "X-SecURL-Client",
   "X-SecURL-Client-Version",
   "X-SecURL-Client-Channel",
+  "X-SecURL-Client-Surface",
 ];
 
 const DEFAULT_ALLOWED_METHODS = [

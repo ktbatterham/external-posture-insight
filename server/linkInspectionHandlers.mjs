@@ -1,5 +1,13 @@
 import { inspectLink } from "../packages/core/dist/link-inspection.js";
 
+function readEntryPoint(request, body) {
+  if (typeof body.entryPoint === "string") {
+    return body.entryPoint;
+  }
+  const surface = String(request.headers["x-securl-client-surface"] || "").trim().toLowerCase();
+  return surface === "share-extension" ? "share_extension" : surface || "unknown";
+}
+
 export async function handleLinkInspectionRequest({
   request,
   response,
@@ -33,7 +41,7 @@ export async function handleLinkInspectionRequest({
   try {
     const body = await readJsonBody(request);
     const target = typeof body.url === "string" ? body.url : "";
-    entryPoint = typeof body.entryPoint === "string" ? body.entryPoint : "unknown";
+    entryPoint = readEntryPoint(request, body);
     clientMetadata = readClientMetadata?.(request, {
       fallbackClient: body.appId,
       authState,

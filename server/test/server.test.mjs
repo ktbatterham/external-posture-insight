@@ -1031,6 +1031,7 @@ test("api preflight allows the Hostinger frontend origins", async () => {
       assert.match(response.headers.get("access-control-allow-headers") || "", /X-SecURL-Client/i);
       assert.match(response.headers.get("access-control-allow-headers") || "", /X-SecURL-Client-Version/i);
       assert.match(response.headers.get("access-control-allow-headers") || "", /X-SecURL-Client-Channel/i);
+      assert.match(response.headers.get("access-control-allow-headers") || "", /X-SecURL-Client-Surface/i);
       assert.match(response.headers.get("access-control-allow-headers") || "", /Authorization/i);
     }
   } finally {
@@ -1068,11 +1069,11 @@ test("link checks record privacy-safe client and entry-point funnel telemetry", 
 
   try {
     const response = await postLinkCheck(server.baseUrl, "https://example.com", {
-      entryPoint: "share_extension",
       headers: {
         "X-SecURL-Client": "securl-ios",
         "X-SecURL-Client-Version": "1.5.0+29",
         "X-SecURL-Client-Channel": "testflight",
+        "X-SecURL-Client-Surface": "share-extension",
       },
     });
     assert.equal(response.status, 200);

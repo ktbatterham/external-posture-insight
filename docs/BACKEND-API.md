@@ -73,6 +73,9 @@ link is safe. A full destination posture scan remains a separate, explicit user 
 The backend records aggregate started and terminal outcome counts by authenticated client,
 version, channel and entry point. Link-inspection telemetry never stores the submitted URL,
 QR payload, redirect destination, device identifier, owner credential, IP or raw user agent.
+For compatibility with SecURL 1.5 build 30, the native Share Extension's bounded
+`X-SecURL-Client-Surface: share-extension` header is accepted as an alias for
+`entryPoint: "share_extension"`. A body `entryPoint` remains authoritative when present.
 
 Runtime controls:
 
