@@ -47,8 +47,8 @@ jobs:
       - name: Install pinned Railway CLI
         if: steps.token.outputs.available == 'true'
         env:
-          RAILWAY_CLI_VERSION: "5.30.1"
-          RAILWAY_CLI_SHA256: "c6169e27e87d95d73fb7a30ec2c6b6c767c042f8a3ba9aa98c92deccda8db10c"
+          RAILWAY_CLI_VERSION: "5.43.1"
+          RAILWAY_CLI_SHA256: "88fb44b35b74ded67d383fe6f8b69161d8cc4ca5e3f9b8c6c338293f65f52ee9"
         run: |
           set -euo pipefail
 
