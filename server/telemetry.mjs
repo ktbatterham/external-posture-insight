@@ -2012,7 +2012,7 @@ function sanitizeOutcome(value) {
 }
 
 function sanitizeLinkInspectionEntryPoint(value) {
-  return ["share_extension", "qr", "paste", "manual", "unknown"].includes(value)
+  return ["share_extension", "browser_extension", "qr", "paste", "manual", "unknown"].includes(value)
     ? value
     : "unknown";
 }

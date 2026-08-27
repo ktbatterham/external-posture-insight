@@ -1097,6 +1097,32 @@ test("link checks record privacy-safe client and entry-point funnel telemetry", 
   }
 });
 
+test("link checks preserve the bounded browser-extension entry point", async () => {
+  const server = await startServer();
+
+  try {
+    const response = await postLinkCheck(server.baseUrl, "https://example.com", {
+      entryPoint: "browser_extension",
+      headers: {
+        "X-SecURL-Client": "securl-link-checker",
+        "X-SecURL-Client-Version": "2.0.0",
+      },
+    });
+    assert.equal(response.status, 200);
+
+    const telemetryResponse = await fetch(`${server.baseUrl}/api/telemetry`);
+    const telemetryPayload = await telemetryResponse.json();
+    assert.equal(
+      telemetryPayload.funnel.byEntryPoint.browser_extension.link_inspection_completed,
+      1,
+    );
+    assert.equal(telemetryPayload.funnel.recent[0].entryPoint, "browser_extension");
+    assert.equal(telemetryPayload.funnel.recent[0].target, null);
+  } finally {
+    await server.stop();
+  }
+});
+
 test("link checks stop before requesting URLs with embedded credentials", async () => {
   const server = await startServer();
 
