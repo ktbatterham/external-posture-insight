@@ -61,8 +61,9 @@ Successful `POST /api/scans` responses include a `resources` object with relativ
 
 `POST /api/link-checks` accepts `{ "url": "https://example.com/path?next=..." }` and the
 same owner authentication used by scan resources. Clients may also send the optional,
-bounded `entryPoint` value `share_extension`, `qr`, `paste`, or `manual`; omitted or invalid
-values are aggregated as `unknown`. Existing clients remain compatible. It returns
+bounded `entryPoint` value `share_extension`, `browser_extension`, `qr`, `paste`, or
+`manual`; omitted or invalid values are aggregated as `unknown`. Existing clients remain
+compatible. It returns
 `securl.link-inspection.v1`: the normalized exact URL, lexical attention signals, every
 bounded redirect hop, the final destination, response status/type/disposition, a cautious
 verdict, and explicit limitations. Every requested hop is independently DNS-validated
