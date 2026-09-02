@@ -15,33 +15,40 @@ moved, who needs to care, and can I trust the evidence?"
 
 The roadmap is based on the signals now visible across the product system:
 
-- The `securl` npm package is getting meaningful weekly downloads, with provenance enabled and no install scripts.
+- The `securl` npm package retains provenance and no install scripts, but current demand is weak:
+  20 downloads in the latest trailing week and no public GitHub dependency or reusable-workflow
+  evidence. Package-download counts alone must not be treated as developer adoption.
 - The iOS apps have real backend activity, especially Cert Watch live certificate reads,
   SecURL monitoring-target creation, and share-card reads.
-- App Store Connect now shows early organic acquisition across all three iOS apps:
-  21 app units in the Jun 15-Jul 14 window, led by SecURL and Header Watch.
+- App Store Connect's 30-day view through 24 August recorded 33 first-time SecURL downloads,
+  124 product-page views and a 4.6% daily-average conversion rate. This is early organic
+  discovery, not evidence of repeat use, and includes the 1.5 release window.
 - APNs delivery has been reliable enough for continued use, but production telemetry now
   includes a small number of failed and disabled-token outcomes; push reliability should
   stay visible in every release/ritual rather than being treated as "done."
-- The web landing page is now instrumented as a routing funnel, but mobile and npm currently show the clearest engagement signals.
+- The acquisition and scanner web apps are measured separately. The 27 August Hacker News treatment
+  proved that useful community exposure can produce a short traffic spike, but traffic immediately
+  returned to a very low baseline and did not establish a durable acquisition loop.
 - The deprecated scoped package still receives residual downloads, which suggests historical discovery and automation paths are still alive.
 
-## Current Operating Focus - August 2026
+## Current Operating Focus - September 2026
 
 The engine, hosted API and monitoring foundations are healthy, while acquisition remains
 the evidenced constraint. The mobile suite has consolidated into SecURL and broadened from
 developer-only posture scanning to checking an unfamiliar link or QR before opening it.
-SecURL 1.5's Share Extension is the active distribution experiment because it puts link
-inspection at the moment of doubt instead of asking people to remember a passive website.
+The next active distribution experiment is the permission-minimal browser extension, which
+puts the public Link Checker into an existing right-click decision without requiring an app
+install or automatic scan. Its local flow is proven; public distribution and measurable
+`browser_extension` completions are not.
 
 Current priority order is:
 
-1. **Measure the Share Extension loop**: count privacy-safe link-inspection starts and
-   terminal outcomes by client version, channel and a bounded entry-point label. Do not
-   store inspected URLs or QR payloads in product telemetry.
-2. **Release-linked acquisition**: once Mobile records a validated release, align App
-   Store, Android/downloads and one attributed product story around inspecting shared links.
-3. **Observe before adding capability**: use exposure, completed inspections, monitoring
+1. **Finish one browser-extension experiment**: complete Chrome Web Store distribution, then
+   measure extension-origin presets, submitted inspections and completed inspections. Do not
+   infer adoption from repository stars, listing impressions or package downloads.
+2. **Keep attribution honest**: count privacy-safe link-inspection starts and terminal outcomes
+   by bounded entry point without storing inspected URLs or QR payloads in product telemetry.
+3. **Observe before adding capability**: use useful exposure, completed inspections, monitoring
    registrations and repeat activity to decide whether the proposition pulls.
 4. **Finish consolidation safely**: build the consent-based ownership migration contract
    only after the unified app is live and stable, then observe real migrations before any
